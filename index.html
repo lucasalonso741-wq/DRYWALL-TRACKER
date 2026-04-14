@@ -1159,12 +1159,18 @@ async function fetchBillData() {
 function categorize(desc) {
   if (!desc) return 'other';
   const d = String(desc).toUpperCase();
-  if (/DRYWALL|GYPSUM|1\/2|5\/8|DENSHIELD|SHAFT LINER|DUROCK|FIRECODE|ULTRALIGHT|MR BOARD|TYPE X|GREENBOARD/.test(d)) return 'boards';
-  if (/STUD|TRACK|RUNNER|FURRING|METAL|ANGLE/.test(d)) return 'metal';
-  if (/COMPOUND|TAPE|BEAD|CORNER|MUD|SETTING|FIBERGLASS|JOINT|TOPPING/.test(d)) return 'finish';
-  if (/SCREW|FASTENER|PIN|ANCHOR|NAIL|STAPLE/.test(d)) return 'fasteners';
-  if (/LABOR|INSTALL|FRAMING|HANGING|PUNCHOUT|FINISH WORK|LAYOUT|SUPERVISION/.test(d)) return 'labor';
-  if (/SAND|SANDPAPER|DISC|SPONGE|SPRAY|PAD/.test(d)) return 'supplies';
+  // BOARDS — all drywall panel types
+  if (/DRYWALL|GYPSUM|1\/2|5\/8|DENSHIELD|SHAFT.?LINER|DUROCK|FIRECODE|ULTRALIGHT|MR.?BOARD|TYPE.?X|GREENBOARD|HARDIBOARD|REGULAR.?BOARD|DW$|4X8|4X10|4X12|4X16/.test(d)) return 'boards';
+  // METAL — studs and track
+  if (/STUD|TRACK|RUNNER|FURRING|METAL|ANGLE|CHANNEL|HAT.?CHAN|RESILIENT/.test(d)) return 'metal';
+  // FINISH — all finishing materials
+  if (/COMPOUND|JOINT.?COMP|TAPE|CORNER.?BEAD|CORNERBEAD|BEAD|MUD|SETTING|FIBERGLASS|TOPPING|MESH|SPRAY|PRIMER|TEXTURE/.test(d)) return 'finish';
+  // SUPPLIES — sanding, tools, accessories
+  if (/SAND|SANDPAPER|DISC|SPONGE|PAD|STAPLE|SCREW|FASTENER|PIN|ANCHOR|NAIL|TOOL|KNIFE|BIT|BLADE/.test(d)) return 'supplies';
+  // LABOR — labor line items
+  if (/LABOR|INSTALL|FRAMING|HANGING|PUNCHOUT|PUNCH.?OUT|FINISH.?WORK|LAYOUT|SUPERVISION|SUB.?CONTRACT/.test(d)) return 'labor';
+  // TAX
+  if (/^TAX$|SALES.?TAX/.test(d)) return 'tax';
   return 'other';
 }
 
@@ -1180,7 +1186,12 @@ function isBoard(desc) { return categorize(desc) === 'boards'; }
 function isLaborVendor(vendor) {
   if (!vendor) return false;
   const v = String(vendor).toUpperCase();
-  return /AVAL|SUB LLC|LABOR|SUBCONTRACT/.test(v);
+  // Known material suppliers
+  if (/OLYMPIA|L&W|USG|GATOR|GYPSUM|BUILDING SUPPLIES|SUPPLY|LUMBER|HOME DEPOT|LOWES/.test(v)) return false;
+  // Known labor/subcontractor patterns
+  if (/AVAL|SUB LLC|LLC$|CONSTRUCTION LLC|DRYWALL LLC|SERVICES LLC|FINISH AND PAINT|MULTISERVICES|ZEPEDA|SANTA B|PETER JR|JV &|TP SERVICES/.test(v)) return true;
+  // If no quantity on bill lines, likely labor
+  return false;
 }
 
 // ── JOBS ──────────────────────────────────────────
@@ -1375,11 +1386,14 @@ function renderInbox() {
         const vendor = billRows[0]?.['VENDOR'] || billRows[0]?.['Vendor'] || '—';
         const total = billRows.reduce((s, b) => s + parseFloat(b['LINE TOTAL'] || b['Line Total'] || 0), 0);
         const isLabor = isLaborVendor(vendor);
+        const rawJob = billRows[0]?.['JOB'] || '—';
+        // QB reference numbers like A7470 — show as unassigned
+        const jobDisplay = /^A\d{4,}$/.test(rawJob) ? '⚠ Needs job assignment' : rawJob;
         return `<div class="inbox-item" onclick="openBillModal('${inv}')">
           <div class="inbox-dot bill"></div>
           <div class="inbox-info">
             <div class="inbox-title">${vendor}</div>
-            <div class="inbox-sub">Invoice #${inv} · ${billRows.length} lines</div>
+            <div class="inbox-sub">Invoice #${inv} · ${billRows.length} lines · ${jobDisplay}</div>
           </div>
           <div>
             <div class="inbox-amt">${fmt(total)}</div>
@@ -1720,52 +1734,129 @@ function renderJobMapPage() {
 function renderJobMap() {
   const job = document.getElementById('jmap-job-sel').value;
   if (!job) return;
-  const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job && r['BUILDING'] && r['FLOOR']);
-  if (rows.length === 0) {
-    document.getElementById('jobmap-container').innerHTML = `<div class="empty"><div class="empty-icon">🏗️</div><div class="empty-title">No assigned POs for this job yet</div><div class="empty-sub">Assign POs via the Inbox or PO Wizard</div></div>`;
+
+  const allJobRows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const assignedRows = allJobRows.filter(r => r['BUILDING'] && String(r['BUILDING']).trim() !== '');
+
+  const container = document.getElementById('jobmap-container');
+  if (allJobRows.length === 0) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">🏗️</div><div class="empty-title">No POs found for this job</div><div class="empty-sub">Sync your sheet to load data</div></div>`;
+    return;
+  }
+  if (assignedRows.length === 0) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">📍</div><div class="empty-title">No locations assigned yet</div><div class="empty-sub">${allJobRows.length} PO rows exist — go to Inbox to assign buildings/floors/units</div></div>`;
     return;
   }
 
   // Group by building → floor → unit
   const bldgs = {};
-  rows.forEach(r => {
-    const b = r['BUILDING'] || '—';
-    const fl = String(r['FLOOR'] || '—');
-    const u = String(r['UNIT'] || 'N/A');
+  assignedRows.forEach(r => {
+    const b = String(r['BUILDING'] || '—').trim();
+    const fl = String(r['FLOOR'] || '1').trim();
+    const u = String(r['UNIT'] || 'N/A').trim();
+    const mat = r['MATERIAL'] || r['Material'] || '';
     if (!bldgs[b]) bldgs[b] = {};
     if (!bldgs[b][fl]) bldgs[b][fl] = {};
-    if (!bldgs[b][fl][u]) bldgs[b][fl][u] = { rows: [], total: 0, boards: 0 };
-    bldgs[b][fl][u].rows.push(r);
-    bldgs[b][fl][u].total += parseFloat(r['LINE TOTAL']||r['Line Total']||0);
-    if (isBoard(r['MATERIAL']||r['Material']||'')) bldgs[b][fl][u].boards += parseFloat(r['QTY']||r['Qty']||0);
+    if (!bldgs[b][fl][u]) bldgs[b][fl][u] = { total: 0, boards: 0, metal: 0, finish: 0, supplies: 0, pos: new Set() };
+    const lineTotal = parseFloat(r['LINE TOTAL'] || 0);
+    bldgs[b][fl][u].total += lineTotal;
+    bldgs[b][fl][u].pos.add(String(r['PO NUMBER'] || ''));
+    const cat = categorize(mat);
+    if (cat === 'boards') bldgs[b][fl][u].boards += parseFloat(r['QTY'] || 0);
+    if (cat === 'metal') bldgs[b][fl][u].metal += lineTotal;
+    if (cat === 'finish') bldgs[b][fl][u].finish += lineTotal;
+    if (cat === 'supplies') bldgs[b][fl][u].supplies += lineTotal;
   });
 
-  const budget = S.budgets[job]?.dollars || 0;
-  const totalJobSpend = rows.reduce((s, r) => s + parseFloat(r['LINE TOTAL']||r['Line Total']||0), 0);
+  const budget = parseFloat(S.budgets[job]?.dollars || 0);
+  const boardBudget = parseFloat(S.budgets[job]?.qty || 0);
+  const totalSpend = assignedRows.reduce((s, r) => s + parseFloat(r['LINE TOTAL'] || 0), 0);
+  const totalBoards = assignedRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s, r) => s + parseFloat(r['QTY'] || 0), 0);
 
-  let html = `<div style="margin-bottom:16px;"><span class="badge badge-gray">${job}</span> <span style="color:var(--ink3);font-size:13px;margin-left:8px;">Total spend: <strong>${fmt(totalJobSpend)}</strong>${budget ? ' · Budget: ' + fmt(budget) : ''}</span></div>`;
+  // Summary bar
+  let html = `
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;">
+      <div class="stat-card" style="flex:1;min-width:140px;padding:14px;">
+        <div class="stat-label">Total Spend</div>
+        <div class="stat-val orange" style="font-size:22px;">${fmt(totalSpend)}</div>
+        ${budget ? `<div class="prog-wrap" style="margin-top:8px;"><div class="prog-bar ${totalSpend/budget > 0.9 ? 'red' : totalSpend/budget > 0.7 ? 'yellow' : 'green'}" style="width:${Math.min((totalSpend/budget)*100,100)}%"></div></div>` : ''}
+      </div>
+      <div class="stat-card" style="flex:1;min-width:140px;padding:14px;">
+        <div class="stat-label">Total Boards</div>
+        <div class="stat-val" style="font-size:22px;">${Math.round(totalBoards)}</div>
+        ${boardBudget ? `<div style="font-size:11px;color:var(--ink3);">Budget: ${boardBudget}</div>` : ''}
+      </div>
+      <div class="stat-card" style="flex:1;min-width:140px;padding:14px;">
+        <div class="stat-label">Buildings</div>
+        <div class="stat-val" style="font-size:22px;">${Object.keys(bldgs).length}</div>
+      </div>
+      <div class="stat-card" style="flex:1;min-width:140px;padding:14px;">
+        <div class="stat-label">Budget</div>
+        <div class="stat-val" style="font-size:22px;">${budget ? fmt(budget) : '—'}</div>
+        ${!budget ? '<div style="font-size:11px;color:var(--ink3);">Set in Budget Bank</div>' : ''}
+      </div>
+    </div>`;
 
+  // Color legend
+  html += `<div style="display:flex;gap:12px;margin-bottom:20px;font-size:12px;align-items:center;">
+    <span style="font-weight:600;color:var(--ink3);">Status:</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#10B981;margin-right:4px;"></span>Under budget</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#F59E0B;margin-right:4px;"></span>75%+ used</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#EF4444;margin-right:4px;"></span>90%+ used</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#9CA3AF;margin-right:4px;"></span>No budget set</span>
+  </div>`;
+
+  // Building → Floor → Unit grid
   Object.keys(bldgs).sort().forEach(bldg => {
-    html += `<div style="margin-bottom:28px;"><div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:14px;padding:8px 14px;background:var(--ink);color:#fff;border-radius:8px;display:inline-block;">Building ${bldg}</div>`;
-    Object.keys(bldgs[bldg]).sort((a,b)=>+a-+b).forEach(fl => {
+    const bldgTotal = Object.values(bldgs[bldg]).reduce((s, floors) =>
+      s + Object.values(floors).reduce((fs, u) => fs + u.total, 0), 0);
+    const bldgBoards = Object.values(bldgs[bldg]).reduce((s, floors) =>
+      s + Object.values(floors).reduce((fs, u) => fs + u.boards, 0), 0);
+
+    html += `<div style="margin-bottom:32px;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;padding:8px 18px;background:var(--ink);color:#fff;border-radius:10px;">Building ${bldg}</div>
+        <div style="font-size:13px;color:var(--ink3);">${fmt(bldgTotal)} · ${Math.round(bldgBoards)} boards</div>
+      </div>`;
+
+    Object.keys(bldgs[bldg]).sort((a,b) => +a - +b).forEach(fl => {
       const units = bldgs[bldg][fl];
-      html += `<div class="floor-section"><div class="floor-label">Floor ${fl}</div><div class="unit-tiles">`;
+      const flTotal = Object.values(units).reduce((s, u) => s + u.total, 0);
+      const flBoards = Object.values(units).reduce((s, u) => s + u.boards, 0);
+
+      html += `<div class="floor-section">
+        <div class="floor-label" style="display:flex;justify-content:space-between;">
+          <span>Floor ${fl}</span>
+          <span style="font-weight:400;">${fmt(flTotal)} · ${Math.round(flBoards)} boards</span>
+        </div>
+        <div class="unit-tiles">`;
+
       Object.keys(units).sort().forEach(u => {
         const d = units[u];
-        const pct = budget > 0 ? (d.total / budget) * 100 : 0;
-        const color = budget === 0 ? 'gray' : pct > 90 ? 'red' : pct > 60 ? 'yellow' : 'green';
+        // Determine color based on unit budget vs spend
+        const unitBudget = parseFloat(S.budgets[job]?.dollars || 0) / Math.max(Object.keys(units).length, 1);
+        let color = 'gray';
+        if (budget > 0) {
+          const pct = (d.total / (budget / Object.values(bldgs[bldg]).reduce((s,f) => s + Object.keys(f).length, 0))) * 100;
+          color = pct > 90 ? 'red' : pct > 75 ? 'yellow' : 'green';
+        }
+        const poCount = d.pos.size;
         html += `<div class="unit-tile ${color}" onclick="openUnitModal('${job}','${bldg}','${fl}','${u}')">
-          <div class="unit-num">${u}</div>
-          <div class="unit-boards">🟦 ${Math.round(d.boards)} boards</div>
-          <div class="unit-spend">${fmt(d.total)}</div>
+          <div class="unit-num">${u === 'N/A' ? '—' : u}</div>
+          <div class="unit-boards" style="font-size:10px;margin-top:4px;">📋 ${poCount} PO${poCount !== 1 ? 's' : ''}</div>
+          ${d.boards > 0 ? `<div class="unit-boards" style="font-size:10px;">🟦 ${Math.round(d.boards)} boards</div>` : ''}
+          <div class="unit-spend" style="font-size:12px;font-weight:700;margin-top:6px;">${fmt(d.total)}</div>
+          ${d.finish > 0 ? `<div style="font-size:9px;color:var(--ink3);">Finish: ${fmt(d.finish)}</div>` : ''}
         </div>`;
       });
+
       html += `</div></div>`;
     });
+
     html += `</div>`;
   });
 
-  document.getElementById('jobmap-container').innerHTML = html;
+  container.innerHTML = html;
 }
 
 function openUnitModal(job, bldg, floor, unit) {
@@ -2132,20 +2223,25 @@ async function sendAI() {
   const totalBoards = S.rows.filter(r => isBoard(r['MATERIAL']||r['Material']||'')).reduce((s, r) => s + parseFloat(r['QTY']||r['Qty']||0), 0);
   const uniqPOs = [...new Set(S.rows.map(r => String(r['PO NUMBER']||r['PO #']||'')).filter(Boolean))];
 
-  const context = `You are an AI assistant for AA Drywall, a drywall subcontracting company.
-Current data:
-- Jobs: ${jobs.join(', ')}
-- Total POs: ${uniqPOs.length}
-- Total Spend: $${totalSpend.toFixed(2)}
-- Total Boards (all jobs): ${Math.round(totalBoards)}
-- Total Bill rows: ${S.bills.length}
-- Budgets set: ${JSON.stringify(S.budgets)}
-- PO rows: ${S.rows.length} line items
+  // Build rich context
+  const jobBreakdown = jobs.map(j => {
+    const jRows = S.rows.filter(r => (r['JOB']||'') === j);
+    const spend = jRows.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0);
+    const boards = jRows.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0);
+    const pos = [...new Set(jRows.map(r=>String(r['PO NUMBER']||'')).filter(Boolean))];
+    const bldgs = [...new Set(jRows.map(r=>r['BUILDING']||'').filter(Boolean))];
+    return j + ': ' + pos.length + ' POs, $' + spend.toFixed(0) + ' spend, ' + Math.round(boards) + ' boards, Buildings: ' + (bldgs.join(',')||'unassigned');
+  }).join('\n');
 
-Recent PO data summary (first 20 rows):
-${S.rows.slice(0,20).map(r => `PO#${r['PO NUMBER']||''} ${r['JOB']||''} ${r['MATERIAL']||''} Qty:${r['QTY']||''} $${r['LINE TOTAL']||''} Bldg:${r['BUILDING']||''} FL:${r['FLOOR']||''} Unit:${r['UNIT']||''}`).join('\n')}
+  const vendorSummary = [...new Set(S.bills.map(b=>b['VENDOR']||''))].filter(Boolean).map(v => {
+    const isLab = isLaborVendor(v);
+    const vTotal = S.bills.filter(b=>b['VENDOR']===v).reduce((s,b)=>s+parseFloat(b['LINE TOTAL']||0),0);
+    return v + ' [' + (isLab?'SUBCONTRACTOR':'SUPPLIER') + '] $' + vTotal.toFixed(0);
+  }).join('\n');
 
-Answer questions about jobs, POs, budgets, boards, and spending. Be concise and helpful.`;
+  const context = 'You are an AI assistant for A.A. DRYWALL FINISH PAINT, LLC, a drywall subcontracting company in Florida. Answer questions concisely using the data below.\n\nJOBS:\n' + jobBreakdown + '\n\nVENDORS:\n' + vendorSummary + '\n\nTOTALS: Spend=$' + totalSpend.toFixed(0) + ' Boards=' + Math.round(totalBoards) + ' POs=' + uniqPOs.length + ' Bills=' + S.bills.length + '\n\nBUDGETS: ' + JSON.stringify(S.budgets) + '\n\nRECENT POs:\n' + S.rows.slice(0,25).map(r => 'PO#' + (r['PO NUMBER']||'') + ' ' + (r['JOB']||'') + ' ' + (r['MATERIAL']||'') + ' Qty:' + (r['QTY']||'') + ' $' + (r['LINE TOTAL']||'') + ' Bldg:' + (r['BUILDING']||'') + ' FL:' + (r['FLOOR']||'') + ' Unit:' + (r['UNIT']||'')).join('\n');
+
+  
 
   // Try Supabase Edge Function first (secure - no key in browser)
   const EDGE_URL = 'https://svvjsumhkbezbyskxxej.supabase.co/functions/v1/ai-chat';
