@@ -429,6 +429,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
     <div class="nav-item" onclick="nav('bills-tracker')" data-page="bills-tracker">
       <span class="nav-icon">📑</span> Bills Tracker
     </div>
+    <div class="nav-item" onclick="nav('actuals')" data-page="actuals">
+      <span class="nav-icon">✅</span> Actuals
+    </div>
 
     <div class="nav-section">Data</div>
     <div class="nav-item" onclick="nav('raw')" data-page="raw">
@@ -885,6 +888,32 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
     </div>
   </div>
 
+  <!-- ── ACTUALS ──────────────────────────────── -->
+  <div class="page" id="page-actuals">
+    <div class="filter-bar">
+      <select id="act-job" onchange="renderActuals()"><option value="">All Jobs</option></select>
+      <button class="btn btn-ghost btn-sm" onclick="exportActualsCSV()">↓ Export CSV</button>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="stats-row" id="act-stats" style="margin-bottom:24px;"></div>
+
+    <!-- Charts row -->
+    <div class="charts-row" style="margin-bottom:24px;">
+      <div class="chart-card">
+        <div class="chart-title">Budget vs PO vs Actual by Job</div>
+        <div class="chart-wrap"><canvas id="act-chart-main"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Actual Spend Breakdown</div>
+        <div class="chart-wrap"><canvas id="act-chart-cat"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Job breakdown accordion -->
+    <div id="act-job-breakdown"></div>
+  </div>
+
   <!-- ── RAW DATA ───────────────────────────── -->
   <div class="page" id="page-raw">
     <div class="filter-bar">
@@ -1071,6 +1100,9 @@ window.onload = async () => {
     document.getElementById('last-sync-label').textContent = 'Last sync: ' + new Date(S.lastSync).toLocaleTimeString();
   }
 
+  // Load saved actuals
+  S.actuals = JSON.parse(localStorage.getItem('dw_actuals') || '{}');
+
   if (S.sheetId) {
     await syncAll();
   } else {
@@ -1108,6 +1140,7 @@ function nav(page) {
   if (page === 'jobmap') renderJobMapPage();
   if (page === 'budgets') renderBudgets();
   if (page === 'bills-tracker') renderBillsTracker();
+  if (page === 'actuals') renderActuals();
   if (page === 'raw') renderRaw();
   if (page === 'settings') renderSettings();
   if (page === 'po-wizard') initPOWizard();
@@ -1417,7 +1450,7 @@ function renderInbox() {
         const rawJob = billRows[0]?.['JOB'] || '—';
         // QB reference numbers like A7470 — show as unassigned
         const jobDisplay = /^A\d{4,}$/.test(rawJob) ? '⚠ Needs job assignment' : rawJob;
-        return `<div class="inbox-item" onclick="openBillModal('${inv}')">
+        return `<div class="inbox-item" onclick="openSmartBillModal('${inv}')">
           <div class="inbox-dot bill"></div>
           <div class="inbox-info">
             <div class="inbox-title">${vendor}</div>
