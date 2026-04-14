@@ -5,596 +5,399 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AA Drywall Tracker</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js">
-
 // ═══════════════════════════════════════════════
-// BILL ENTRY WIZARD
+// BILL WIZARD
 // ═══════════════════════════════════════════════
-let BW = { inv:null, lines:[], vendor:'', ref:'', type:null, cat:'', job:'', bldg:'', floor:'', unit:'', parsed:null };
+let BW={inv:null,lines:[],vendor:'',ref:'',type:null,cat:'',job:'',bldg:'',floor:'',unit:'',parsed:null};
+const LAB_V=['aval','avall','sub llc','subcontractor','crew','framing co','drywall sub'];
+const MAT_V=['olympia','l&w','gator','usg','certainteed','georgia pacific','home depot','lowes','supply'];
 
-const LABOR_VENDORS = ['aval','avall','sub llc','subcontractor','labor','crew','framing co','drywall sub'];
-const MAT_VENDORS = ['olympia','l&w','gator','usg','certainteed','georgia pacific','home depot','lowes','supply'];
-
-function bwDetectType(vendor, lines) {
-  const v = (vendor||'').toLowerCase();
-  const hasQty = lines.some(l => l.qty && parseFloat(l.qty) > 0);
-  const hasDesc = lines.some(l => l.item_description || l['Item Description'] || l['ITEM DESCRIPTION']);
-  if (LABOR_VENDORS.some(kw => v.includes(kw))) return 'labor';
-  if (MAT_VENDORS.some(kw => v.includes(kw))) return 'material';
-  if (!hasQty) return 'labor';
-  return 'material';
+function bwDetect(vendor,lines){
+  const v=(vendor||'').toLowerCase();
+  const hasQty=lines.some(l=>parseFloat(l['Quantity']||l['QUANTITY']||l.qty||0)>0);
+  if(LAB_V.some(k=>v.includes(k)))return'labor';
+  if(MAT_V.some(k=>v.includes(k)))return'material';
+  if(!hasQty)return'labor';
+  return'material';
 }
 
-function bwLookup(v) {
-  const inv = v.trim();
-  document.getElementById('bwFound').classList.add('hidden');
-  document.getElementById('bwNotFound').classList.add('hidden');
-  if (inv.length < 3) return;
-
-  // Find matching lines in bills data
-  const lines = A.bills.filter(b => {
-    const invNum = b['Invoice Number'] || b['INVOICE NUMBER'] || b.invoice_number || b['Invoice #'] || '';
-    return String(invNum).trim() === inv;
+function bwLookup(v){
+  const inv=v.trim();
+  ['bwFound','bwNone'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('hidden');});
+  if(inv.length<3)return;
+  const lines=A.bills.filter(b=>{
+    const n=b['Invoice Number']||b['INVOICE NUMBER']||b.invoice_number||'';
+    return String(n).trim()===inv;
   });
-
-  if (!lines.length) { document.getElementById('bwNotFound').classList.remove('hidden'); return; }
-
-  const vendor = lines[0]['Vendor'] || lines[0]['VENDOR'] || lines[0].vendor || '';
-  const ref = lines[0]['Job Reference Number'] || lines[0]['JOB REFERANCE NUMBER'] || lines[0].job_reference || '';
-  const suggestedType = bwDetectType(vendor, lines);
-
-  BW = { inv, lines, vendor, ref, type: suggestedType, cat:'', job:'', bldg:'', floor:'', unit:'', parsed: parseJobRef(ref) };
-
-  document.getElementById('bwFoundTitle').textContent = 'Invoice ' + inv + ' · ' + (vendor || 'Unknown vendor');
-  document.getElementById('bwFoundLines').innerHTML = lines.filter(l => {
-    const d = l['Item Description'] || l['ITEM DESCRIPTION'] || l.item_description || '';
-    const lt = parseFloat(l['Line Total'] || l['LINE TOTAL'] || l.line_total || 0);
-    return d || lt > 0;
-  }).map(l => {
-    const d = l['Item Description'] || l['ITEM DESCRIPTION'] || l.item_description || '—';
-    const qty = l['Quantity'] || l['QUANTITY'] || l.qty || '';
-    const lt = parseFloat(l['Line Total'] || l['LINE TOTAL'] || l.line_total || 0);
-    return '<div class="pol"><span>' + d + '</span><span>' + (qty ? qty + ' · ' : '') + fmt(lt) + '</span></div>';
+  if(!lines.length){const e=document.getElementById('bwNone');if(e)e.classList.remove('hidden');return;}
+  const vendor=lines[0]['Vendor']||lines[0]['VENDOR']||lines[0].vendor||'';
+  const ref=lines[0]['Job Reference Number']||lines[0]['JOB REFERANCE NUMBER']||lines[0].job_reference||'';
+  BW={inv,lines,vendor,ref,type:bwDetect(vendor,lines),cat:'',job:'',bldg:'',floor:'',unit:'',parsed:parseJobRef(ref)};
+  const tot=lines.reduce((a,l)=>a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
+  const t=document.getElementById('bwTitle');if(t)t.textContent='Invoice '+inv+' · '+(vendor||'Unknown vendor');
+  const lel=document.getElementById('bwLines');
+  if(lel)lel.innerHTML=lines.filter(l=>l['Item Description']||l['ITEM DESCRIPTION']||l.item_description).map(l=>{
+    const d=l['Item Description']||l['ITEM DESCRIPTION']||l.item_description||'—';
+    const q=l['Quantity']||l['QUANTITY']||l.qty||'';
+    const lt=parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0);
+    return'<div class="pol"><span>'+d+'</span><span>'+(q?q+' · ':'')+fmt(lt)+'</span></div>';
   }).join('');
-  const tot = lines.reduce((a,l) => a + parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0), 0);
-  document.getElementById('bwFoundBadges').innerHTML =
-    '<span class="bdg bb">' + (vendor||'?') + '</span>' +
-    '<span class="bdg bg">' + fmt(tot) + '</span>' +
-    '<span class="bdg bgr">' + lines.length + ' line' + (lines.length!==1?'s':'') + '</span>' +
-    '<span class="bdg ' + (suggestedType==='labor'?'ba':'bb') + '">Suggested: ' + suggestedType + '</span>';
-  document.getElementById('bwFound').classList.remove('hidden');
+  const bel=document.getElementById('bwBadges');
+  if(bel)bel.innerHTML='<span class="bdg bb">'+(vendor||'?')+'</span><span class="bdg bg">'+fmt(tot)+'</span><span class="bdg bgr">'+lines.length+' line'+(lines.length!==1?'s':'')+'</span><span class="bdg '+(BW.type==='labor'?'ba':'bb')+'">Suggested: '+BW.type+'</span>';
+  const f=document.getElementById('bwFound');if(f)f.classList.remove('hidden');
 }
 
-function bwSetWS(n) {
-  [1,2,3,4].forEach(i => {
-    const e = document.getElementById('bw'+i); if(e) { e.classList.toggle('on',i===n); e.classList.toggle('dn',i<n); }
-    const s = document.getElementById('bwStep'+i); if(s) s.classList.toggle('hidden',i!==n);
+function bwSetWS(n){
+  [1,2,3,4].forEach(i=>{
+    const e=document.getElementById('bw'+i);if(e){e.classList.toggle('on',i===n);e.classList.toggle('dn',i<n);}
+    const s=document.getElementById('bwStep'+i);if(s)s.classList.toggle('hidden',i!==n);
   });
 }
 
-function bwSetType(t) {
-  BW.type = t;
-  ['material','labor','equipment','other'].forEach(x => {
-    const el = document.getElementById('bwType'+x.charAt(0).toUpperCase()+x.slice(1));
-    if(el) el.classList.toggle('on', x===t);
-  });
-  // Show auto-detect note
-  const suggestedType = bwDetectType(BW.vendor, BW.lines);
-  if (t !== suggestedType) {
-    document.getElementById('bwTypeWarning').classList.remove('hidden');
-    document.getElementById('bwTypeWarningText').textContent = 'Note: App suggested ' + suggestedType + ' based on vendor/qty. You selected ' + t + '.';
-  } else {
-    document.getElementById('bwTypeWarning').classList.add('hidden');
-  }
+function bwSetType(t){
+  BW.type=t;
+  ['Mat','Lab','Equip','Other'].forEach(x=>{const e=document.getElementById('bwType'+x);if(e)e.classList.toggle('on',t===x.toLowerCase()||t==='material'&&x==='Mat'||t==='labor'&&x==='Lab'||t==='equipment'&&x==='Equip'||t==='other'&&x==='Other');});
+  const suggested=bwDetect(BW.vendor,BW.lines);
+  const w=document.getElementById('bwTypeWarn');const wt=document.getElementById('bwTypeWarnTxt');
+  if(t!==suggested&&w&&wt){wt.textContent='Note: App suggested '+suggested+' based on vendor/qty. You selected '+t+'.';w.classList.remove('hidden');}
+  else if(w)w.classList.add('hidden');
 }
 
-function bwSetCat(cat) {
-  BW.cat = cat;
-  ['framing','hanging','finish','punchout','other'].forEach(c => {
-    const el = document.getElementById('bwCat-' + c.toLowerCase()); if(el) el.classList.toggle('on', c.toLowerCase()===cat.toLowerCase());
-  });
-  const otherInp = document.getElementById('bwCatOtherInput');
-  if(cat === 'Other') otherInp.classList.remove('hidden'); else otherInp.classList.add('hidden');
+function bwSetCat(cat){
+  BW.cat=cat;
+  ['Framing','Hanging','Finish','Punchout','Other'].forEach(c=>{const e=document.getElementById('bwCat'+c);if(e)e.classList.toggle('on',c===cat);});
+  const ow=document.getElementById('bwCatCustomWrap');if(ow)ow.classList.toggle('hidden',cat!=='Other');
 }
 
-function bwGo(n) {
-  if (n===2) {
-    const tot = BW.lines.reduce((a,l) => a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
-    document.getElementById('bwStep2Sum').innerHTML = 'Invoice <strong>' + BW.inv + '</strong> · ' + (BW.vendor||'?') + ' · ' + fmt(tot);
-    // Pre-select suggested type
+function bwGo(n){
+  if(n===2){
+    const tot=BW.lines.reduce((a,l)=>a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
+    const s=document.getElementById('bwStep2Sum');if(s)s.innerHTML='Invoice <strong>'+BW.inv+'</strong> · '+(BW.vendor||'?')+' · '+fmt(tot);
     bwSetType(BW.type);
   }
-
-  if (n===3) {
-    if (!BW.type) { alert('Please select a bill type.'); return; }
-    const tot = BW.lines.reduce((a,l) => a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
-    document.getElementById('bwStep3Sum').innerHTML = 'Invoice <strong>' + BW.inv + '</strong> · ' + BW.type.toUpperCase() + ' · ' + fmt(tot);
-
-    // Fill job selector
-    fSel('bwJob', A.jobs.map(j=>j.name).sort(), 'Select job...');
-
-    // Pre-fill from parsed job ref
-    if (BW.parsed) {
-      if (BW.parsed.job) document.getElementById('bwJob').value = BW.parsed.job;
-      if (BW.parsed.building) document.getElementById('bwBldg').value = BW.parsed.building;
-      if (BW.parsed.floor) document.getElementById('bwFloor').value = BW.parsed.floor;
-      if (BW.parsed.unit) document.getElementById('bwUnit').value = BW.parsed.unit;
+  if(n===3){
+    if(!BW.type){alert('Please select a bill type.');return;}
+    const tot=BW.lines.reduce((a,l)=>a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
+    const s=document.getElementById('bwStep3Sum');if(s)s.innerHTML='Invoice <strong>'+BW.inv+'</strong> · '+BW.type.toUpperCase()+' · '+fmt(tot);
+    fSel('bwJob',A.jobs.map(j=>j.name).sort(),'Select job...');
+    if(BW.parsed){
+      if(BW.parsed.job){const e=document.getElementById('bwJob');if(e)e.value=BW.parsed.job;}
+      if(BW.parsed.building){const e=document.getElementById('bwBldg');if(e)e.value=BW.parsed.building;}
+      if(BW.parsed.floor){const e=document.getElementById('bwFloor');if(e)e.value=BW.parsed.floor;}
+      if(BW.parsed.unit){const e=document.getElementById('bwUnit');if(e)e.value=BW.parsed.unit;}
     }
-
-    // Show/hide labor category and material comparison
-    const isLabor = BW.type === 'labor';
-    document.getElementById('bwLaborCat').classList.toggle('hidden', !isLabor);
-    document.getElementById('bwMatComp').classList.toggle('hidden', isLabor);
-
-    // Update PO comparison when job/location changes
-    document.getElementById('bwJob').onchange = updateBWMatComp;
-    document.getElementById('bwBldg').onchange = updateBWMatComp;
-    document.getElementById('bwFloor').onchange = updateBWMatComp;
-    document.getElementById('bwUnit').onchange = updateBWMatComp;
-    if (!isLabor) updateBWMatComp();
+    const isLab=BW.type==='labor';
+    const lc=document.getElementById('bwLaborCat');if(lc)lc.classList.toggle('hidden',!isLab);
+    const mc=document.getElementById('bwMatComp');if(mc)mc.classList.toggle('hidden',isLab);
+    const bwj=document.getElementById('bwJob');
+    const bwb=document.getElementById('bwBldg');
+    const bwf=document.getElementById('bwFloor');
+    const bwu=document.getElementById('bwUnit');
+    if(bwj)bwj.onchange=bwUpdateComp;if(bwb)bwb.onchange=bwUpdateComp;if(bwf)bwf.onchange=bwUpdateComp;if(bwu)bwu.onchange=bwUpdateComp;
+    if(!isLab)bwUpdateComp();
   }
-
-  if (n===4) {
-    const job = document.getElementById('bwJob').value;
-    const bldg = document.getElementById('bwBldg').value.trim();
-    const floor = document.getElementById('bwFloor').value.trim();
-    const unit = document.getElementById('bwUnit').value.trim();
-    if (!job) { alert('Please select a job.'); return; }
-
-    let cat = BW.cat;
-    if (BW.type === 'labor') {
-      if (!cat) { alert('Please select a labor category.'); return; }
-      if (cat === 'Other') { cat = document.getElementById('bwCatCustom').value.trim() || 'Other'; }
-    }
-
-    BW.job = job; BW.bldg = bldg; BW.floor = floor; BW.unit = unit;
-    if (BW.type === 'labor') BW.cat = cat;
-
-    const tot = BW.lines.reduce((a,l) => a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
-    document.getElementById('bwConfirmLines').innerHTML =
-      '<div class="pol"><span>Invoice</span><strong>' + BW.inv + '</strong></div>' +
-      '<div class="pol"><span>Vendor</span><strong>' + (BW.vendor||'?') + '</strong></div>' +
-      '<div class="pol"><span>Type</span><strong>' + BW.type.toUpperCase() + '</strong></div>' +
-      (BW.type==='labor' ? '<div class="pol"><span>Category</span><strong>' + BW.cat + '</strong></div>' : '') +
-      '<div class="pol"><span>Job</span><strong>' + job + '</strong></div>' +
-      '<div class="pol"><span>Building</span><strong>' + (bldg||'—') + '</strong></div>' +
-      '<div class="pol"><span>Floor</span><strong>' + (floor||'—') + '</strong></div>' +
-      '<div class="pol"><span>Unit</span><strong>' + (unit||'—') + '</strong></div>' +
-      '<div class="pol" style="margin-top:7px;padding-top:7px;border-top:2px solid var(--g200)"><span>' + BW.lines.length + ' lines</span><strong>' + fmt(tot) + '</strong></div>';
+  if(n===4){
+    const job=document.getElementById('bwJob')?.value;
+    if(!job){alert('Please select a job.');return;}
+    let cat=BW.cat;
+    if(BW.type==='labor'){if(!cat){alert('Please select a labor category.');return;}if(cat==='Other')cat=document.getElementById('bwCatCustom')?.value.trim()||'Other';}
+    BW.job=job;BW.bldg=document.getElementById('bwBldg')?.value.trim()||'';BW.floor=document.getElementById('bwFloor')?.value.trim()||'';BW.unit=document.getElementById('bwUnit')?.value.trim()||'';if(BW.type==='labor')BW.cat=cat;
+    const tot=BW.lines.reduce((a,l)=>a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
+    const c=document.getElementById('bwConfirm');
+    if(c)c.innerHTML='<div class="pol"><span>Invoice</span><strong>'+BW.inv+'</strong></div><div class="pol"><span>Vendor</span><strong>'+(BW.vendor||'?')+'</strong></div><div class="pol"><span>Type</span><strong>'+BW.type.toUpperCase()+'</strong></div>'+(BW.type==='labor'?'<div class="pol"><span>Category</span><strong>'+BW.cat+'</strong></div>':'')+'<div class="pol"><span>Job</span><strong>'+job+'</strong></div><div class="pol"><span>Building</span><strong>'+(BW.bldg||'—')+'</strong></div><div class="pol"><span>Floor</span><strong>'+(BW.floor||'—')+'</strong></div><div class="pol"><span>Unit</span><strong>'+(BW.unit||'—')+'</strong></div><div class="pol" style="margin-top:7px;padding-top:7px;border-top:2px solid var(--g200)"><span>'+BW.lines.length+' lines</span><strong>'+fmt(tot)+'</strong></div>';
   }
-
   bwSetWS(n);
 }
 
-function updateBWMatComp() {
-  const job = document.getElementById('bwJob')?.value;
-  const bldg = document.getElementById('bwBldg')?.value.trim();
-  const floor = document.getElementById('bwFloor')?.value.trim();
-  const unit = document.getElementById('bwUnit')?.value.trim();
-  const el = document.getElementById('bwMatCompContent'); if(!el) return;
-
-  if (!job) { el.innerHTML = '<div style="color:var(--g400);font-size:13px">Select a job above to see PO comparison.</div>'; return; }
-
-  // Find matching PO lines
-  const poLines = A.raw.filter(r => {
-    const rj = r.job || r.Job || '';
-    if (rj.toLowerCase() !== job.toLowerCase()) return false;
-    if (bldg && r.building && r.building !== bldg) return false;
-    if (floor && r.floor && r.floor !== floor) return false;
-    if (unit && r.unit && r.unit !== unit) return false;
+function bwUpdateComp(){
+  const job=document.getElementById('bwJob')?.value;
+  const bldg=document.getElementById('bwBldg')?.value.trim();
+  const floor=document.getElementById('bwFloor')?.value.trim();
+  const unit=document.getElementById('bwUnit')?.value.trim();
+  const el=document.getElementById('bwMatCompContent');if(!el)return;
+  if(!job){el.innerHTML='<div style="color:var(--g400);font-size:13px">Select a job to see PO comparison.</div>';return;}
+  const poLines=A.raw.filter(r=>{
+    if((r.job||'').toLowerCase()!==job.toLowerCase())return false;
+    if(bldg&&r.building&&r.building!==bldg)return false;
+    if(floor&&r.floor&&r.floor!==floor)return false;
+    if(unit&&r.unit&&r.unit!==unit)return false;
     return true;
   });
-
-  if (!poLines.length) {
-    el.innerHTML = '<div style="color:var(--g400);font-size:13px">No PO lines found for ' + job + (bldg?' Bldg '+bldg:'') + (floor?' FL '+floor:'') + (unit?' Unit '+unit:'') + '</div>';
-    return;
-  }
-
-  // Compare bill lines to PO lines
-  const billLines = BW.lines.filter(l => l['Item Description']||l['ITEM DESCRIPTION']||l.item_description);
-  let html2 = '<table><thead><tr><th>Material</th><th>PO Qty</th><th>PO Price</th><th>PO Total</th><th>Bill Qty</th><th>Bill Price</th><th>Bill Total</th><th>Diff</th></tr></thead><tbody>';
-
-  // Group PO lines by material
-  const poByMat = {};
-  poLines.forEach(p => {
-    const mat = p.material || p.mat || p.Material || '';
-    if (!poByMat[mat]) poByMat[mat] = { qty:0, total:0, cost: p.unit_cost||p.unitCost||0 };
-    poByMat[mat].qty += parseFloat(p.qty)||0;
-    poByMat[mat].total += parseFloat(p.line_total||p.lineTotal||0);
+  if(!poLines.length){el.innerHTML='<div style="color:var(--g400);font-size:13px">No PO lines found for '+job+(bldg?' Bldg '+bldg:'')+(floor?' FL '+floor:'')+(unit?' Unit '+unit:'')+'</div>';return;}
+  const billLines=BW.lines.filter(l=>l['Item Description']||l['ITEM DESCRIPTION']||l.item_description);
+  const poByMat={};
+  poLines.forEach(p=>{const mat=p.mat||p.material||'';if(!poByMat[mat])poByMat[mat]={qty:0,total:0,cost:p.unitCost||p.unit_cost||0};poByMat[mat].qty+=parseFloat(p.qty)||0;poByMat[mat].total+=parseFloat(p.lineTotal||p.line_total||0);});
+  let h='<table><thead><tr><th>Material</th><th>PO Qty</th><th>PO $</th><th>Bill Qty</th><th>Bill $</th><th>Diff</th></tr></thead><tbody>';
+  billLines.forEach(bl=>{
+    const desc=bl['Item Description']||bl['ITEM DESCRIPTION']||bl.item_description||'';
+    const bQty=parseFloat(bl['Quantity']||bl['QUANTITY']||bl.qty||0);
+    const bTotal=parseFloat(bl['Line Total']||bl['LINE TOTAL']||bl.line_total||0);
+    const match=Object.entries(poByMat).find(([mat])=>fzm(mat,desc)||fzm(desc,mat));
+    if(match){const[mat,po]=match;const diff=bTotal-po.total;const dc=Math.abs(diff)<1?'var(--green)':diff>0?'var(--red)':'var(--amber)';h+='<tr><td>'+desc+'</td><td>'+po.qty+'</td><td>'+fmt(po.total)+'</td><td>'+bQty+'</td><td>'+fmt(bTotal)+'</td><td style="font-weight:700;color:'+dc+'">'+(Math.abs(diff)<1?'✓ Match':(diff>0?'+':'')+fmt(diff))+'</td></tr>';}
+    else h+='<tr style="background:#FFFBF0"><td>'+desc+'</td><td colspan="2" style="color:var(--amber);font-style:italic">No matching PO</td><td>'+bQty+'</td><td>'+fmt(bTotal)+'</td><td style="color:var(--amber)">⚠ No PO</td></tr>';
   });
-
-  // Match bill lines to PO by fuzzy description
-  billLines.forEach(bl => {
-    const desc = bl['Item Description']||bl['ITEM DESCRIPTION']||bl.item_description||'';
-    const bQty = parseFloat(bl['Quantity']||bl['QUANTITY']||bl.qty||0);
-    const bPrice = parseFloat(bl['Unit Price']||bl['UNIT PRICE']||bl.unit_price||0);
-    const bTotal = parseFloat(bl['Line Total']||bl['LINE TOTAL']||bl.line_total||0);
-
-    // Try to find matching PO line
-    const match = Object.entries(poByMat).find(([mat]) => fzm(mat, desc) || fzm(desc, mat));
-    if (match) {
-      const [mat, po] = match;
-      const diff = bTotal - po.total;
-      const diffColor = Math.abs(diff) < 1 ? 'var(--green)' : diff > 0 ? 'var(--red)' : 'var(--amber)';
-      html2 += '<tr><td>' + desc + '</td><td>' + po.qty + '</td><td>$' + po.cost.toFixed(2) + '</td><td>' + fmt(po.total) + '</td><td>' + bQty + '</td><td>$' + bPrice.toFixed(2) + '</td><td>' + fmt(bTotal) + '</td><td style="font-weight:700;color:'+diffColor+'">' + (Math.abs(diff) < 1 ? '✓ Match' : (diff > 0 ? '+' : '') + fmt(diff)) + '</td></tr>';
-    } else {
-      html2 += '<tr style="background:#FFFBF0"><td>' + desc + '</td><td colspan="3" style="color:var(--amber);font-style:italic">No matching PO line</td><td>' + bQty + '</td><td>$' + bPrice.toFixed(2) + '</td><td>' + fmt(bTotal) + '</td><td style="color:var(--amber)">⚠ No PO</td></tr>';
-    }
-  });
-
-  // Show PO lines with no matching bill line
-  Object.entries(poByMat).forEach(([mat, po]) => {
-    const hasBill = billLines.some(bl => {
-      const desc = bl['Item Description']||bl['ITEM DESCRIPTION']||bl.item_description||'';
-      return fzm(mat, desc) || fzm(desc, mat);
-    });
-    if (!hasBill) {
-      html2 += '<tr style="background:#F0FFF4"><td>' + mat + '</td><td>' + po.qty + '</td><td>$' + po.cost.toFixed(2) + '</td><td>' + fmt(po.total) + '</td><td colspan="3" style="color:var(--g400);font-style:italic">Not on this bill</td><td style="color:var(--g400)">—</td></tr>';
-    }
-  });
-
-  html2 += '</tbody></table>';
-  el.innerHTML = html2;
+  h+='</tbody></table>';
+  el.innerHTML=h;
 }
 
-async function bwSave() {
-  const tot = BW.lines.reduce((a,l) => a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
-  showSaving(true);
-
-  // 1. Save to Supabase bills table
-  const billRows = BW.lines.map(l => ({
-    vendor: BW.vendor,
-    invoice_number: BW.inv,
-    date: l['Date']||l['DATE']||l.date||null,
-    item_description: l['Item Description']||l['ITEM DESCRIPTION']||l.item_description||'',
-    qty: parseFloat(l['Quantity']||l['QUANTITY']||l.qty||0),
-    unit_price: parseFloat(l['Unit Price']||l['UNIT PRICE']||l.unit_price||0),
-    line_total: parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),
-    job_reference: BW.ref,
-    job: BW.job,
-    building: BW.bldg,
-    floor: BW.floor,
-    unit: BW.unit,
-    category: BW.type === 'labor' ? BW.cat : BW.type,
-    bill_type: BW.type,
+async function bwSave(){
+  const tot=BW.lines.reduce((a,l)=>a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
+  const billRows=BW.lines.map(l=>({
+    vendor:BW.vendor,invoice_number:BW.inv,
+    date:l['Date']||l['DATE']||l.date||null,
+    item_description:l['Item Description']||l['ITEM DESCRIPTION']||l.item_description||'',
+    qty:parseFloat(l['Quantity']||l['QUANTITY']||l.qty||0),
+    unit_price:parseFloat(l['Unit Price']||l['UNIT PRICE']||l.unit_price||0),
+    line_total:parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),
+    job_reference:BW.ref,job:BW.job,building:BW.bldg,floor:BW.floor,unit:BW.unit,
+    bill_type:BW.type,category:BW.type==='labor'?BW.cat:BW.type,
   }));
-
-  try { await db.from('bills').upsert(billRows, {onConflict:'invoice_number,item_description'}); } catch(e) { console.warn('Supabase bill save:', e); }
-
-  // Update local cache
-  A.bills.forEach(b => {
-    const invNum = b['Invoice Number']||b['INVOICE NUMBER']||b.invoice_number||'';
-    if (String(invNum).trim() === BW.inv) {
-      b.job = BW.job; b.building = BW.bldg; b.floor = BW.floor; b.unit = BW.unit;
-      b.category = BW.type==='labor' ? BW.cat : BW.type; b.bill_type = BW.type;
-    }
-  });
-
-  // 2. Write back to Google Sheet
-  try {
-    fetch(A.su, {
-      method: 'POST', mode: 'no-cors',
-      body: JSON.stringify({ type:'bill_location', invoice:BW.inv, job:BW.job, building:BW.bldg, floor:BW.floor, unit:BW.unit, category: BW.type==='labor' ? BW.cat : BW.type })
-    });
-  } catch(e) {}
-
-  // 3. If labor, also add to labor entries in Supabase
-  if (BW.type === 'labor') {
-    try {
-      await dbAddLabor({ type:'sub', job:BW.job, date:BW.lines[0]?.date||null, name:BW.vendor, f1:0, f2:0, total:tot, notes:'Invoice '+BW.inv+' · '+BW.cat });
-    } catch(e) {}
-  }
-
-  showSaving(false);
-
-  // Reset wizard
-  document.getElementById('bwInvInput').value='';
-  document.getElementById('bwFound').classList.add('hidden');
-  BW = {inv:null,lines:[],vendor:'',ref:'',type:null,cat:'',job:'',bldg:'',floor:'',unit:'',parsed:null};
-  bwSetWS(1);
-
-  rBillsOverview(); renderMatBills(); renderLaborBills(); renderAllBills(); rDash(); upBdg();
-  alert('Bill saved! Invoice '+BW.inv||'');
+  await dbSaveBills(billRows);
+  A.bills.forEach(b=>{const n=b['Invoice Number']||b['INVOICE NUMBER']||b.invoice_number||'';if(String(n).trim()===BW.inv){b.job=BW.job;b.building=BW.bldg;b.floor=BW.floor;b.unit=BW.unit;b.bill_type=BW.type;b.category=BW.type==='labor'?BW.cat:BW.type;}});
+  try{fetch(A.su,{method:'POST',mode:'no-cors',body:JSON.stringify({type:'bill_location',invoice:BW.inv,job:BW.job,building:BW.bldg,floor:BW.floor,unit:BW.unit,category:BW.type==='labor'?BW.cat:BW.type})});}catch(e){}
+  if(BW.type==='labor'){await dbAddLabor({type:'sub',job:BW.job,date:BW.lines[0]?.date||null,name:BW.vendor,f1:0,f2:0,total:tot,notes:'Invoice '+BW.inv+' · '+BW.cat});}
+  const inv=BW.inv;
+  const bwi=document.getElementById('bwInv');if(bwi)bwi.value='';
+  const bwf=document.getElementById('bwFound');if(bwf)bwf.classList.add('hidden');
+  BW={inv:null,lines:[],vendor:'',ref:'',type:null,cat:'',job:'',bldg:'',floor:'',unit:'',parsed:null};
+  bwSetWS(1);rBillsOverview();rMatBills();rLabBills();rAllBills();rDash();upBdg();
+  alert('Bill saved! Invoice '+inv);
 }
 
-// ── Bills tab switching ──
-function showBillsTab(tab) {
-  ['overview','material','labor','all'].forEach(t => {
-    const el = document.getElementById('billsTab-'+t); if(el) el.classList.toggle('hidden',t!==tab);
-    const btn = document.getElementById('bilt-'+t); if(btn) btn.classList.toggle('on',t===tab);
-  });
-  if(tab==='material') { fSel('bMatFJob',A.jobs.map(j=>j.name).sort(),'All jobs'); renderMatBills(); }
-  if(tab==='labor') { fSel('bLabFJob',A.jobs.map(j=>j.name).sort(),'All jobs'); fSel('bLabFCat',getLabCats(),'All categories'); renderLaborBills(); }
-  if(tab==='all') { fSel('bAllFJob',A.jobs.map(j=>j.name).sort(),'All jobs'); renderAllBills(); }
+function parseJobRef(ref){
+  if(!ref)return null;
+  const r=ref.trim();
+  const bm=r.match(/BDG\s+(\S+)/i),fm=r.match(/\bFL\s+(\S+)/i),um=r.match(/UNIT\s+(\S+)/i);
+  if(!bm&&!fm&&!um)return null;
+  const first=r.search(/\b(BDG|FL|UNIT)\b/i);
+  const jobRaw=first>0?r.substring(0,first).trim():'';
+  return{jobRaw,job:res(jobRaw),building:bm?bm[1]:'',floor:fm?fm[1]:'',unit:um?um[1]:''};
 }
 
-function getLabCats() { return [...new Set(A.bills.filter(b=>b.bill_type==='labor').map(b=>b.category).filter(Boolean))].sort(); }
+function showBillsTab(tab){
+  ['overview','material','labor','all'].forEach(t=>{
+    const e=document.getElementById('billTab-'+t);if(e)e.classList.toggle('hidden',t!==tab);
+    const b=document.getElementById('bilt-'+t);if(b)b.classList.toggle('on',t===tab);
+  });
+  if(tab==='material'){fSel('bMatFJob',A.jobs.map(j=>j.name).sort(),'All jobs');rMatBills();}
+  if(tab==='labor'){fSel('bLabFJob',A.jobs.map(j=>j.name).sort(),'All jobs');fSel('bLabFCat',getLabCats(),'All cats');rLabBills();}
+  if(tab==='all'){fSel('bAllFJob',A.jobs.map(j=>j.name).sort(),'All jobs');rAllBills();}
+}
 
-function getBillVal(b, keys) { for(const k of keys) { if(b[k]!==undefined&&b[k]!=='') return b[k]; } return ''; }
+function getLabCats(){return[...new Set(A.bills.filter(b=>b.bill_type==='labor').map(b=>b.category).filter(Boolean))].sort();}
+function getBV(b,keys){for(const k of keys){if(b[k]!==undefined&&b[k]!=='')return b[k];}return'';}
 
-function rBillsOverview() {
-  const el = document.getElementById('bComp3'); if(!el) return;
-  if(!A.jobs.length) { el.innerHTML='<div class="emp"><div class="etx">Sync to load jobs</div></div>'; return; }
-  el.innerHTML = A.jobs.map(j => {
-    const budget = j.budgetDollars||j.budget_dollars||0;
-    const poSp = A.raw.filter(r=>(r.job||'').toLowerCase()===j.name.toLowerCase()).reduce((a,r)=>a+(r.lineTotal||r.line_total||0),0);
-    const billSp = A.bills.filter(b=>b.job&&b.job.toLowerCase()===j.name.toLowerCase()&&b.bill_type!=='labor').reduce((a,b)=>a+parseFloat(getBillVal(b,['line_total','Line Total','LINE TOTAL'])||0),0);
-    const labSp = A.bills.filter(b=>b.job&&b.job.toLowerCase()===j.name.toLowerCase()&&b.bill_type==='labor').reduce((a,b)=>a+parseFloat(getBillVal(b,['line_total','Line Total','LINE TOTAL'])||0),0);
-    const matGap = poSp - billSp;
-    return '<div style="padding:14px 0;border-bottom:1px solid var(--g100)">' +
-      '<div style="font-size:14px;font-weight:700;margin-bottom:10px">' + j.name + '</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px">' +
-        '<div class="met"><div class="ml">Budget</div><div class="mv" style="font-size:16px">' + (budget?fmt(budget):'—') + '</div></div>' +
-        '<div class="met"><div class="ml">PO Ordered</div><div class="mv" style="font-size:16px">' + fmt(poSp) + '</div></div>' +
-        '<div class="met"><div class="ml">Billed (Mat)</div><div class="mv" style="font-size:16px;color:var(--blue)">' + fmt(billSp) + '</div></div>' +
-        '<div class="met"><div class="ml">Billed (Labor)</div><div class="mv" style="font-size:16px;color:var(--amber)">' + fmt(labSp) + '</div></div>' +
-        '<div class="met"><div class="ml">Mat Gap</div><div class="mv" style="font-size:16px;color:'+(matGap>0?'var(--amber)':'var(--green)')+'">' + fmt(Math.abs(matGap)) + (matGap>0?' left':' over') + '</div></div>' +
-      '</div>' +
-      (budget?'<div class="pb2" style="height:8px"><div class="pf '+bcc(pct(poSp,budget))+'" style="width:'+pct(poSp,budget)+'%"></div></div><div style="font-size:11px;color:var(--g400);margin-top:2px">'+pct(poSp,budget)+'% of budget used via POs</div>':'') +
-      '</div>';
+function rBillsOverview(){
+  const el=document.getElementById('bComp3');if(!el)return;
+  if(!A.jobs.length){el.innerHTML='<div class="emp"><div class="etx">Sync to load jobs</div></div>';return;}
+  el.innerHTML=A.jobs.map(j=>{
+    const bud=j.budgetDollars||j.budget_dollars||0;
+    const poSp=A.raw.filter(r=>(r.job||'').toLowerCase()===j.name.toLowerCase()).reduce((a,r)=>a+(r.lineTotal||r.line_total||0),0);
+    const blSp=A.bills.filter(b=>b.job&&b.job.toLowerCase()===j.name.toLowerCase()&&b.bill_type!=='labor').reduce((a,b)=>a+parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0),0);
+    const labSp=A.bills.filter(b=>b.job&&b.job.toLowerCase()===j.name.toLowerCase()&&b.bill_type==='labor').reduce((a,b)=>a+parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0),0);
+    const gap=poSp-blSp;
+    return'<div style="padding:13px 0;border-bottom:1px solid var(--g100)"><div style="font-size:14px;font-weight:700;margin-bottom:9px">'+j.name+'</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:9px">'+
+      '<div class="met"><div class="ml">Budget</div><div class="mv" style="font-size:16px">'+(bud?fmt(bud):'—')+'</div></div>'+
+      '<div class="met"><div class="ml">PO Ordered</div><div class="mv" style="font-size:16px">'+fmt(poSp)+'</div></div>'+
+      '<div class="met"><div class="ml">Mat Billed</div><div class="mv" style="font-size:16px;color:var(--blue)">'+fmt(blSp)+'</div></div>'+
+      '<div class="met"><div class="ml">Lab Billed</div><div class="mv" style="font-size:16px;color:var(--amber)">'+fmt(labSp)+'</div></div>'+
+      '<div class="met"><div class="ml">Mat Gap</div><div class="mv" style="font-size:16px;color:'+(gap>0?'var(--amber)':'var(--green)')+'">'+fmt(Math.abs(gap))+(gap>0?' left':' over')+'</div></div>'+
+      '</div>'+(bud?'<div class="pb2" style="height:7px"><div class="pf '+bcc(pct(poSp,bud))+'" style="width:'+pct(poSp,bud)+'%"></div></div><div style="font-size:11px;color:var(--g400);margin-top:1px">'+pct(poSp,bud)+'% of budget used via POs</div>':'')+'</div>';
   }).join('');
 }
 
-function renderMatBills() {
-  const fj = document.getElementById('bMatFJob')?.value||'';
-  const fb = document.getElementById('bMatFBldg')?.value||'';
-  const ff = document.getElementById('bMatFFloor')?.value||'';
-  const rows = A.bills.filter(b => {
-    if(b.bill_type==='labor') return false;
-    const d = getBillVal(b,['item_description','Item Description','ITEM DESCRIPTION']);
-    const lt = parseFloat(getBillVal(b,['line_total','Line Total','LINE TOTAL'])||0);
-    if(!d&&!lt) return false;
-    if(fj&&b.job!==fj) return false;
-    if(fb&&b.building!==fb) return false;
-    if(ff&&b.floor!==ff) return false;
+function rMatBills(){
+  const fj=document.getElementById('bMatFJob')?.value||'';
+  const fb=document.getElementById('bMatFBldg')?.value||'';
+  const ff=document.getElementById('bMatFFloor')?.value||'';
+  const rows=A.bills.filter(b=>{
+    if(b.bill_type==='labor')return false;
+    const lt=parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0);
+    const d=getBV(b,['item_description','Item Description','ITEM DESCRIPTION']);
+    if(!lt&&!d)return false;
+    if(fj&&b.job!==fj)return false;
+    if(fb&&b.building!==fb)return false;
+    if(ff&&b.floor!==ff)return false;
     return true;
   });
-  const el = document.getElementById('bMatTable'); if(!el) return;
-
-  // Fill building/floor filters
+  const el=document.getElementById('bMatTbl');if(!el)return;
   fSel('bMatFBldg',[...new Set(rows.map(b=>b.building).filter(Boolean))].sort(),'All bldgs');
   fSel('bMatFFloor',[...new Set(rows.map(b=>b.floor).filter(Boolean))].sort(),'All floors');
-
-  el.innerHTML = rows.length ?
-    '<table><thead><tr><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Description</th><th>Board?</th><th>Qty</th><th>Unit $</th><th>Total</th><th>Job</th><th>Bldg</th><th>Floor</th><th>Unit</th></tr></thead><tbody>' +
-    rows.map(r => {
-      const desc = getBillVal(r,['item_description','Item Description','ITEM DESCRIPTION']);
-      const inv = getBillVal(r,['invoice_number','Invoice Number','INVOICE NUMBER']);
-      const lt = parseFloat(getBillVal(r,['line_total','Line Total','LINE TOTAL'])||0);
-      const qty = getBillVal(r,['qty','Quantity','QUANTITY']);
-      const up = parseFloat(getBillVal(r,['unit_price','Unit Price','UNIT PRICE'])||0);
-      const date = getBillVal(r,['date','Date','DATE']);
-      const flagged = !r.job||!r.building;
-      return '<tr'+(flagged?' style="background:#FFF5F5"':'')+'>'+
-        '<td class="tdm">'+(date||'—')+'</td>'+
-        '<td>'+(r.vendor||'—')+'</td>'+
-        '<td class="tdb tdm">'+inv+'</td>'+
-        '<td>'+desc+'</td>'+
-        '<td style="text-align:center">'+(isB(desc)?'<span class="bdg ba" style="font-size:10px">📋</span>':'')+'</td>'+
-        '<td>'+(qty||'—')+'</td>'+
-        '<td>$'+up.toFixed(2)+'</td>'+
-        '<td class="tdb">'+fmt(lt)+'</td>'+
-        '<td>'+(r.job||'<span class="tdx">—</span>')+'</td>'+
-        '<td>'+(r.building||'<span class="tdx">—</span>')+'</td>'+
-        '<td>'+(r.floor||'<span class="tdx">—</span>')+'</td>'+
-        '<td>'+(r.unit||'<span class="tdx">—</span>')+'</td>'+
-        '</tr>';
-    }).join('')+'</tbody></table>'
-    : '<div class="emp"><div class="etx">No material bills yet</div><div class="esb">Use the wizard above to categorize bills</div></div>';
+  el.innerHTML=rows.length?'<table><thead><tr><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Description</th><th>Board?</th><th>Qty</th><th>Total</th><th>Job</th><th>Bldg</th><th>Floor</th><th>Unit</th></tr></thead><tbody>'+
+    rows.map(r=>{
+      const d=getBV(r,['item_description','Item Description','ITEM DESCRIPTION']);
+      const inv=getBV(r,['invoice_number','Invoice Number','INVOICE NUMBER']);
+      const lt=parseFloat(getBV(r,['line_total','Line Total','LINE TOTAL'])||0);
+      const q=getBV(r,['qty','Quantity','QUANTITY']);
+      const dt=getBV(r,['date','Date','DATE']);
+      const fl=!r.job||!r.building;
+      return'<tr'+(fl?' style="background:#FFF5F5"':'')+'>'+
+        '<td class="tdm">'+(dt||'—')+'</td><td>'+(r.vendor||'—')+'</td><td class="tdb tdm">'+inv+'</td>'+
+        '<td>'+d+'</td><td style="text-align:center">'+(isB(d)?'<span class="bdg ba" style="font-size:10px">📋</span>':'')+'</td>'+
+        '<td>'+(q||'—')+'</td><td class="tdb">'+fmt(lt)+'</td>'+
+        '<td>'+(r.job||'<span class="tdx">—</span>')+'</td><td>'+(r.building||'<span class="tdx">—</span>')+'</td>'+
+        '<td>'+(r.floor||'<span class="tdx">—</span>')+'</td><td>'+(r.unit||'<span class="tdx">—</span>')+'</td></tr>';
+    }).join('')+'</tbody></table>':
+    '<div class="emp"><div class="etx">No material bills yet</div><div class="esb">Use the wizard above to categorize bills from the sync</div></div>';
 }
 
-function renderLaborBills() {
-  const fj = document.getElementById('bLabFJob')?.value||'';
-  const fc = document.getElementById('bLabFCat')?.value||'';
-  const ff = document.getElementById('bLabFFloor')?.value||'';
-  const rows = A.bills.filter(b => {
-    if(b.bill_type!=='labor') return false;
-    const lt = parseFloat(getBillVal(b,['line_total','Line Total','LINE TOTAL'])||0);
-    if(!lt) return false;
-    if(fj&&b.job!==fj) return false;
-    if(fc&&b.category!==fc) return false;
-    if(ff&&b.floor!==ff) return false;
+function rLabBills(){
+  const fj=document.getElementById('bLabFJob')?.value||'';
+  const fc=document.getElementById('bLabFCat')?.value||'';
+  const ff=document.getElementById('bLabFFloor')?.value||'';
+  const rows=A.bills.filter(b=>{
+    if(b.bill_type!=='labor')return false;
+    const lt=parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0);
+    if(!lt)return false;
+    if(fj&&b.job!==fj)return false;
+    if(fc&&b.category!==fc)return false;
+    if(ff&&b.floor!==ff)return false;
     return true;
   });
-  const el = document.getElementById('bLabTable'); if(!el) return;
-
-  // Update category filter
+  const el=document.getElementById('bLabTbl');if(!el)return;
   fSel('bLabFCat',getLabCats(),'All categories');
   fSel('bLabFFloor',[...new Set(rows.map(b=>b.floor).filter(Boolean))].sort(),'All floors');
-
-  el.innerHTML = rows.length ?
-    '<table><thead><tr><th>Date</th><th>Vendor/Crew</th><th>Invoice #</th><th>Category</th><th>Job</th><th>Bldg</th><th>Floor</th><th>Unit</th><th>Total</th></tr></thead><tbody>' +
-    rows.map(r => {
-      const inv = getBillVal(r,['invoice_number','Invoice Number','INVOICE NUMBER']);
-      const lt = parseFloat(getBillVal(r,['line_total','Line Total','LINE TOTAL'])||0);
-      const date = getBillVal(r,['date','Date','DATE']);
-      const catColors = {Framing:'ba',Hanging:'bb',Finish:'bg',Punchout:'bgr',Other:'bgr'};
-      const catColor = catColors[r.category]||'bgr';
-      return '<tr>'+
-        '<td class="tdm">'+(date||'—')+'</td>'+
-        '<td class="tdb">'+(r.vendor||'—')+'</td>'+
-        '<td class="tdm">'+inv+'</td>'+
-        '<td>'+(r.category?'<span class="bdg '+catColor+'">'+r.category+'</span>':'<span class="tdx">—</span>')+'</td>'+
-        '<td>'+(r.job||'<span class="tdx">—</span>')+'</td>'+
-        '<td>'+(r.building||'—')+'</td>'+
-        '<td>'+(r.floor||'—')+'</td>'+
-        '<td>'+(r.unit||'—')+'</td>'+
-        '<td class="tdb">'+fmt(lt)+'</td>'+
-        '</tr>';
-    }).join('')+'</tbody></table>'
-    : '<div class="emp"><div class="etx">No labor bills yet</div><div class="esb">Use the wizard and select Labor type</div></div>';
-
-  // Category breakdown vs budget
-  const cats = ['Framing','Hanging','Finish','Punchout','Other'];
-  const byJob = {};
-  A.bills.filter(b=>b.bill_type==='labor'&&(!fj||b.job===fj)).forEach(b => {
-    if(!byJob[b.job]) byJob[b.job] = {};
-    const cat = b.category||'Other';
-    if(!byJob[b.job][cat]) byJob[b.job][cat] = 0;
-    byJob[b.job][cat] += parseFloat(getBillVal(b,['line_total','Line Total','LINE TOTAL'])||0);
+  el.innerHTML=rows.length?'<table><thead><tr><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Category</th><th>Job</th><th>Bldg</th><th>Floor</th><th>Unit</th><th>Total</th></tr></thead><tbody>'+
+    rows.map(r=>{
+      const inv=getBV(r,['invoice_number','Invoice Number','INVOICE NUMBER']);
+      const lt=parseFloat(getBV(r,['line_total','Line Total','LINE TOTAL'])||0);
+      const dt=getBV(r,['date','Date','DATE']);
+      const cc={Framing:'ba',Hanging:'bb',Finish:'bg',Punchout:'bgr',Other:'bgr'};
+      return'<tr>'+
+        '<td class="tdm">'+(dt||'—')+'</td><td class="tdb">'+(r.vendor||'—')+'</td><td class="tdm">'+inv+'</td>'+
+        '<td>'+(r.category?'<span class="bdg '+(cc[r.category]||'bgr')+'">'+r.category+'</span>':'<span class="tdx">—</span>')+'</td>'+
+        '<td>'+(r.job||'<span class="tdx">—</span>')+'</td><td>'+(r.building||'—')+'</td>'+
+        '<td>'+(r.floor||'—')+'</td><td>'+(r.unit||'—')+'</td><td class="tdb">'+fmt(lt)+'</td></tr>';
+    }).join('')+'</tbody></table>':
+    '<div class="emp"><div class="etx">No labor bills yet</div><div class="esb">Use wizard and select Labor type</div></div>';
+  // Category breakdown
+  const byJob={};
+  A.bills.filter(b=>b.bill_type==='labor'&&(!fj||b.job===fj)).forEach(b=>{
+    if(!byJob[b.job])byJob[b.job]={};
+    const cat=b.category||'Other';
+    if(!byJob[b.job][cat])byJob[b.job][cat]=0;
+    byJob[b.job][cat]+=parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0);
   });
-  const cbd = document.getElementById('bLabCatBreakdown'); if(!cbd) return;
-  if(!Object.keys(byJob).length) { cbd.innerHTML='<div style="color:var(--g400);font-size:13px">No labor bills categorized yet.</div>'; return; }
-  cbd.innerHTML = Object.entries(byJob).map(([jname, cats2]) => {
-    const j = A.jobs.find(x=>x.name===jname);
-    const labBudget = j?.laborBudget||j?.labor_budget||0;
-    const total = Object.values(cats2).reduce((a,v)=>a+v,0);
-    return '<div style="margin-bottom:16px"><div style="font-size:14px;font-weight:700;margin-bottom:8px">'+jname+' · '+fmt(total)+' total'+(labBudget?' · Budget: '+fmt(labBudget):'')+'</div>'+
-      Object.entries(cats2).map(([cat,amt]) => {
-        return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--g100)">'+
-          '<div style="width:90px;font-size:12px;font-weight:700">'+cat+'</div>'+
-          '<div style="flex:1"><div class="pb2" style="height:8px"><div class="pf pfb" style="width:'+pct(amt,total)+'%"></div></div></div>'+
-          '<div style="min-width:70px;text-align:right;font-size:12px;font-weight:700">'+fmt(amt)+'</div>'+
-          '<div style="min-width:40px;text-align:right;font-size:11px;color:var(--g400)">'+pct(amt,total)+'%</div>'+
-          '</div>';
-      }).join('')+
-      '</div>';
+  const cbd=document.getElementById('bLabCats');if(!cbd)return;
+  if(!Object.keys(byJob).length){cbd.innerHTML='<div style="color:var(--g400);font-size:13px">No labor bills categorized yet.</div>';return;}
+  cbd.innerHTML=Object.entries(byJob).map(([jname,cats])=>{
+    const j=A.jobs.find(x=>x.name===jname);const lb=j?.laborBudget||j?.labor_budget||0;
+    const total=Object.values(cats).reduce((a,v)=>a+v,0);
+    return'<div style="margin-bottom:14px"><div style="font-size:14px;font-weight:700;margin-bottom:7px">'+jname+' · '+fmt(total)+(lb?' · Budget: '+fmt(lb):'')+'</div>'+
+      Object.entries(cats).map(([cat,amt])=>
+        '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--g100)">'+
+        '<div style="width:80px;font-size:12px;font-weight:700">'+cat+'</div>'+
+        '<div style="flex:1"><div class="pb2" style="height:7px"><div class="pf pfb" style="width:'+pct(amt,total)+'%"></div></div></div>'+
+        '<div style="min-width:65px;text-align:right;font-size:12px;font-weight:700">'+fmt(amt)+'</div>'+
+        '<div style="min-width:35px;text-align:right;font-size:11px;color:var(--g400)">'+pct(amt,total)+'%</div>'+
+        '</div>'
+      ).join('')+'</div>';
   }).join('');
 }
 
-function renderAllBills() {
-  const fj = document.getElementById('bAllFJob')?.value||'';
-  const rows = A.bills.filter(b => {
-    const lt = parseFloat(getBillVal(b,['line_total','Line Total','LINE TOTAL'])||0);
-    if(!lt) return false;
-    if(fj&&b.job!==fj) return false;
+function rAllBills(){
+  const fj=document.getElementById('bAllFJob')?.value||'';
+  const rows=A.bills.filter(b=>{
+    const lt=parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0);
+    if(!lt)return false;
+    if(fj&&b.job!==fj)return false;
     return true;
   });
-  const el = document.getElementById('bAllTable'); if(!el) return;
-  el.innerHTML = rows.length ?
-    '<table><thead><tr><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Type</th><th>Category</th><th>Description</th><th>Total</th><th>Job</th><th>Bldg</th><th>Floor</th><th>Unit</th></tr></thead><tbody>' +
-    rows.map(r => {
-      const desc = getBillVal(r,['item_description','Item Description','ITEM DESCRIPTION']);
-      const inv = getBillVal(r,['invoice_number','Invoice Number','INVOICE NUMBER']);
-      const lt = parseFloat(getBillVal(r,['line_total','Line Total','LINE TOTAL'])||0);
-      const date = getBillVal(r,['date','Date','DATE']);
-      const flagged = !r.job||!r.building;
-      return '<tr'+(flagged?' style="background:#FFF5F5"':'')+'>'+
-        '<td class="tdm">'+(date||'—')+'</td>'+
-        '<td>'+(r.vendor||'—')+'</td>'+
-        '<td class="tdb tdm">'+inv+'</td>'+
+  const el=document.getElementById('bAllTbl');if(!el)return;
+  el.innerHTML=rows.length?'<table><thead><tr><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Type</th><th>Cat</th><th>Description</th><th>Total</th><th>Job</th><th>Bldg</th><th>Floor</th><th>Unit</th></tr></thead><tbody>'+
+    rows.map(r=>{
+      const d=getBV(r,['item_description','Item Description','ITEM DESCRIPTION']);
+      const inv=getBV(r,['invoice_number','Invoice Number','INVOICE NUMBER']);
+      const lt=parseFloat(getBV(r,['line_total','Line Total','LINE TOTAL'])||0);
+      const dt=getBV(r,['date','Date','DATE']);
+      const fl=!r.job||!r.building;
+      return'<tr'+(fl?' style="background:#FFF5F5"':'')+'>'+
+        '<td class="tdm">'+(dt||'—')+'</td><td>'+(r.vendor||'—')+'</td><td class="tdb tdm">'+inv+'</td>'+
         '<td>'+(r.bill_type?'<span class="bdg '+(r.bill_type==='labor'?'ba':'bb')+'">'+r.bill_type+'</span>':'—')+'</td>'+
-        '<td>'+(r.category||'—')+'</td>'+
-        '<td>'+(desc||'—')+'</td>'+
-        '<td class="tdb">'+fmt(lt)+'</td>'+
-        '<td>'+(r.job||'<span class="tdx">—</span>')+'</td>'+
-        '<td>'+(r.building||'—')+'</td>'+
-        '<td>'+(r.floor||'—')+'</td>'+
-        '<td>'+(r.unit||'—')+'</td>'+
-        '</tr>';
-    }).join('')+'</tbody></table>'
-    : '<div class="emp"><div class="etx">No bills yet</div></div>';
+        '<td>'+(r.category||'—')+'</td><td>'+(d||'—')+'</td><td class="tdb">'+fmt(lt)+'</td>'+
+        '<td>'+(r.job||'<span class="tdx">—</span>')+'</td><td>'+(r.building||'—')+'</td>'+
+        '<td>'+(r.floor||'—')+'</td><td>'+(r.unit||'—')+'</td></tr>';
+    }).join('')+'</tbody></table>':
+    '<div class="emp"><div class="etx">No bills yet</div></div>';
 }
 
 // ═══════════════════════════════════════════════
 // AI FLOATING CHAT
 // ═══════════════════════════════════════════════
-let aiOpen = false;
-let aiHistory = [];
+let aiOpen=false,aiHistory=[];
 
-function toggleAI(){
-  aiOpen = !aiOpen;
-  document.getElementById('ai-panel').classList.toggle('open', aiOpen);
-}
-
-function aiQ(msg){ document.getElementById('ai-inp').value = msg; sendAI(); }
+function toggleAI(){aiOpen=!aiOpen;const p=document.getElementById('ai-panel');if(p)p.classList.toggle('open',aiOpen);}
+function aiQ(msg){const i=document.getElementById('ai-inp');if(i){i.value=msg;sendAI();}}
 
 function buildCtx(){
-  const jobs = A.jobs.map(j=>{
-    const je=A.raw.filter(r=>r.job&&r.job.toLowerCase()===j.name.toLowerCase());
+  const jobs=A.jobs.map(j=>{
+    const je=A.raw.filter(r=>(r.job||'').toLowerCase()===j.name.toLowerCase());
     const spent=je.reduce((a,r)=>a+(r.lineTotal||r.line_total||0),0);
-    const boards=je.filter(r=>isB(r.material||r.mat)).reduce((a,r)=>a+r.qty,0);
-    const billed=A.bills.filter(b=>b.job&&b.job.toLowerCase()===j.name.toLowerCase()).reduce((a,b)=>a+(b.line_total||0),0);
+    const boards=je.filter(r=>isB(r.mat||r.material||'')).reduce((a,r)=>a+r.qty,0);
+    const billed=A.bills.filter(b=>b.job&&b.job.toLowerCase()===j.name.toLowerCase()).reduce((a,b)=>a+parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0),0);
     const labor=A.labor.filter(e=>e.job===j.name).reduce((a,e)=>a+(e.total||0),0);
     const budget=j.budgetDollars||j.budget_dollars||0;
     return{name:j.name,budget,spent,boards,billed,labor,remaining:budget-spent,pct:budget?Math.round(spent/budget*100):0,pos:new Set(je.map(r=>r.po||r.po_number)).size};
   });
-  return{
-    company:A.co,jobs,
+  return{company:A.co,jobs,
     totalSpend:A.raw.reduce((a,r)=>a+(r.lineTotal||r.line_total||0),0),
-    totalBilled:A.bills.reduce((a,b)=>a+(b.line_total||0),0),
+    totalBilled:A.bills.reduce((a,b)=>a+parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0),0),
     totalLabor:A.labor.reduce((a,e)=>a+(e.total||0),0),
-    totalBoards:A.raw.filter(r=>isB(r.material||r.mat)).reduce((a,r)=>a+r.qty,0),
+    totalBoards:A.raw.filter(r=>isB(r.mat||r.material||'')).reduce((a,r)=>a+r.qty,0),
     totalBudget:A.jobs.reduce((a,j)=>a+(j.budgetDollars||j.budget_dollars||0),0),
     pendingPOs:[...new Set(A.raw.filter(r=>!r.building||!r.floor||!r.unit).map(r=>r.po||r.po_number))].length,
-    pendingBills:[...new Set(A.bills.filter(b=>!b.job||!b.building).map(b=>b.invoice_number))].length,
-    totalPOs:new Set(A.raw.map(r=>r.po||r.po_number)).size,
-  };
+    pendingBills:[...new Set(A.bills.filter(b=>!b.job||!b.building).map(b=>b.invoice_number||getBV(b,['Invoice Number','INVOICE NUMBER'])))].length,
+    totalPOs:new Set(A.raw.map(r=>r.po||r.po_number)).size};
 }
 
 async function sendAI(){
-  const inp=document.getElementById('ai-inp');
+  const inp=document.getElementById('ai-inp');if(!inp)return;
   const msg=inp.value.trim();if(!msg)return;
   inp.value='';
   if(!aiOpen)toggleAI();
-  document.getElementById('ai-quick').style.display='none';
+  const qk=document.getElementById('ai-quick');if(qk)qk.style.display='none';
   addAIMsg('user',msg);
   aiHistory.push({role:'user',content:msg});
   const typing=addTyping();
   const ctx=buildCtx();
-  const sys=`You are Claude, an AI assistant embedded in a drywall construction tracker for ${ctx.company}.
-
-LIVE DATA:
-- Jobs: ${ctx.jobs.length} | Total PO spend: $${Math.round(ctx.totalSpend).toLocaleString()} | Total billed: $${Math.round(ctx.totalBilled).toLocaleString()}
-- Total budget: $${Math.round(ctx.totalBudget).toLocaleString()} | Boards ordered: ${Math.round(ctx.totalBoards).toLocaleString()}
-- Labor & subs: $${Math.round(ctx.totalLabor).toLocaleString()} | POs missing location: ${ctx.pendingPOs} | Bills missing: ${ctx.pendingBills}
-
-JOBS:
-${ctx.jobs.map(j=>`${j.name}: Budget $${Math.round(j.budget).toLocaleString()}, Spent $${Math.round(j.spent).toLocaleString()} (${j.pct}%), Billed $${Math.round(j.billed).toLocaleString()}, Boards ${Math.round(j.boards).toLocaleString()}, Labor $${Math.round(j.labor).toLocaleString()}, $${Math.round(j.remaining).toLocaleString()} left, ${j.pos} POs`).join('\n')}
-
-Be concise, direct, and helpful. Use $ and numbers. Flag issues proactively.`;
-
+  const sys='You are Claude, an AI assistant embedded in a drywall construction tracker for '+ctx.company+'.\n\nLIVE DATA:\n- Jobs: '+ctx.jobs.length+' | PO spend: $'+Math.round(ctx.totalSpend).toLocaleString()+' | Billed: $'+Math.round(ctx.totalBilled).toLocaleString()+'\n- Budget: $'+Math.round(ctx.totalBudget).toLocaleString()+' | Boards: '+Math.round(ctx.totalBoards).toLocaleString()+' | Labor: $'+Math.round(ctx.totalLabor).toLocaleString()+'\n- POs missing location: '+ctx.pendingPOs+' | Bills missing location: '+ctx.pendingBills+'\n\nJOBS:\n'+ctx.jobs.map(j=>j.name+': Budget $'+Math.round(j.budget).toLocaleString()+', Spent $'+Math.round(j.spent).toLocaleString()+' ('+j.pct+'%), Billed $'+Math.round(j.billed).toLocaleString()+', Boards '+Math.round(j.boards).toLocaleString()+', Labor $'+Math.round(j.labor).toLocaleString()+', $'+Math.round(j.remaining).toLocaleString()+' left, '+j.pos+' POs').join('\n')+'\n\nBe concise, direct, helpful. Use $ and numbers. Flag issues.';
   try{
     const apiKey=localStorage.getItem('dw_ak')||'';
-    if(!apiKey){
-      typing.remove();
-      addAIMsg('ai','To use the AI assistant, go to Settings → Company and add your Anthropic API key. Get one free at console.anthropic.com — it only takes 2 minutes.');
-      return;
-    }
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,system:sys,messages:aiHistory})
-    });
+    if(!apiKey){typing.remove();addAIMsg('ai','To use AI assistant go to Settings → Company and add your Anthropic API key (free at console.anthropic.com).');return;}
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,system:sys,messages:aiHistory})});
     const data=await res.json();
     if(data.error)throw new Error(data.error.message);
     const reply=data.content[0].text;
     aiHistory.push({role:'assistant',content:reply});
-    typing.remove();
-    addAIMsg('ai',reply);
-  }catch(e){
-    typing.remove();
-    addAIMsg('ai','Error: '+e.message);
-  }
+    typing.remove();addAIMsg('ai',reply);
+  }catch(e){typing.remove();addAIMsg('ai','Error: '+e.message);}
 }
 
 function addAIMsg(role,text){
-  const el=document.getElementById('ai-msgs');
+  const el=document.getElementById('ai-msgs');if(!el)return;
   const d=document.createElement('div');
   d.className='ai-msg '+(role==='user'?'ai-msg-user':'ai-msg-ai');
   if(role!=='user'){const l=document.createElement('div');l.className='ai-msg-label';l.textContent='Claude';d.appendChild(l);}
   const t=document.createElement('div');t.style.whiteSpace='pre-wrap';t.textContent=text;d.appendChild(t);
-  el.appendChild(d);el.scrollTop=el.scrollHeight;
-  return d;
+  el.appendChild(d);el.scrollTop=el.scrollHeight;return d;
 }
 
 function addTyping(){
-  const el=document.getElementById('ai-msgs');
-  const d=document.createElement('div');
-  d.className='ai-typing';
+  const el=document.getElementById('ai-msgs');if(!el)return{remove:()=>{}};
+  const d=document.createElement('div');d.className='ai-typing';
   d.innerHTML='<span></span><span></span><span></span>';
-  el.appendChild(d);el.scrollTop=el.scrollHeight;
-  return d;
+  el.appendChild(d);el.scrollTop=el.scrollHeight;return d;
 }
 
-// API key in settings
 function addAPIKeyField(){
   if(document.getElementById('sak'))return;
   const co=document.getElementById('ss-company');if(!co)return;
   const div=document.createElement('div');div.className='fg';
-  div.innerHTML='<label class="flbl">Anthropic API Key <span style="font-weight:400;text-transform:none;color:var(--g400)">(for AI chat)</span></label><input id="sak" class="fi" type="password" placeholder="sk-ant-..." value="'+(localStorage.getItem('dw_ak')||'')+'"><div style="font-size:11px;color:var(--g400);margin-top:3px">Get free at <a href="https://console.anthropic.com" target="_blank" style="color:var(--blue)">console.anthropic.com</a> · saved locally only</div><button class="btn btns" style="margin-top:6px" onclick="saveAK()">Save API key</button>';
+  div.innerHTML='<label class="flbl">Anthropic API Key <span style="font-weight:400;text-transform:none;color:var(--g400)">(for AI chat)</span></label><input id="sak" class="fi" type="password" placeholder="sk-ant-..." value="'+(localStorage.getItem('dw_ak')||'')+'"><div style="font-size:11px;color:var(--g400);margin-top:3px">Free at <a href="https://console.anthropic.com" target="_blank" style="color:var(--blue)">console.anthropic.com</a></div><button class="btn btns" style="margin-top:6px" onclick="saveAK()">Save key</button>';
   const brow=co.querySelector('.brow');if(brow)co.insertBefore(div,brow);
 }
-function saveAK(){const v=document.getElementById('sak')?.value.trim();if(v){localStorage.setItem('dw_ak',v);alert('API key saved!');}else{localStorage.removeItem('dw_ak');alert('API key removed.');}}
+function saveAK(){const v=document.getElementById('sak')?.value.trim();if(v){localStorage.setItem('dw_ak',v);alert('API key saved!');}else{localStorage.removeItem('dw_ak');alert('Removed.');}}
 
 </script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -702,38 +505,36 @@ tr:hover td{background:var(--g50)}.tdb{font-weight:700;color:var(--g900)}.tdm{fo
 .bkpill span{font-size:12px;font-weight:600;color:#92400E}
 .bkpill button{background:none;border:none;cursor:pointer;color:#92400E;font-size:14px;line-height:1;padding:0}
 
-/* AI CHAT */
+/* AI FLOATING CHAT */
 #ai-fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--blue);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(24,95,165,.4);z-index:200;transition:transform .2s}
-#ai-fab:hover{transform:scale(1.08)}
+#ai-fab:hover{transform:scale(1.1)}
 #ai-fab svg{width:24px;height:24px;fill:white}
 #ai-panel{position:fixed;bottom:88px;right:24px;width:380px;max-width:calc(100vw - 48px);background:white;border-radius:16px;border:1px solid var(--g200);box-shadow:0 8px 40px rgba(0,0,0,.15);z-index:200;display:flex;flex-direction:column;transform:translateY(20px) scale(.96);opacity:0;pointer-events:none;transition:all .25s cubic-bezier(.34,1.56,.64,1)}
 #ai-panel.open{transform:translateY(0) scale(1);opacity:1;pointer-events:all}
-.ai-hdr{padding:14px 16px;border-bottom:1px solid var(--g200);display:flex;align-items:center;gap:10px}
-.ai-hdr-ico{width:32px;height:32px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.ai-hdr-ico svg{width:16px;height:16px;fill:white}
-.ai-hdr-title{font-size:14px;font-weight:700;color:var(--g900)}
-.ai-hdr-sub{font-size:11px;color:var(--g400)}
-.ai-hdr-close{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--g400);font-size:18px;line-height:1;padding:4px}
+.ai-hdr{padding:13px 15px;border-bottom:1px solid var(--g200);display:flex;align-items:center;gap:9px}
+.ai-hdr-ico{width:30px;height:30px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ai-hdr-ico svg{width:15px;height:15px;fill:white}
+.ai-hdr-title{font-size:13px;font-weight:700;color:var(--g900)}.ai-hdr-sub{font-size:11px;color:var(--g400)}
+.ai-hdr-close{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--g400);font-size:18px;line-height:1;padding:3px}
 .ai-hdr-close:hover{color:var(--g900)}
-#ai-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;max-height:340px;min-height:200px}
-.ai-msg{border-radius:10px;padding:9px 12px;font-size:13px;line-height:1.5;max-width:88%;animation:msgIn .2s ease}
+#ai-msgs{flex:1;overflow-y:auto;padding:13px;display:flex;flex-direction:column;gap:8px;max-height:340px;min-height:180px}
+.ai-msg{border-radius:10px;padding:8px 11px;font-size:13px;line-height:1.5;max-width:88%;animation:msgIn .2s ease}
 @keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .ai-msg-user{background:var(--blue);color:white;align-self:flex-end}
 .ai-msg-ai{background:var(--g50);color:var(--g800);align-self:flex-start;border:1px solid var(--g200)}
 .ai-msg-label{font-size:10px;font-weight:700;color:var(--blue);margin-bottom:3px}
-.ai-typing{display:flex;gap:4px;padding:10px 12px;background:var(--g50);border-radius:10px;align-self:flex-start;border:1px solid var(--g200)}
+.ai-typing{display:flex;gap:4px;padding:9px 11px;background:var(--g50);border-radius:10px;align-self:flex-start;border:1px solid var(--g200)}
 .ai-typing span{width:6px;height:6px;background:var(--g400);border-radius:50%;animation:bounce .9s infinite}
-.ai-typing span:nth-child(2){animation-delay:.15s}
-.ai-typing span:nth-child(3){animation-delay:.3s}
+.ai-typing span:nth-child(2){animation-delay:.15s}.ai-typing span:nth-child(3){animation-delay:.3s}
 @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
-.ai-footer{padding:10px 12px;border-top:1px solid var(--g200);display:flex;gap:8px}
-.ai-footer input{flex:1;padding:8px 11px;border:1.5px solid var(--g200);border-radius:20px;font-size:13px;outline:none;font-family:var(--font);background:var(--g50)}
+.ai-footer{padding:9px 11px;border-top:1px solid var(--g200);display:flex;gap:7px}
+.ai-footer input{flex:1;padding:7px 11px;border:1.5px solid var(--g200);border-radius:20px;font-size:13px;outline:none;font-family:var(--font);background:var(--g50)}
 .ai-footer input:focus{border-color:var(--blue);background:white}
-.ai-footer button{width:34px;height:34px;border-radius:50%;background:var(--blue);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s}
+.ai-footer button{width:32px;height:32px;border-radius:50%;background:var(--blue);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .ai-footer button:hover{background:var(--blue2)}
-.ai-footer button svg{width:16px;height:16px;fill:white}
-.ai-quick{padding:0 12px 10px;display:flex;gap:5px;flex-wrap:wrap}
-.ai-qbtn{padding:4px 9px;border-radius:12px;border:1px solid var(--g200);background:white;font-size:11px;color:var(--g600);cursor:pointer;font-family:var(--font);transition:all .15s}
+.ai-footer button svg{width:15px;height:15px;fill:white}
+#ai-quick{padding:0 11px 9px;display:flex;gap:5px;flex-wrap:wrap}
+.ai-qbtn{padding:4px 8px;border-radius:11px;border:1px solid var(--g200);background:white;font-size:11px;color:var(--g600);cursor:pointer;font-family:var(--font);transition:all .15s}
 .ai-qbtn:hover{background:var(--blue-lt);border-color:var(--blue);color:var(--blue)}
 .hidden{display:none!important}
 @media(max-width:768px){#sb{transform:translateX(-100%);transition:transform .3s}#sb.open{transform:translateX(0)}#cnt{margin-left:0}.g2,.g3,.g4,.etc{grid-template-columns:1fr}.pb{padding:14px}}
@@ -871,21 +672,112 @@ tr:hover td{background:var(--g50)}.tdb{font-weight:700;color:var(--g900)}.tdm{fo
     </div>
 
     <div id="sec-bills" class="sec">
-      <div class="alt alb">Bills = what was actually paid. POs = what was ordered. POs take 3–6 months to become bills.</div>
+      <div class="alt alb">Bills = what was actually delivered and invoiced. POs = what was ordered. The gap shows accuracy.</div>
+
       <div class="card">
-        <div class="ct">Add bill entry</div>
-        <div class="g3">
-          <div class="fg"><label class="flbl">Job</label><select id="bj" class="fse"><option value="">Select job...</option></select></div>
-          <div class="fg"><label class="flbl">Vendor</label><input id="bv" class="fi" placeholder="Vendor name"></div>
-          <div class="fg"><label class="flbl">Date paid</label><input id="bd" class="fi" type="date"></div>
-          <div class="fg"><label class="flbl">PO # (linked)</label><input id="bpo" class="fi" placeholder="Optional"></div>
-          <div class="fg"><label class="flbl">Description</label><input id="bds" class="fi" placeholder="What was paid for"></div>
-          <div class="fg"><label class="flbl">Amount paid ($)</label><input id="bam" class="fi" type="number" placeholder="0.00"></div>
+        <div class="ct">Bill entry wizard</div>
+        <div class="ws">
+          <div class="wsi on" id="bw1"><div class="wsd">1</div>Invoice lookup</div><div class="wsl"></div>
+          <div class="wsi" id="bw2"><div class="wsd">2</div>Bill type</div><div class="wsl"></div>
+          <div class="wsi" id="bw3"><div class="wsd">3</div>Location</div><div class="wsl"></div>
+          <div class="wsi" id="bw4"><div class="wsd">4</div>Confirm</div>
         </div>
-        <div class="brow"><button class="btn btnp" onclick="addBill()">Add bill +</button></div>
+        <div id="bwStep1">
+          <div class="fg"><label class="flbl">Invoice number</label>
+            <input id="bwInv" class="fi" type="text" placeholder="e.g. 1727196-00" style="font-size:18px;font-weight:700;font-family:var(--mono)" oninput="bwLookup(this.value)">
+          </div>
+          <div id="bwFound" class="hidden">
+            <div class="pop bl"><div class="popt" id="bwTitle"></div><div id="bwLines"></div><div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap" id="bwBadges"></div></div>
+            <div class="brow"><button class="btn btnp" onclick="bwGo(2)">Looks good — next ↗</button></div>
+          </div>
+          <div id="bwNone" class="hidden"><div class="alt ala">Invoice not found. Hit Sync in the sidebar first to load bills from your sheet.</div></div>
+        </div>
+        <div id="bwStep2" class="hidden">
+          <div style="font-size:13px;color:var(--g500);margin-bottom:14px;padding:9px;background:var(--g50);border-radius:8px" id="bwStep2Sum"></div>
+          <div class="ct">What type of bill is this?</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+            <div class="etc2" id="bwTypeMat" onclick="bwSetType('material')"><div class="etico">🧱</div><div class="etnm">Material</div><div class="etd">Drywall, studs, screws etc.</div></div>
+            <div class="etc2" id="bwTypeLab" onclick="bwSetType('labor')"><div class="etico">👷</div><div class="etnm">Labor</div><div class="etd">Sub crews, hanging, framing</div></div>
+            <div class="etc2" id="bwTypeEquip" onclick="bwSetType('equipment')"><div class="etico">🔧</div><div class="etnm">Equipment</div><div class="etd">Rentals, tools</div></div>
+            <div class="etc2" id="bwTypeOther" onclick="bwSetType('other')"><div class="etico">📋</div><div class="etnm">Other</div><div class="etd">Misc job costs</div></div>
+          </div>
+          <div id="bwTypeWarn" class="hidden"><div class="alt ala" id="bwTypeWarnTxt"></div></div>
+          <div class="brow"><button class="btn" onclick="bwGo(1)">← Back</button><button class="btn btnp" onclick="bwGo(3)">Next ↗</button></div>
+        </div>
+        <div id="bwStep3" class="hidden">
+          <div style="font-size:13px;color:var(--g500);margin-bottom:12px;padding:9px;background:var(--g50);border-radius:8px" id="bwStep3Sum"></div>
+          <div class="g4">
+            <div class="fg"><label class="flbl">Job</label><select id="bwJob" class="fse"><option value="">Select job...</option></select></div>
+            <div class="fg"><label class="flbl">Building #</label><input id="bwBldg" class="fi" placeholder="1, 2, A"></div>
+            <div class="fg"><label class="flbl">Floor</label><input id="bwFloor" class="fi" placeholder="1, 2, 3"></div>
+            <div class="fg"><label class="flbl">Unit</label><input id="bwUnit" class="fi" placeholder="101, 209"></div>
+          </div>
+          <div id="bwLaborCat" class="hidden">
+            <div class="ct" style="margin-top:4px">Labor category</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:10px">
+              <div class="etc2" id="bwCatFraming" onclick="bwSetCat('Framing')"><div class="etico">🏗️</div><div class="etnm">Framing</div></div>
+              <div class="etc2" id="bwCatHanging" onclick="bwSetCat('Hanging')"><div class="etico">📋</div><div class="etnm">Hanging</div></div>
+              <div class="etc2" id="bwCatFinish" onclick="bwSetCat('Finish')"><div class="etico">✨</div><div class="etnm">Finish</div></div>
+              <div class="etc2" id="bwCatPunchout" onclick="bwSetCat('Punchout')"><div class="etico">🔨</div><div class="etnm">Punchout</div></div>
+              <div class="etc2" id="bwCatOther" onclick="bwSetCat('Other')"><div class="etico">➕</div><div class="etnm">Other</div></div>
+            </div>
+            <div id="bwCatCustomWrap" class="hidden"><div class="fg"><label class="flbl">Category name</label><input id="bwCatCustom" class="fi" placeholder="e.g. Taping, Insulation..."></div></div>
+          </div>
+          <div id="bwMatComp" class="hidden">
+            <div class="ct" style="margin-top:4px">PO comparison for this job/location</div>
+            <div id="bwMatCompContent" style="font-size:13px;color:var(--g400)">Select job and location above to compare to POs.</div>
+          </div>
+          <div class="brow"><button class="btn" onclick="bwGo(2)">← Back</button><button class="btn btnp" onclick="bwGo(4)">Review ↗</button></div>
+        </div>
+        <div id="bwStep4" class="hidden">
+          <div class="pop gr"><div class="popt" style="color:var(--green)">Review before saving</div><div id="bwConfirm"></div></div>
+          <div class="alt alg" style="margin-top:9px">Saves to Supabase + writes category and job reference back to BILL DATA sheet.</div>
+          <div class="brow"><button class="btn" onclick="bwGo(3)">← Edit</button><button class="btn btng" onclick="bwSave()">Save everywhere ✓</button></div>
+        </div>
       </div>
-      <div class="card"><div class="ct">PO ordered vs bills paid — by job</div><div id="bcomp"></div></div>
-      <div class="card"><div class="ct">All bill entries</div><div class="tw" id="btbl"></div></div>
+
+      <div class="tbr">
+        <button class="tbn on" onclick="showBillsTab('overview')" id="bilt-overview">Overview</button>
+        <button class="tbn" onclick="showBillsTab('material')" id="bilt-material">Material Bills</button>
+        <button class="tbn" onclick="showBillsTab('labor')" id="bilt-labor">Labor Bills</button>
+        <button class="tbn" onclick="showBillsTab('all')" id="bilt-all">All Lines</button>
+      </div>
+      <div id="billTab-overview">
+        <div class="card"><div class="ct">Budget → PO ordered → Bills paid — by job</div><div id="bComp3"></div></div>
+      </div>
+      <div id="billTab-material" class="hidden">
+        <div class="card">
+          <div class="chdr"><div class="ct" style="margin:0">Material bill lines</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <select class="fs2" id="bMatFJob" onchange="rMatBills()"><option value="">All jobs</option></select>
+              <select class="fs2" id="bMatFBldg" onchange="rMatBills()"><option value="">All bldgs</option></select>
+              <select class="fs2" id="bMatFFloor" onchange="rMatBills()"><option value="">All floors</option></select>
+            </div>
+          </div>
+          <div class="tw" id="bMatTbl"></div>
+        </div>
+      </div>
+      <div id="billTab-labor" class="hidden">
+        <div class="card">
+          <div class="chdr"><div class="ct" style="margin:0">Labor bill breakdown</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <select class="fs2" id="bLabFJob" onchange="rLabBills()"><option value="">All jobs</option></select>
+              <select class="fs2" id="bLabFCat" onchange="rLabBills()"><option value="">All categories</option></select>
+              <select class="fs2" id="bLabFFloor" onchange="rLabBills()"><option value="">All floors</option></select>
+            </div>
+          </div>
+          <div class="tw" id="bLabTbl"></div>
+        </div>
+        <div class="card"><div class="ct">Labor by category — budget vs actual</div><div id="bLabCats"></div></div>
+      </div>
+      <div id="billTab-all" class="hidden">
+        <div class="card">
+          <div class="chdr"><div class="ct" style="margin:0">All bill lines</div>
+            <select class="fs2" id="bAllFJob" onchange="rAllBills()"><option value="">All jobs</option></select>
+          </div>
+          <div class="tw" id="bAllTbl"></div>
+        </div>
+      </div>
     </div>
 
     <div id="sec-boards" class="sec">
@@ -1053,7 +945,8 @@ tr:hover td{background:var(--g50)}.tdb{font-weight:700;color:var(--g900)}.tdm{fo
       <div id="ss-connect" class="hidden">
         <div class="card">
           <div class="ct">Google Sheet connection</div>
-          <div class="fg"><label class="flbl">Apps Script URL (POs)</label><input id="surl" class="fi" placeholder="https://script.google.com/macros/s/..."></div>
+          <div class="fg"><label class="flbl">Apps Script URL</label><input id="surl" class="fi" placeholder="https://script.google.com/macros/s/..."></div>
+          <div class="fg"><label class="flbl">Bill Script URL (optional separate)</label><input id="burl" class="fi" placeholder="Leave blank to use same URL above"></div>
           <div class="brow" style="justify-content:flex-start">
             <button class="btn btnp" onclick="svURL()">Save URL</button>
             <button class="btn" onclick="sync()">Test connection</button>
@@ -1081,83 +974,93 @@ tr:hover td{background:var(--g50)}.tdb{font-weight:700;color:var(--g900)}.tdm{fo
 
 
 <script>
+
 const SUPA_URL = 'https://svvjsumhkbezbyskxxej.supabase.co';
 const SUPA_KEY = 'sb_publishable_4HfeK566v2NHwXwZISd75g_c2muZNID';
 const { createClient } = supabase;
 const db = createClient(SUPA_URL, SUPA_KEY);
 
-const JC=['#1E6FBF','#1A7A4A','#B45309','#7C3AED','#0F766E','#BE185D','#C2410C'];
-const JL=['#E8F2FC','#E6F5ED','#FEF3C7','#EDE9FE','#CCFBF1','#FCE7F3','#FFF7ED'];
-const BKD=['denshield','shaft liner','durock','1/2 reg','5/8 type x','5/8 typex','1/2 drywall','5/8 drywall','mr board','mold defense','densglass','sheetrock','blueboard','greenboard','gypsum board'];
-const SURL='https://script.google.com/macros/s/AKfycbypj5Zs0d6RBKpslnmkp4tMDwC7OXGpjevtwbrLrXReAWdZSEoSP4mMN6HE-_0LhU9I/exec';
-
-let A={pc:'GYPSUM',co:'AA Drywall',logo:null,su:'https://script.google.com/macros/s/AKfycbypj5Zs0d6RBKpslnmkp4tMDwC7OXGpjevtwbrLrXReAWdZSEoSP4mMN6HE-_0LhU9I/exec',bill_url:'',jobs:[],raw:[],bills:[],labor:[],bkw:[...BKD],abt:'ov',ast:'company',aet:'labor',abj:null,ppo:null};
-
-// ── SUPABASE DB OPERATIONS ──
 async function dbLoad(){
   try{
-    const [sR,jR,pR,bR,lR] = await Promise.all([
+    const [sR,jR,pR,bR,lR]=await Promise.all([
       db.from('settings').select('*').eq('id',1).single(),
       db.from('jobs').select('*').order('name'),
       db.from('po_lines').select('*').order('date',{ascending:false}),
       db.from('bills').select('*').order('date',{ascending:false}),
       db.from('labor').select('*').order('date',{ascending:false}),
     ]);
-    if(sR.data){A.co=sR.data.company_name||'AA Drywall';A.pc=sR.data.passcode||'GYPSUM';A.logo=sR.data.logo_data||null;A.su=sR.data.script_url||A.su;A.bill_url=sR.data.bill_url||'';if(sR.data.board_keywords&&sR.data.board_keywords.length)A.bkw=sR.data.board_keywords;}
-    if(jR.data)A.jobs=jR.data.map(j=>({...j,mat_budgets:j.mat_budgets||[],aliases:j.aliases||[],budgetDollars:j.budget_dollars||0,boardBudget:j.board_budget||0,laborBudget:j.labor_budget||0}));
-    if(pR.data)A.raw=pR.data.map(r=>({...r,po:r.po_number,mat:r.material,uom:r.uom,unitCost:r.unit_cost||0,lineTotal:r.line_total||0,building:r.building||'',floor:r.floor||'',unit:r.unit||'',model:r.model||'',date:r.date||''}));
+    if(sR.data){A.co=sR.data.company_name||A.co;A.pc=sR.data.passcode||A.pc;A.logo=sR.data.logo_data||null;if(sR.data.script_url)A.su=sR.data.script_url;if(sR.data.bill_url)A.bill_url=sR.data.bill_url||'';if(sR.data.board_keywords&&sR.data.board_keywords.length)A.bkw=sR.data.board_keywords;}
+    if(jR.data)A.jobs=jR.data.map(j=>({...j,mat_budgets:j.mat_budgets||[],matBudgets:j.mat_budgets||[],aliases:j.aliases||[],budgetDollars:j.budget_dollars||0,boardBudget:j.board_budget||0,laborBudget:j.labor_budget||0}));
+    if(pR.data)A.raw=pR.data.map(r=>({...r,po:r.po_number,mat:r.material,unitCost:r.unit_cost||0,lineTotal:r.line_total||0,building:r.building||'',floor:r.floor||'',unit:r.unit||'',model:r.model||'',date:r.date||''}));
     if(bR.data)A.bills=bR.data;
     if(lR.data)A.labor=lR.data.map(e=>({...e,type:e.type||'labor',total:e.total||0,f1:e.field1||0,f2:e.field2||0}));
   }catch(e){console.warn('DB load:',e);}
 }
-async function dbSaveSetting(){
-  await db.from('settings').upsert({id:1,company_name:A.co,passcode:A.pc,logo_data:A.logo,script_url:A.su,bill_url:A.bill_url||'',board_keywords:A.bkw});
+
+async function dbSaveSettings(){
+  try{await db.from('settings').upsert({id:1,company_name:A.co,passcode:A.pc,logo_data:A.logo,script_url:A.su,bill_url:A.bill_url||'',board_keywords:A.bkw});}catch(e){console.warn(e);}
 }
+
 async function dbSaveJob(job){
-  const row={name:job.name,color:job.color,light:job.light,budget_dollars:job.budgetDollars||0,board_budget:job.boardBudget||0,labor_budget:job.laborBudget||0,mat_budgets:job.mat_budgets||[],aliases:job.aliases||[]};
+  const row={name:job.name,color:job.color,light:job.light,budget_dollars:job.budgetDollars||0,board_budget:job.boardBudget||0,labor_budget:job.laborBudget||0,mat_budgets:job.mat_budgets||job.matBudgets||[],aliases:job.aliases||[]};
   if(job.id)row.id=job.id;
   const {data}=await db.from('jobs').upsert(row,{onConflict:'name'}).select().single();
-  if(data){const i=A.jobs.findIndex(j=>j.name===job.name);const merged={...data,mat_budgets:data.mat_budgets||[],aliases:data.aliases||[],budgetDollars:data.budget_dollars||0,boardBudget:data.board_budget||0,laborBudget:data.labor_budget||0};if(i>=0)A.jobs[i]=merged;else A.jobs.push(merged);}
+  if(data){const i=A.jobs.findIndex(j=>j.name===job.name);const m={...data,mat_budgets:data.mat_budgets||[],matBudgets:data.mat_budgets||[],aliases:data.aliases||[],budgetDollars:data.budget_dollars||0,boardBudget:data.board_budget||0,laborBudget:data.labor_budget||0};if(i>=0)A.jobs[i]=m;else A.jobs.push(m);}
 }
+
 async function dbDeleteJob(name){await db.from('jobs').delete().eq('name',name);}
+
 async function dbSavePO(lines){
-  const rows=lines.map(r=>({po_number:r.po||r.po_number,job:r.job,date:r.date||null,material:r.mat||r.material,qty:r.qty||0,uom:r.uom||'',unit_cost:r.unitCost||r.unit_cost||0,line_total:r.lineTotal||r.line_total||0,building:r.building||'',floor:r.floor||'',unit:r.unit||'',model:r.model||''}));
-  await db.from('po_lines').upsert(rows,{onConflict:'po_number,material'});
+  try{
+    const rows=lines.map(r=>({po_number:r.po||r.po_number,job:r.job,date:r.date||null,material:r.mat||r.material||'',qty:r.qty||0,uom:r.uom||'',unit_cost:r.unitCost||r.unit_cost||0,line_total:r.lineTotal||r.line_total||0,building:r.building||'',floor:r.floor||'',unit:r.unit||'',model:r.model||''}));
+    await db.from('po_lines').upsert(rows,{onConflict:'po_number,material'});
+  }catch(e){console.warn('PO save:',e);}
 }
+
 async function dbUpdPOLoc(po,b,f,u,m){
-  await db.from('po_lines').update({building:b,floor:f,unit:u,model:m}).eq('po_number',po);
+  try{await db.from('po_lines').update({building:b,floor:f,unit:u,model:m}).eq('po_number',po);}catch(e){console.warn(e);}
   A.raw.forEach(r=>{if((r.po||r.po_number)===po){r.building=b;r.floor=f;r.unit=u;r.model=m;}});
 }
-async function dbSaveBills(rows){await db.from('bills').upsert(rows,{onConflict:'invoice_number,item_description'});}
-async function dbUpdBillLoc(inv,job,b,f,u){
-  await db.from('bills').update({job,building:b,floor:f,unit:u}).eq('invoice_number',inv);
-  A.bills.forEach(r=>{if(r.invoice_number===inv){r.job=job;r.building=b;r.floor=f;r.unit=u;}});
+
+async function dbSaveBills(rows){
+  try{await db.from('bills').upsert(rows,{onConflict:'invoice_number,item_description'});}catch(e){console.warn('Bill save:',e);}
 }
+
 async function dbAddLabor(entry){
-  const {data}=await db.from('labor').insert({type:entry.type,job:entry.job,date:entry.date||null,name:entry.name,field1:entry.f1||0,field2:entry.f2||0,total:entry.total||0,notes:entry.notes||''}).select().single();
-  if(data)A.labor.unshift({...data,f1:data.field1||0,f2:data.field2||0});
-}
-async function dbDelLabor(id){await db.from('labor').delete().eq('id',id);A.labor=A.labor.filter(e=>e.id!==id);}
-
-function parseJobRef(ref){
-  if(!ref)return null;
-  const r=ref.trim();
-  const bdgM=r.match(/BDG\s+(\S+)/i),flM=r.match(/FL\s+(\S+)/i),unitM=r.match(/UNIT\s+(\S+)/i);
-  if(!bdgM&&!flM&&!unitM)return null;
-  const first=r.search(/(BDG|FL|UNIT)/i);
-  const jobRaw=first>0?r.substring(0,first).trim():'';
-  return{jobRaw,job:res(jobRaw),building:bdgM?bdgM[1]:'',floor:flM?flM[1]:'',unit:unitM?unitM[1]:''};
+  try{
+    const {data}=await db.from('labor').insert({type:entry.type,job:entry.job,date:entry.date||null,name:entry.name,field1:entry.f1||0,field2:entry.f2||0,total:entry.total||0,notes:entry.notes||''}).select().single();
+    if(data)A.labor.unshift({...data,f1:data.field1||0,f2:data.field2||0});
+  }catch(e){console.warn(e);}
 }
 
-function sv(){} // data saved to Supabase, not localStorage
-function ld(){} // data loaded from Supabase in init()
+async function dbDelLabor(id){
+  try{await db.from('labor').delete().eq('id',id);}catch(e){}
+  A.labor=A.labor.filter(e=>e.id!==id);
+}
+
+const JC=['#1E6FBF','#1A7A4A','#B45309','#7C3AED','#0F766E','#BE185D','#C2410C'];
+const JL=['#E8F2FC','#E6F5ED','#FEF3C7','#EDE9FE','#CCFBF1','#FCE7F3','#FFF7ED'];
+const BKD=['denshield','shaft liner','durock','1/2 reg','5/8 type x','5/8 typex','1/2 drywall','5/8 drywall','mr board','mold defense','densglass','sheetrock','blueboard','greenboard','gypsum board'];
+const SURL='https://script.google.com/macros/s/AKfycbypj5Zs0d6RBKpslnmkp4tMDwC7OXGpjevtwbrLrXReAWdZSEoSP4mMN6HE-_0LhU9I/exec';
+
+let A={pc:'GYPSUM',co:'AA Drywall',logo:null,su:SURL,bill_url:'',jobs:[],raw:[],bills:[],labor:[],bkw:[...BKD],abt:'ov',ast:'company',aet:'labor',abj:null,ppo:null};
+
+function sv(){try{localStorage.setItem('dw4',JSON.stringify(A));}catch(e){}}
+function ld(){
+  try{
+    const s=localStorage.getItem('dw4');if(!s)return;const p=JSON.parse(s);
+    A.pc=p.pc||'GYPSUM';A.co=p.co||'AA Drywall';A.logo=p.logo||null;A.su=p.su||SURL;
+    A.jobs=p.jobs||[];A.raw=p.raw||[];A.bills=p.bills||[];A.labor=p.labor||[];
+    A.bkw=p.bkw||[...BKD];A.abj=p.abj||null;
+  }catch(e){}
+}
 
 function chk(){
   const v=document.getElementById('li').value.trim().toUpperCase();
   if(v===A.pc.toUpperCase()){
     document.getElementById('lock').style.display='none';
     document.getElementById('aw').style.display='block';
-    try{sessionStorage.setItem('dwa','1');}catch(e){}
+    try{sessionStorage.setItem('dwa','1');localStorage.setItem('dwa','1');}catch(e){}
     brand();rDash();
   }else{
     const e=document.getElementById('lerr');e.textContent='Incorrect passcode.';
@@ -1185,8 +1088,8 @@ function brand(){
   const surl=document.getElementById('surl');if(surl)surl.value=A.su;
 }
 
-function upLogo(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=async e=>{A.logo=e.target.result;await dbSaveSetting();brand();};r.readAsDataURL(f);}
-async function rmLogo(){A.logo=null;await dbSaveSetting();brand();document.getElementById('lpv').classList.add('hidden');document.getElementById('lht').style.display='inline';}
+function upLogo(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{A.logo=e.target.result;sv();brand();};r.readAsDataURL(f);}
+function rmLogo(){A.logo=null;sv();brand();document.getElementById('lpv').classList.add('hidden');document.getElementById('lht').style.display='inline';}
 
 const PM={dash:{t:'Dashboard',s:'Overview of all active jobs'},po:{t:'PO Tracking',s:'Entry and tracking'},bills:{t:'Bills & Actuals',s:'Paid vs ordered'},boards:{t:'Board Tracker',s:'Drywall board counts from PO data'},labor:{t:'Labor & Subs',s:'Weekly entries'},budget:{t:'Budget Bank',s:'Job, material, board and labor budgets'},breakdown:{t:'Job Breakdown',s:'Drill down by job, floor, unit, date'},raw:{t:'Raw Data',s:'Synced from Google Sheets'},settings:{t:'Settings',s:'Company, jobs, and connections'}};
 
@@ -1199,13 +1102,13 @@ function go(p){
   cSB();
   if(p==='dash')rDash();
   if(p==='po'){fSel('pfj',A.jobs.map(j=>j.name).sort(),'All jobs');rPOT();}
-  if(p==='bills'){fSel('bj',A.jobs.map(j=>j.name).sort(),'Select job...');rBC();rBT();}
+  if(p==='bills'){rBillsOverview();rMatBills();rLabBills();rAllBills();}
   if(p==='boards'){fSel('bdfj',A.jobs.map(j=>j.name).sort(),'All jobs');rBds();rBKWD();}
   if(p==='labor'){fSel('lj',A.jobs.map(j=>j.name).sort(),'Select job...');fSel('lfj',A.jobs.map(j=>j.name).sort(),'All jobs');rLabT();rLabS();}
   if(p==='budget')rBP();
   if(p==='breakdown'){fBDF();rBD();}
   if(p==='raw')rRaw();
-  if(p==='settings'){brand();rSt();}
+  if(p==='settings'){brand();rSt();setTimeout(addAPIKeyField,100);}
 }
 function oSB(){document.getElementById('sb').classList.add('open');document.getElementById('ovl').classList.add('show');}
 function cSB(){document.getElementById('sb').classList.remove('open');document.getElementById('ovl').classList.remove('show');}
@@ -1270,17 +1173,38 @@ async function sync(){
     const jns=[...new Set(data.map(r=>r.job).filter(Boolean))];let added=0;
     jns.forEach(name=>{if(!A.jobs.find(j=>j.name.toLowerCase()===name.toLowerCase())){const i=A.jobs.length%JC.length;A.jobs.push({id:name.toLowerCase().replace(/[^a-z0-9]/g,'-')+Date.now(),name,color:JC[i],light:JL[i],budgetDollars:0,boardBudget:0,laborBudget:0,matBudgets:[],aliases:[]});added++;}});
     A.jobs=A.jobs.filter(j=>jns.some(n=>n.toLowerCase()===j.name.toLowerCase())||j.budgetDollars>0||j.boardBudget>0||j.laborBudget>0||(j.matBudgets&&j.matBudgets.length>0));
-    await dbSavePO(data);sv();st.textContent='Synced — '+data.length+' rows'+(added?', '+added+' new job'+(added!==1?'s':''):'');st.className='sst ok';
+    try{await dbSavePO(data);}catch(e){console.warn('Supabase PO save:',e);}sv();st.textContent='Synced — '+data.length+' rows'+(added?', '+added+' new job'+(added!==1?'s':''):'');st.className='sst ok';
     upBdg();rDash();
+    // Also sync bills from same script
+    try{
+      const bUrl=A.bill_url||A.su;
+      let bParsed;
+      try{const br=await fetch(bUrl,{redirect:'follow'});bParsed=await br.json();}
+      catch(e1){const br2=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(bUrl));const bw=await br2.json();bParsed=JSON.parse(bw.contents);}
+      const brows=(bParsed.bills||[]).filter(r=>{
+        const lt=parseFloat(r['Line Total']||r['LINE TOTAL']||r.line_total||0);
+        const desc=r['Item Description']||r['ITEM DESCRIPTION']||r.item_description||'';
+        return lt>0||desc;
+      }).map(r=>({
+        vendor:r['Vendor']||r['VENDOR']||r.vendor||'',
+        invoice_number:r['Invoice Number']||r['INVOICE NUMBER']||r.invoice_number||'',
+        date:r['Date']||r['DATE']||r.date||null,
+        item_description:r['Item Description']||r['ITEM DESCRIPTION']||r.item_description||'',
+        qty:parseFloat(r['Quantity']||r['QUANTITY']||r.qty||0),
+        unit_price:parseFloat(r['Unit Price']||r['UNIT PRICE']||r.unit_price||0),
+        line_total:parseFloat(r['Line Total']||r['LINE TOTAL']||r.line_total||0),
+        job_reference:r['Job Reference Number']||r['JOB REFERANCE NUMBER']||r.job_reference||'',
+        job:r.job||'',building:r.building||'',floor:r.floor||'',unit:r.unit||'',
+        bill_type:r.bill_type||'',category:r.category||''
+      })).filter(r=>r.invoice_number);
+      if(brows.length){await dbSaveBills(brows);A.bills=brows;upBdg();if(A.activePage==='bills'){rBillsOverview();rMatBills();rLabBills();rAllBills();}}
+      st.textContent+=' + '+brows.length+' bill rows';
+    }catch(be){console.warn('Bills sync:',be);}
   }catch(e){st.textContent='Error: '+e.message;st.className='sst err';console.error(e);}
   finally{ico.classList.remove('spinning');}
 }
 
 async function svBTS(){
-  // Save each job to Supabase
-  for(const j of A.jobs){await dbSaveJob(j);}
-}
-async function _svBTS_orig(){
   try{fetch(A.su,{method:'POST',mode:'no-cors',body:JSON.stringify({type:'budgets',jobs:A.jobs.map(j=>({name:j.name,budgetDollars:j.budgetDollars||0,boardBudget:j.boardBudget||0,laborBudget:j.laborBudget||0,matBudgets:j.matBudgets||[],aliases:j.aliases||[]}))})});}catch(e){}
 }
 async function wLoc(po,b,f,u,m){
@@ -1438,7 +1362,7 @@ function rBOv(){
   document.getElementById('bdi').innerHTML=A.jobs.map((j,i)=>'<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--g100);flex-wrap:wrap"><div style="width:11px;height:11px;border-radius:50%;background:'+j.color+'"></div><div style="font-size:14px;font-weight:700;flex:2;min-width:130px">'+j.name+'</div><div style="flex:1;min-width:130px"><label class="flbl">Dollar budget ($)</label><input id="bd-'+i+'" class="fi" type="number" placeholder="120000" value="'+(j.budgetDollars||'')+'"></div></div>').join('')||'<div style="color:var(--g400)">Sync to load jobs.</div>';
   document.getElementById('bva').innerHTML=A.jobs.map(j=>{const sp=A.raw.filter(r=>r.job.toLowerCase()===j.name.toLowerCase()).reduce((a,r)=>a+r.lineTotal,0);const p=pct(sp,j.budgetDollars);return'<div style="padding:11px 0;border-bottom:1px solid var(--g100)"><div style="display:flex;justify-content:space-between;margin-bottom:3px;flex-wrap:wrap;gap:5px"><span style="font-weight:700">'+j.name+'</span><span style="font-size:12px;color:var(--g500)">'+fmt(sp)+' / '+(j.budgetDollars?fmt(j.budgetDollars):'no budget')+'</span></div><div class="pb2"><div class="pf '+bcc(p)+'" style="width:'+p+'%"></div></div><div style="font-size:11px;color:var(--g400);margin-top:1px">'+p+'% used'+(j.budgetDollars?' · '+fmt(j.budgetDollars-sp)+' remaining':'')+'</div></div>';}).join('')||'<div style="color:var(--g400)">No jobs.</div>';
 }
-async function svBud(){for(let i=0;i<A.jobs.length;i++){A.jobs[i].budgetDollars=parseFloat(document.getElementById('bd-'+i)?.value)||0;await dbSaveJob(A.jobs[i]);}rBOv();rDash();alert('Budgets saved!');}
+async function svBud(){for(let i=0;i<A.jobs.length;i++){A.jobs[i].budgetDollars=parseFloat(document.getElementById('bd-'+i)?.value)||0;await dbSaveJob(A.jobs[i]);}sv();svBTS();rBOv();rDash();alert('Budgets saved!');}
 
 function rMB(){
   fSel('mjs',A.jobs.map(j=>j.name).sort(),'Select job...');
@@ -1462,7 +1386,7 @@ function rMB(){
       '<button class="btn btns btnd" data-jn="'+job.name+'" data-i="'+i+'" onclick="rmMB(this)">×</button></div>';
   }).join('');
 }
-async function addMB(){
+function addMB(){
   const jn=document.getElementById('mjs')?.value;const job=A.jobs.find(j=>j.name===jn);
   if(!job){alert('Select a job.');return;}
   const kw=document.getElementById('mkw').value.trim();if(!kw){alert('Enter a keyword.');return;}
@@ -1470,23 +1394,23 @@ async function addMB(){
   const bd=parseFloat(document.getElementById('mbd').value)||0,bq=parseFloat(document.getElementById('mbq').value)||0;
   job.matBudgets.push({keyword:kw,budgetDollars:bd,budgetQty:bq});
   document.getElementById('mkw').value='';document.getElementById('mbd').value='';document.getElementById('mbq').value='';
-  await dbSaveJob(job);rMB();
+  sv();svBTS();rMB();
 }
-async function rmMB(btn){
+function rmMB(btn){
   const jn=btn.dataset.jn,i=parseInt(btn.dataset.i);
   const job=A.jobs.find(j=>j.name===jn);if(!job)return;
-  job.matBudgets.splice(i,1);await dbSaveJob(job);rMB();
+  job.matBudgets.splice(i,1);sv();svBTS();rMB();
 }
 function rBBud(){
   document.getElementById('bbi').innerHTML=A.jobs.map((j,i)=>'<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--g100);flex-wrap:wrap"><div style="width:11px;height:11px;border-radius:50%;background:'+j.color+'"></div><div style="font-size:14px;font-weight:700;flex:2;min-width:130px">'+j.name+'</div><div style="flex:1;min-width:130px"><label class="flbl">Board budget (sheets)</label><input id="bb-'+i+'" class="fi" type="number" placeholder="2000" value="'+(j.boardBudget||'')+'"></div></div>').join('')||'<div style="color:var(--g400)">Sync to load jobs.</div>';
   document.getElementById('bbva').innerHTML=A.jobs.map(j=>{const bds=A.raw.filter(r=>r.job.toLowerCase()===j.name.toLowerCase()&&isB(r.mat)).reduce((a,r)=>a+r.qty,0);const p=pct(bds,j.boardBudget);return'<div style="padding:11px 0;border-bottom:1px solid var(--g100)"><div style="display:flex;justify-content:space-between;margin-bottom:3px;flex-wrap:wrap;gap:5px"><span style="font-weight:700">'+j.name+'</span><span style="font-size:12px;color:var(--g500)">'+Math.round(bds).toLocaleString()+' / '+(j.boardBudget?j.boardBudget.toLocaleString():'no budget')+' boards</span></div><div class="pb2"><div class="pf '+bcc(p)+'" style="width:'+p+'%"></div></div></div>';}).join('');
 }
-async function svBB(){for(let i=0;i<A.jobs.length;i++){A.jobs[i].boardBudget=parseFloat(document.getElementById('bb-'+i)?.value)||0;await dbSaveJob(A.jobs[i]);}rBBud();alert('Board budgets saved!');}
+async function svBB(){for(let i=0;i<A.jobs.length;i++){A.jobs[i].boardBudget=parseFloat(document.getElementById('bb-'+i)?.value)||0;await dbSaveJob(A.jobs[i]);}sv();rBBud();alert('Board budgets saved!');}
 function rLBud(){
   document.getElementById('lbi').innerHTML=A.jobs.map((j,i)=>'<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--g100);flex-wrap:wrap"><div style="width:11px;height:11px;border-radius:50%;background:'+j.color+'"></div><div style="font-size:14px;font-weight:700;flex:2;min-width:130px">'+j.name+'</div><div style="flex:1;min-width:130px"><label class="flbl">Labor &amp; sub budget ($)</label><input id="lb-'+i+'" class="fi" type="number" placeholder="50000" value="'+(j.laborBudget||'')+'"></div></div>').join('')||'<div style="color:var(--g400)">Sync to load jobs.</div>';
   document.getElementById('lbva').innerHTML=A.jobs.map(j=>{const lab=A.labor.filter(e=>e.job===j.name).reduce((a,e)=>a+e.total,0);const p=pct(lab,j.laborBudget);return'<div style="padding:11px 0;border-bottom:1px solid var(--g100)"><div style="display:flex;justify-content:space-between;margin-bottom:3px;flex-wrap:wrap;gap:5px"><span style="font-weight:700">'+j.name+'</span><span style="font-size:12px;color:var(--g500)">'+fmt(lab)+' / '+(j.laborBudget?fmt(j.laborBudget):'no budget')+'</span></div><div class="pb2"><div class="pf '+bcc(p)+'" style="width:'+p+'%"></div></div></div>';}).join('');
 }
-async function svLB(){for(let i=0;i<A.jobs.length;i++){A.jobs[i].laborBudget=parseFloat(document.getElementById('lb-'+i)?.value)||0;await dbSaveJob(A.jobs[i]);}rLBud();alert('Labor budgets saved!');}
+function svLB(){A.jobs.forEach((j,i)=>{j.laborBudget=parseFloat(document.getElementById('lb-'+i)?.value)||0;});sv();svBTS();rLBud();alert('Labor budgets saved!');}
 
 function fBDF(){
   const e=ents();
@@ -1546,437 +1470,432 @@ function svCo(){
   const n=document.getElementById('scn').value.trim(),p=document.getElementById('scp').value.trim();
   if(n)A.co=n;if(p)A.pc=p.toUpperCase();sv();brand();alert('Settings saved!');
 }
-async function svURL(){A.su=document.getElementById('surl').value.trim();A.bill_url=document.getElementById('burl')?.value.trim()||'';await dbSaveSetting();alert('URLs saved!');}
+function svURL(){A.su=document.getElementById('surl').value.trim();sv();alert('URL saved!');}
 function rJobs(){
   document.getElementById('jlist').innerHTML=A.jobs.map((j,i)=>'<div class="srow"><div class="cdot" style="background:'+j.color+';margin-top:14px"></div><div style="flex:1"><div style="font-size:14px;font-weight:700;margin-bottom:7px">'+j.name+'</div><label class="flbl">QB name aliases (comma separated)</label><input id="al-'+i+'" class="fi" placeholder="e.g. Pioneer Lofts Building 3" value="'+(j.aliases||[]).join(', ')+'"><div style="font-size:11px;color:var(--g400);margin-top:2px">These QB name variations auto-merge into <strong>'+j.name+'</strong> on sync</div><div style="margin-top:7px;display:flex;gap:7px"><button class="btn btns" onclick="svAl('+i+')">Save aliases</button><button class="btn btns btnd" onclick="rmJob('+i+')">Remove</button></div></div></div>').join('')||'<div style="color:var(--g400);font-size:13px;padding:11px 0">No jobs yet — sync to auto-create from sheet.</div>';
 }
-async function svAl(i){const el=document.getElementById('al-'+i);if(!el||!A.jobs[i])return;A.jobs[i].aliases=el.value.split(',').map(a=>a.trim()).filter(Boolean);await dbSaveJob(A.jobs[i]);alert('Aliases saved!');}
-async function addJob(){const n=document.getElementById('njn').value.trim();if(!n)return;if(A.jobs.find(j=>j.name.toLowerCase()===n.toLowerCase())){alert('Already exists.');return;}const i=A.jobs.length%JC.length;const job={name:n,color:JC[i],light:JL[i],budgetDollars:0,boardBudget:0,laborBudget:0,mat_budgets:[],aliases:[]};await dbSaveJob(job);document.getElementById('njn').value='';rJobs();}
-async function rmJob(i){if(!confirm('Remove "'+A.jobs[i].name+'"?'))return;await dbDeleteJob(A.jobs[i].name);A.jobs.splice(i,1);rJobs();}
+function svAl(i){const el=document.getElementById('al-'+i);if(!el||!A.jobs[i])return;A.jobs[i].aliases=el.value.split(',').map(a=>a.trim()).filter(Boolean);sv();svBTS();alert('Aliases saved!');}
+function addJob(){const n=document.getElementById('njn').value.trim();if(!n)return;if(A.jobs.find(j=>j.name.toLowerCase()===n.toLowerCase())){alert('Already exists.');return;}const i=A.jobs.length%JC.length;A.jobs.push({id:n.toLowerCase().replace(/[^a-z0-9]/g,'-')+Date.now(),name:n,color:JC[i],light:JL[i],budgetDollars:0,boardBudget:0,laborBudget:0,matBudgets:[],aliases:[]});document.getElementById('njn').value='';sv();rJobs();}
+function rmJob(i){if(!confirm('Remove "'+A.jobs[i].name+'"?'))return;A.jobs.splice(i,1);sv();rJobs();}
 function rBKWL(){document.getElementById('bkwl').innerHTML='<div style="display:flex;flex-wrap:wrap">'+A.bkw.map((kw,i)=>'<div class="bkpill"><span>'+kw+'</span><button onclick="rmBKW('+i+')">×</button></div>').join('')+'</div>';}
-async function addBKW(){const kw=document.getElementById('nbk').value.trim().toLowerCase();if(!kw)return;if(!A.bkw.includes(kw))A.bkw.push(kw);document.getElementById('nbk').value='';await dbSaveSetting();rBKWL();rBKWD();}
-async function rmBKW(i){A.bkw.splice(i,1);await dbSaveSetting();rBKWL();rBKWD();}
+function addBKW(){const kw=document.getElementById('nbk').value.trim().toLowerCase();if(!kw)return;if(!A.bkw.includes(kw))A.bkw.push(kw);document.getElementById('nbk').value='';sv();rBKWL();rBKWD();}
+function rmBKW(i){A.bkw.splice(i,1);sv();rBKWL();rBKWD();}
 
 async function init(){
-  await dbLoad();
-  brand();
-  try{if(sessionStorage.getItem('dwa')==='1'){document.getElementById('lock').style.display='none';document.getElementById('aw').style.display='block';rDash();}}catch(e){}
+  // Load from localStorage first for instant load
+  ld();brand();
+  // Then load from Supabase (authoritative)
+  try{
+    await dbLoad();
+    brand();
+    // Update localStorage with fresh Supabase data
+    sv();
+  }catch(e){console.warn('Supabase load failed, using localStorage:',e);}
+  // Check session
+  try{
+    if(sessionStorage.getItem('dwa')==='1'||localStorage.getItem('dwa')==='1'){
+      document.getElementById('lock').style.display='none';
+      document.getElementById('aw').style.display='block';
+      rDash();
+    }
+  }catch(e){}
 }
 init();
 
 // ═══════════════════════════════════════════════
-// AI ASSISTANT
+// BILL WIZARD
 // ═══════════════════════════════════════════════
-function buildContext(){
-  const jobs = A.jobs.map(j => {
-    const je = A.raw.filter(r => r.job && r.job.toLowerCase() === j.name.toLowerCase());
-    const spent = je.reduce((a,r) => a+(r.lineTotal||r.line_total||0), 0);
-    const boards = je.filter(r => isB(r.material||r.mat)).reduce((a,r) => a+r.qty, 0);
-    const billed = A.bills.filter(b => b.job && b.job.toLowerCase() === j.name.toLowerCase()).reduce((a,b) => a+(b.line_total||0), 0);
-    const labor = A.labor.filter(e => e.job === j.name).reduce((a,e) => a+(e.total||0), 0);
-    return {
-      name: j.name,
-      budgetDollars: j.budgetDollars || j.budget_dollars || 0,
-      spent, boards, billed, labor,
-      poCount: new Set(je.map(r => r.po||r.po_number)).size,
-      remaining: (j.budgetDollars||j.budget_dollars||0) - spent,
-      percentUsed: j.budgetDollars ? Math.round(spent/(j.budgetDollars)*100) : 0
-    };
+let BW={inv:null,lines:[],vendor:'',ref:'',type:null,cat:'',job:'',bldg:'',floor:'',unit:'',parsed:null};
+const LAB_V=['aval','avall','sub llc','subcontractor','crew','framing co','drywall sub'];
+const MAT_V=['olympia','l&w','gator','usg','certainteed','georgia pacific','home depot','lowes','supply'];
+
+function bwDetect(vendor,lines){
+  const v=(vendor||'').toLowerCase();
+  const hasQty=lines.some(l=>parseFloat(l['Quantity']||l['QUANTITY']||l.qty||0)>0);
+  if(LAB_V.some(k=>v.includes(k)))return'labor';
+  if(MAT_V.some(k=>v.includes(k)))return'material';
+  if(!hasQty)return'labor';
+  return'material';
+}
+
+function bwLookup(v){
+  const inv=v.trim();
+  ['bwFound','bwNone'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('hidden');});
+  if(inv.length<3)return;
+  const lines=A.bills.filter(b=>{
+    const n=b['Invoice Number']||b['INVOICE NUMBER']||b.invoice_number||'';
+    return String(n).trim()===inv;
   });
-  const pendingPOs = [...new Set(A.raw.filter(r => !r.building||!r.floor||!r.unit).map(r => r.po||r.po_number))];
-  const pendingBills = [...new Set(A.bills.filter(b => !b.job||!b.building).map(b => b.invoice_number))];
-  return {
-    jobs,
-    totalPOSpend: A.raw.reduce((a,r) => a+(r.lineTotal||r.line_total||0), 0),
-    totalBilled: A.bills.reduce((a,b) => a+(b.line_total||0), 0),
-    totalLabor: A.labor.reduce((a,e) => a+(e.total||0), 0),
-    totalBoards: A.raw.filter(r => isB(r.material||r.mat)).reduce((a,r) => a+r.qty, 0),
-    totalBudget: A.jobs.reduce((a,j) => a+(j.budgetDollars||j.budget_dollars||0), 0),
-    pendingPOs: pendingPOs.length,
-    pendingBills: pendingBills.length,
-    totalPOs: new Set(A.raw.map(r => r.po||r.po_number)).size,
-    totalBillLines: A.bills.length,
-    laborEntries: A.labor.length,
-    boardKeywords: A.bkw,
-    companyName: A.co
-  };
+  if(!lines.length){const e=document.getElementById('bwNone');if(e)e.classList.remove('hidden');return;}
+  const vendor=lines[0]['Vendor']||lines[0]['VENDOR']||lines[0].vendor||'';
+  const ref=lines[0]['Job Reference Number']||lines[0]['JOB REFERANCE NUMBER']||lines[0].job_reference||'';
+  BW={inv,lines,vendor,ref,type:bwDetect(vendor,lines),cat:'',job:'',bldg:'',floor:'',unit:'',parsed:parseJobRef(ref)};
+  const tot=lines.reduce((a,l)=>a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
+  const t=document.getElementById('bwTitle');if(t)t.textContent='Invoice '+inv+' · '+(vendor||'Unknown vendor');
+  const lel=document.getElementById('bwLines');
+  if(lel)lel.innerHTML=lines.filter(l=>l['Item Description']||l['ITEM DESCRIPTION']||l.item_description).map(l=>{
+    const d=l['Item Description']||l['ITEM DESCRIPTION']||l.item_description||'—';
+    const q=l['Quantity']||l['QUANTITY']||l.qty||'';
+    const lt=parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0);
+    return'<div class="pol"><span>'+d+'</span><span>'+(q?q+' · ':'')+fmt(lt)+'</span></div>';
+  }).join('');
+  const bel=document.getElementById('bwBadges');
+  if(bel)bel.innerHTML='<span class="bdg bb">'+(vendor||'?')+'</span><span class="bdg bg">'+fmt(tot)+'</span><span class="bdg bgr">'+lines.length+' line'+(lines.length!==1?'s':'')+'</span><span class="bdg '+(BW.type==='labor'?'ba':'bb')+'">Suggested: '+BW.type+'</span>';
+  const f=document.getElementById('bwFound');if(f)f.classList.remove('hidden');
 }
 
-async function sendAI(){
-  const input = document.getElementById('ai-input');
-  const msg = input.value.trim();
-  if(!msg) return;
-  input.value = '';
-  appendAIMsg('user', msg);
-  const btn = document.getElementById('ai-send-btn');
-  btn.disabled = true; btn.textContent = '...';
-  try {
-    const context = buildContext();
-    const systemPrompt = `You are an AI assistant embedded inside a drywall construction tracker app for ${context.companyName}. 
-You have access to live data from their tracker. Here is the current state:
+function bwSetWS(n){
+  [1,2,3,4].forEach(i=>{
+    const e=document.getElementById('bw'+i);if(e){e.classList.toggle('on',i===n);e.classList.toggle('dn',i<n);}
+    const s=document.getElementById('bwStep'+i);if(s)s.classList.toggle('hidden',i!==n);
+  });
+}
 
-SUMMARY:
-- Total jobs: ${context.jobs.length}
-- Total PO spend: $${Math.round(context.totalPOSpend).toLocaleString()}
-- Total billed: $${Math.round(context.totalBilled).toLocaleString()}
-- Total labor & subs: $${Math.round(context.totalLabor).toLocaleString()}
-- Total budget: $${Math.round(context.totalBudget).toLocaleString()}
-- Total boards ordered: ${Math.round(context.totalBoards).toLocaleString()}
-- POs missing location: ${context.pendingPOs}
-- Bills missing location: ${context.pendingBills}
-- Total POs: ${context.totalPOs}
-- Total bill lines: ${context.totalBillLines}
+function bwSetType(t){
+  BW.type=t;
+  ['Mat','Lab','Equip','Other'].forEach(x=>{const e=document.getElementById('bwType'+x);if(e)e.classList.toggle('on',t===x.toLowerCase()||t==='material'&&x==='Mat'||t==='labor'&&x==='Lab'||t==='equipment'&&x==='Equip'||t==='other'&&x==='Other');});
+  const suggested=bwDetect(BW.vendor,BW.lines);
+  const w=document.getElementById('bwTypeWarn');const wt=document.getElementById('bwTypeWarnTxt');
+  if(t!==suggested&&w&&wt){wt.textContent='Note: App suggested '+suggested+' based on vendor/qty. You selected '+t+'.';w.classList.remove('hidden');}
+  else if(w)w.classList.add('hidden');
+}
 
-JOBS:
-${context.jobs.map(j => `- ${j.name}: Budget $${Math.round(j.budgetDollars).toLocaleString()}, Spent $${Math.round(j.spent).toLocaleString()} (${j.percentUsed}%), Billed $${Math.round(j.billed).toLocaleString()}, Boards ${Math.round(j.boards).toLocaleString()}, Labor $${Math.round(j.labor).toLocaleString()}, ${j.poCount} POs, $${Math.round(j.remaining).toLocaleString()} remaining`).join('\n')}
+function bwSetCat(cat){
+  BW.cat=cat;
+  ['Framing','Hanging','Finish','Punchout','Other'].forEach(c=>{const e=document.getElementById('bwCat'+c);if(e)e.classList.toggle('on',c===cat);});
+  const ow=document.getElementById('bwCatCustomWrap');if(ow)ow.classList.toggle('hidden',cat!=='Other');
+}
 
-Answer questions about this data concisely and helpfully. You can analyze trends, flag issues, compare jobs, and give recommendations. Keep responses under 200 words unless asked for detail.`;
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': (document.getElementById('sak')?document.getElementById('sak').value:localStorage.getItem('dw_ak')||''), 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: msg }]
-      })
-    });
-    const data = await response.json();
-    if(data.error) throw new Error(data.error.message);
-    const reply = data.content[0].text;
-    appendAIMsg('claude', reply);
-  } catch(e) {
-    if(e.message && e.message.includes('x-api-key')) {
-      appendAIMsg('claude', 'To activate the AI assistant, go to Settings → Company and add your Anthropic API key. Get one free at console.anthropic.com');
-    } else {
-      appendAIMsg('claude', 'Error: ' + e.message);
+function bwGo(n){
+  if(n===2){
+    const tot=BW.lines.reduce((a,l)=>a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
+    const s=document.getElementById('bwStep2Sum');if(s)s.innerHTML='Invoice <strong>'+BW.inv+'</strong> · '+(BW.vendor||'?')+' · '+fmt(tot);
+    bwSetType(BW.type);
+  }
+  if(n===3){
+    if(!BW.type){alert('Please select a bill type.');return;}
+    const tot=BW.lines.reduce((a,l)=>a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
+    const s=document.getElementById('bwStep3Sum');if(s)s.innerHTML='Invoice <strong>'+BW.inv+'</strong> · '+BW.type.toUpperCase()+' · '+fmt(tot);
+    fSel('bwJob',A.jobs.map(j=>j.name).sort(),'Select job...');
+    if(BW.parsed){
+      if(BW.parsed.job){const e=document.getElementById('bwJob');if(e)e.value=BW.parsed.job;}
+      if(BW.parsed.building){const e=document.getElementById('bwBldg');if(e)e.value=BW.parsed.building;}
+      if(BW.parsed.floor){const e=document.getElementById('bwFloor');if(e)e.value=BW.parsed.floor;}
+      if(BW.parsed.unit){const e=document.getElementById('bwUnit');if(e)e.value=BW.parsed.unit;}
     }
-  } finally {
-    btn.disabled = false; btn.textContent = 'Send';
+    const isLab=BW.type==='labor';
+    const lc=document.getElementById('bwLaborCat');if(lc)lc.classList.toggle('hidden',!isLab);
+    const mc=document.getElementById('bwMatComp');if(mc)mc.classList.toggle('hidden',isLab);
+    const bwj=document.getElementById('bwJob');
+    const bwb=document.getElementById('bwBldg');
+    const bwf=document.getElementById('bwFloor');
+    const bwu=document.getElementById('bwUnit');
+    if(bwj)bwj.onchange=bwUpdateComp;if(bwb)bwb.onchange=bwUpdateComp;if(bwf)bwf.onchange=bwUpdateComp;if(bwu)bwu.onchange=bwUpdateComp;
+    if(!isLab)bwUpdateComp();
   }
-}
-
-function aiQuick(msg){
-  document.getElementById('ai-input').value = msg;
-  sendAI();
-}
-
-function appendAIMsg(role, text){
-  const el = document.getElementById('ai-messages');
-  const isUser = role === 'user';
-  const div = document.createElement('div');
-  div.style.cssText = 'border-radius:8px;padding:10px 13px;max-width:85%;' + (isUser ? 'align-self:flex-end;background:var(--blue);color:white' : 'align-self:flex-start;background:var(--blue-lt)');
-  if(!isUser){
-    const lbl = document.createElement('div');
-    lbl.style.cssText = 'font-size:12px;font-weight:700;color:var(--blue);margin-bottom:4px';
-    lbl.textContent = 'Claude';
-    div.appendChild(lbl);
+  if(n===4){
+    const job=document.getElementById('bwJob')?.value;
+    if(!job){alert('Please select a job.');return;}
+    let cat=BW.cat;
+    if(BW.type==='labor'){if(!cat){alert('Please select a labor category.');return;}if(cat==='Other')cat=document.getElementById('bwCatCustom')?.value.trim()||'Other';}
+    BW.job=job;BW.bldg=document.getElementById('bwBldg')?.value.trim()||'';BW.floor=document.getElementById('bwFloor')?.value.trim()||'';BW.unit=document.getElementById('bwUnit')?.value.trim()||'';if(BW.type==='labor')BW.cat=cat;
+    const tot=BW.lines.reduce((a,l)=>a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
+    const c=document.getElementById('bwConfirm');
+    if(c)c.innerHTML='<div class="pol"><span>Invoice</span><strong>'+BW.inv+'</strong></div><div class="pol"><span>Vendor</span><strong>'+(BW.vendor||'?')+'</strong></div><div class="pol"><span>Type</span><strong>'+BW.type.toUpperCase()+'</strong></div>'+(BW.type==='labor'?'<div class="pol"><span>Category</span><strong>'+BW.cat+'</strong></div>':'')+'<div class="pol"><span>Job</span><strong>'+job+'</strong></div><div class="pol"><span>Building</span><strong>'+(BW.bldg||'—')+'</strong></div><div class="pol"><span>Floor</span><strong>'+(BW.floor||'—')+'</strong></div><div class="pol"><span>Unit</span><strong>'+(BW.unit||'—')+'</strong></div><div class="pol" style="margin-top:7px;padding-top:7px;border-top:2px solid var(--g200)"><span>'+BW.lines.length+' lines</span><strong>'+fmt(tot)+'</strong></div>';
   }
-  const txt = document.createElement('div');
-  txt.style.cssText = 'font-size:13px;white-space:pre-wrap;' + (isUser ? 'color:white' : 'color:var(--g800)');
-  txt.textContent = text;
-  div.appendChild(txt);
-  el.appendChild(div);
-  el.scrollTop = el.scrollHeight;
+  bwSetWS(n);
 }
 
-// Add API key field to settings
-function addAPIKeyField(){
-  const co = document.getElementById('ss-company');
-  if(!co || document.getElementById('api-key-field')) return;
-  const div = document.createElement('div');
-  div.className = 'fg';
-  div.id = 'api-key-field';
-  div.innerHTML = '<label class="flbl">Anthropic API Key <span style="font-weight:400;text-transform:none;color:var(--g400)">(for AI Assistant)</span></label><input id="sak" class="fi" type="password" placeholder="sk-ant-..."><div style="font-size:11px;color:var(--g400);margin-top:3px">Get your free API key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--blue)">console.anthropic.com</a></div>';
-  const btn = co.querySelector('.brow');
-  if(btn) co.insertBefore(div, btn);
+function bwUpdateComp(){
+  const job=document.getElementById('bwJob')?.value;
+  const bldg=document.getElementById('bwBldg')?.value.trim();
+  const floor=document.getElementById('bwFloor')?.value.trim();
+  const unit=document.getElementById('bwUnit')?.value.trim();
+  const el=document.getElementById('bwMatCompContent');if(!el)return;
+  if(!job){el.innerHTML='<div style="color:var(--g400);font-size:13px">Select a job to see PO comparison.</div>';return;}
+  const poLines=A.raw.filter(r=>{
+    if((r.job||'').toLowerCase()!==job.toLowerCase())return false;
+    if(bldg&&r.building&&r.building!==bldg)return false;
+    if(floor&&r.floor&&r.floor!==floor)return false;
+    if(unit&&r.unit&&r.unit!==unit)return false;
+    return true;
+  });
+  if(!poLines.length){el.innerHTML='<div style="color:var(--g400);font-size:13px">No PO lines found for '+job+(bldg?' Bldg '+bldg:'')+(floor?' FL '+floor:'')+(unit?' Unit '+unit:'')+'</div>';return;}
+  const billLines=BW.lines.filter(l=>l['Item Description']||l['ITEM DESCRIPTION']||l.item_description);
+  const poByMat={};
+  poLines.forEach(p=>{const mat=p.mat||p.material||'';if(!poByMat[mat])poByMat[mat]={qty:0,total:0,cost:p.unitCost||p.unit_cost||0};poByMat[mat].qty+=parseFloat(p.qty)||0;poByMat[mat].total+=parseFloat(p.lineTotal||p.line_total||0);});
+  let h='<table><thead><tr><th>Material</th><th>PO Qty</th><th>PO $</th><th>Bill Qty</th><th>Bill $</th><th>Diff</th></tr></thead><tbody>';
+  billLines.forEach(bl=>{
+    const desc=bl['Item Description']||bl['ITEM DESCRIPTION']||bl.item_description||'';
+    const bQty=parseFloat(bl['Quantity']||bl['QUANTITY']||bl.qty||0);
+    const bTotal=parseFloat(bl['Line Total']||bl['LINE TOTAL']||bl.line_total||0);
+    const match=Object.entries(poByMat).find(([mat])=>fzm(mat,desc)||fzm(desc,mat));
+    if(match){const[mat,po]=match;const diff=bTotal-po.total;const dc=Math.abs(diff)<1?'var(--green)':diff>0?'var(--red)':'var(--amber)';h+='<tr><td>'+desc+'</td><td>'+po.qty+'</td><td>'+fmt(po.total)+'</td><td>'+bQty+'</td><td>'+fmt(bTotal)+'</td><td style="font-weight:700;color:'+dc+'">'+(Math.abs(diff)<1?'✓ Match':(diff>0?'+':'')+fmt(diff))+'</td></tr>';}
+    else h+='<tr style="background:#FFFBF0"><td>'+desc+'</td><td colspan="2" style="color:var(--amber);font-style:italic">No matching PO</td><td>'+bQty+'</td><td>'+fmt(bTotal)+'</td><td style="color:var(--amber)">⚠ No PO</td></tr>';
+  });
+  h+='</tbody></table>';
+  el.innerHTML=h;
 }
 
+async function bwSave(){
+  const tot=BW.lines.reduce((a,l)=>a+parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),0);
+  const billRows=BW.lines.map(l=>({
+    vendor:BW.vendor,invoice_number:BW.inv,
+    date:l['Date']||l['DATE']||l.date||null,
+    item_description:l['Item Description']||l['ITEM DESCRIPTION']||l.item_description||'',
+    qty:parseFloat(l['Quantity']||l['QUANTITY']||l.qty||0),
+    unit_price:parseFloat(l['Unit Price']||l['UNIT PRICE']||l.unit_price||0),
+    line_total:parseFloat(l['Line Total']||l['LINE TOTAL']||l.line_total||0),
+    job_reference:BW.ref,job:BW.job,building:BW.bldg,floor:BW.floor,unit:BW.unit,
+    bill_type:BW.type,category:BW.type==='labor'?BW.cat:BW.type,
+  }));
+  await dbSaveBills(billRows);
+  A.bills.forEach(b=>{const n=b['Invoice Number']||b['INVOICE NUMBER']||b.invoice_number||'';if(String(n).trim()===BW.inv){b.job=BW.job;b.building=BW.bldg;b.floor=BW.floor;b.unit=BW.unit;b.bill_type=BW.type;b.category=BW.type==='labor'?BW.cat:BW.type;}});
+  try{fetch(A.su,{method:'POST',mode:'no-cors',body:JSON.stringify({type:'bill_location',invoice:BW.inv,job:BW.job,building:BW.bldg,floor:BW.floor,unit:BW.unit,category:BW.type==='labor'?BW.cat:BW.type})});}catch(e){}
+  if(BW.type==='labor'){await dbAddLabor({type:'sub',job:BW.job,date:BW.lines[0]?.date||null,name:BW.vendor,f1:0,f2:0,total:tot,notes:'Invoice '+BW.inv+' · '+BW.cat});}
+  const inv=BW.inv;
+  const bwi=document.getElementById('bwInv');if(bwi)bwi.value='';
+  const bwf=document.getElementById('bwFound');if(bwf)bwf.classList.add('hidden');
+  BW={inv:null,lines:[],vendor:'',ref:'',type:null,cat:'',job:'',bldg:'',floor:'',unit:'',parsed:null};
+  bwSetWS(1);rBillsOverview();rMatBills();rLabBills();rAllBills();rDash();upBdg();
+  alert('Bill saved! Invoice '+inv);
+}
 
-// ═══════════════════════════════════════════════
-// BILL ENTRY WIZARD
+function parseJobRef(ref){
+  if(!ref)return null;
+  const r=ref.trim();
+  const bm=r.match(/BDG\s+(\S+)/i),fm=r.match(/\bFL\s+(\S+)/i),um=r.match(/UNIT\s+(\S+)/i);
+  if(!bm&&!fm&&!um)return null;
+  const first=r.search(/\b(BDG|FL|UNIT)\b/i);
+  const jobRaw=first>0?r.substring(0,first).trim():'';
+  return{jobRaw,job:res(jobRaw),building:bm?bm[1]:'',floor:fm?fm[1]:'',unit:um?um[1]:''};
+}
+
+function showBillsTab(tab){
+  ['overview','material','labor','all'].forEach(t=>{
+    const e=document.getElementById('billTab-'+t);if(e)e.classList.toggle('hidden',t!==tab);
+    const b=document.getElementById('bilt-'+t);if(b)b.classList.toggle('on',t===tab);
+  });
+  if(tab==='material'){fSel('bMatFJob',A.jobs.map(j=>j.name).sort(),'All jobs');rMatBills();}
+  if(tab==='labor'){fSel('bLabFJob',A.jobs.map(j=>j.name).sort(),'All jobs');fSel('bLabFCat',getLabCats(),'All cats');rLabBills();}
+  if(tab==='all'){fSel('bAllFJob',A.jobs.map(j=>j.name).sort(),'All jobs');rAllBills();}
+}
+
+function getLabCats(){return[...new Set(A.bills.filter(b=>b.bill_type==='labor').map(b=>b.category).filter(Boolean))].sort();}
+function getBV(b,keys){for(const k of keys){if(b[k]!==undefined&&b[k]!=='')return b[k];}return'';}
+
+function rBillsOverview(){
+  const el=document.getElementById('bComp3');if(!el)return;
+  if(!A.jobs.length){el.innerHTML='<div class="emp"><div class="etx">Sync to load jobs</div></div>';return;}
+  el.innerHTML=A.jobs.map(j=>{
+    const bud=j.budgetDollars||j.budget_dollars||0;
+    const poSp=A.raw.filter(r=>(r.job||'').toLowerCase()===j.name.toLowerCase()).reduce((a,r)=>a+(r.lineTotal||r.line_total||0),0);
+    const blSp=A.bills.filter(b=>b.job&&b.job.toLowerCase()===j.name.toLowerCase()&&b.bill_type!=='labor').reduce((a,b)=>a+parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0),0);
+    const labSp=A.bills.filter(b=>b.job&&b.job.toLowerCase()===j.name.toLowerCase()&&b.bill_type==='labor').reduce((a,b)=>a+parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0),0);
+    const gap=poSp-blSp;
+    return'<div style="padding:13px 0;border-bottom:1px solid var(--g100)"><div style="font-size:14px;font-weight:700;margin-bottom:9px">'+j.name+'</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:9px">'+
+      '<div class="met"><div class="ml">Budget</div><div class="mv" style="font-size:16px">'+(bud?fmt(bud):'—')+'</div></div>'+
+      '<div class="met"><div class="ml">PO Ordered</div><div class="mv" style="font-size:16px">'+fmt(poSp)+'</div></div>'+
+      '<div class="met"><div class="ml">Mat Billed</div><div class="mv" style="font-size:16px;color:var(--blue)">'+fmt(blSp)+'</div></div>'+
+      '<div class="met"><div class="ml">Lab Billed</div><div class="mv" style="font-size:16px;color:var(--amber)">'+fmt(labSp)+'</div></div>'+
+      '<div class="met"><div class="ml">Mat Gap</div><div class="mv" style="font-size:16px;color:'+(gap>0?'var(--amber)':'var(--green)')+'">'+fmt(Math.abs(gap))+(gap>0?' left':' over')+'</div></div>'+
+      '</div>'+(bud?'<div class="pb2" style="height:7px"><div class="pf '+bcc(pct(poSp,bud))+'" style="width:'+pct(poSp,bud)+'%"></div></div><div style="font-size:11px;color:var(--g400);margin-top:1px">'+pct(poSp,bud)+'% of budget used via POs</div>':'')+'</div>';
+  }).join('');
+}
+
+function rMatBills(){
+  const fj=document.getElementById('bMatFJob')?.value||'';
+  const fb=document.getElementById('bMatFBldg')?.value||'';
+  const ff=document.getElementById('bMatFFloor')?.value||'';
+  const rows=A.bills.filter(b=>{
+    if(b.bill_type==='labor')return false;
+    const lt=parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0);
+    const d=getBV(b,['item_description','Item Description','ITEM DESCRIPTION']);
+    if(!lt&&!d)return false;
+    if(fj&&b.job!==fj)return false;
+    if(fb&&b.building!==fb)return false;
+    if(ff&&b.floor!==ff)return false;
+    return true;
+  });
+  const el=document.getElementById('bMatTbl');if(!el)return;
+  fSel('bMatFBldg',[...new Set(rows.map(b=>b.building).filter(Boolean))].sort(),'All bldgs');
+  fSel('bMatFFloor',[...new Set(rows.map(b=>b.floor).filter(Boolean))].sort(),'All floors');
+  el.innerHTML=rows.length?'<table><thead><tr><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Description</th><th>Board?</th><th>Qty</th><th>Total</th><th>Job</th><th>Bldg</th><th>Floor</th><th>Unit</th></tr></thead><tbody>'+
+    rows.map(r=>{
+      const d=getBV(r,['item_description','Item Description','ITEM DESCRIPTION']);
+      const inv=getBV(r,['invoice_number','Invoice Number','INVOICE NUMBER']);
+      const lt=parseFloat(getBV(r,['line_total','Line Total','LINE TOTAL'])||0);
+      const q=getBV(r,['qty','Quantity','QUANTITY']);
+      const dt=getBV(r,['date','Date','DATE']);
+      const fl=!r.job||!r.building;
+      return'<tr'+(fl?' style="background:#FFF5F5"':'')+'>'+
+        '<td class="tdm">'+(dt||'—')+'</td><td>'+(r.vendor||'—')+'</td><td class="tdb tdm">'+inv+'</td>'+
+        '<td>'+d+'</td><td style="text-align:center">'+(isB(d)?'<span class="bdg ba" style="font-size:10px">📋</span>':'')+'</td>'+
+        '<td>'+(q||'—')+'</td><td class="tdb">'+fmt(lt)+'</td>'+
+        '<td>'+(r.job||'<span class="tdx">—</span>')+'</td><td>'+(r.building||'<span class="tdx">—</span>')+'</td>'+
+        '<td>'+(r.floor||'<span class="tdx">—</span>')+'</td><td>'+(r.unit||'<span class="tdx">—</span>')+'</td></tr>';
+    }).join('')+'</tbody></table>':
+    '<div class="emp"><div class="etx">No material bills yet</div><div class="esb">Use the wizard above to categorize bills from the sync</div></div>';
+}
+
+function rLabBills(){
+  const fj=document.getElementById('bLabFJob')?.value||'';
+  const fc=document.getElementById('bLabFCat')?.value||'';
+  const ff=document.getElementById('bLabFFloor')?.value||'';
+  const rows=A.bills.filter(b=>{
+    if(b.bill_type!=='labor')return false;
+    const lt=parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0);
+    if(!lt)return false;
+    if(fj&&b.job!==fj)return false;
+    if(fc&&b.category!==fc)return false;
+    if(ff&&b.floor!==ff)return false;
+    return true;
+  });
+  const el=document.getElementById('bLabTbl');if(!el)return;
+  fSel('bLabFCat',getLabCats(),'All categories');
+  fSel('bLabFFloor',[...new Set(rows.map(b=>b.floor).filter(Boolean))].sort(),'All floors');
+  el.innerHTML=rows.length?'<table><thead><tr><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Category</th><th>Job</th><th>Bldg</th><th>Floor</th><th>Unit</th><th>Total</th></tr></thead><tbody>'+
+    rows.map(r=>{
+      const inv=getBV(r,['invoice_number','Invoice Number','INVOICE NUMBER']);
+      const lt=parseFloat(getBV(r,['line_total','Line Total','LINE TOTAL'])||0);
+      const dt=getBV(r,['date','Date','DATE']);
+      const cc={Framing:'ba',Hanging:'bb',Finish:'bg',Punchout:'bgr',Other:'bgr'};
+      return'<tr>'+
+        '<td class="tdm">'+(dt||'—')+'</td><td class="tdb">'+(r.vendor||'—')+'</td><td class="tdm">'+inv+'</td>'+
+        '<td>'+(r.category?'<span class="bdg '+(cc[r.category]||'bgr')+'">'+r.category+'</span>':'<span class="tdx">—</span>')+'</td>'+
+        '<td>'+(r.job||'<span class="tdx">—</span>')+'</td><td>'+(r.building||'—')+'</td>'+
+        '<td>'+(r.floor||'—')+'</td><td>'+(r.unit||'—')+'</td><td class="tdb">'+fmt(lt)+'</td></tr>';
+    }).join('')+'</tbody></table>':
+    '<div class="emp"><div class="etx">No labor bills yet</div><div class="esb">Use wizard and select Labor type</div></div>';
+  // Category breakdown
+  const byJob={};
+  A.bills.filter(b=>b.bill_type==='labor'&&(!fj||b.job===fj)).forEach(b=>{
+    if(!byJob[b.job])byJob[b.job]={};
+    const cat=b.category||'Other';
+    if(!byJob[b.job][cat])byJob[b.job][cat]=0;
+    byJob[b.job][cat]+=parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0);
+  });
+  const cbd=document.getElementById('bLabCats');if(!cbd)return;
+  if(!Object.keys(byJob).length){cbd.innerHTML='<div style="color:var(--g400);font-size:13px">No labor bills categorized yet.</div>';return;}
+  cbd.innerHTML=Object.entries(byJob).map(([jname,cats])=>{
+    const j=A.jobs.find(x=>x.name===jname);const lb=j?.laborBudget||j?.labor_budget||0;
+    const total=Object.values(cats).reduce((a,v)=>a+v,0);
+    return'<div style="margin-bottom:14px"><div style="font-size:14px;font-weight:700;margin-bottom:7px">'+jname+' · '+fmt(total)+(lb?' · Budget: '+fmt(lb):'')+'</div>'+
+      Object.entries(cats).map(([cat,amt])=>
+        '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--g100)">'+
+        '<div style="width:80px;font-size:12px;font-weight:700">'+cat+'</div>'+
+        '<div style="flex:1"><div class="pb2" style="height:7px"><div class="pf pfb" style="width:'+pct(amt,total)+'%"></div></div></div>'+
+        '<div style="min-width:65px;text-align:right;font-size:12px;font-weight:700">'+fmt(amt)+'</div>'+
+        '<div style="min-width:35px;text-align:right;font-size:11px;color:var(--g400)">'+pct(amt,total)+'%</div>'+
+        '</div>'
+      ).join('')+'</div>';
+  }).join('');
+}
+
+function rAllBills(){
+  const fj=document.getElementById('bAllFJob')?.value||'';
+  const rows=A.bills.filter(b=>{
+    const lt=parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0);
+    if(!lt)return false;
+    if(fj&&b.job!==fj)return false;
+    return true;
+  });
+  const el=document.getElementById('bAllTbl');if(!el)return;
+  el.innerHTML=rows.length?'<table><thead><tr><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Type</th><th>Cat</th><th>Description</th><th>Total</th><th>Job</th><th>Bldg</th><th>Floor</th><th>Unit</th></tr></thead><tbody>'+
+    rows.map(r=>{
+      const d=getBV(r,['item_description','Item Description','ITEM DESCRIPTION']);
+      const inv=getBV(r,['invoice_number','Invoice Number','INVOICE NUMBER']);
+      const lt=parseFloat(getBV(r,['line_total','Line Total','LINE TOTAL'])||0);
+      const dt=getBV(r,['date','Date','DATE']);
+      const fl=!r.job||!r.building;
+      return'<tr'+(fl?' style="background:#FFF5F5"':'')+'>'+
+        '<td class="tdm">'+(dt||'—')+'</td><td>'+(r.vendor||'—')+'</td><td class="tdb tdm">'+inv+'</td>'+
+        '<td>'+(r.bill_type?'<span class="bdg '+(r.bill_type==='labor'?'ba':'bb')+'">'+r.bill_type+'</span>':'—')+'</td>'+
+        '<td>'+(r.category||'—')+'</td><td>'+(d||'—')+'</td><td class="tdb">'+fmt(lt)+'</td>'+
+        '<td>'+(r.job||'<span class="tdx">—</span>')+'</td><td>'+(r.building||'—')+'</td>'+
+        '<td>'+(r.floor||'—')+'</td><td>'+(r.unit||'—')+'</td></tr>';
+    }).join('')+'</tbody></table>':
+    '<div class="emp"><div class="etx">No bills yet</div></div>';
+}
+
 // ═══════════════════════════════════════════════
 // AI FLOATING CHAT
 // ═══════════════════════════════════════════════
-let aiOpen = false;
-let aiHistory = [];
+let aiOpen=false,aiHistory=[];
 
-function toggleAI(){
-  aiOpen = !aiOpen;
-  document.getElementById('ai-panel').classList.toggle('open', aiOpen);
-}
-
-function aiQ(msg){ document.getElementById('ai-inp').value = msg; sendAI(); }
+function toggleAI(){aiOpen=!aiOpen;const p=document.getElementById('ai-panel');if(p)p.classList.toggle('open',aiOpen);}
+function aiQ(msg){const i=document.getElementById('ai-inp');if(i){i.value=msg;sendAI();}}
 
 function buildCtx(){
-  const jobs = A.jobs.map(j=>{
-    const je=A.raw.filter(r=>r.job&&r.job.toLowerCase()===j.name.toLowerCase());
+  const jobs=A.jobs.map(j=>{
+    const je=A.raw.filter(r=>(r.job||'').toLowerCase()===j.name.toLowerCase());
     const spent=je.reduce((a,r)=>a+(r.lineTotal||r.line_total||0),0);
-    const boards=je.filter(r=>isB(r.material||r.mat)).reduce((a,r)=>a+r.qty,0);
-    const billed=A.bills.filter(b=>b.job&&b.job.toLowerCase()===j.name.toLowerCase()).reduce((a,b)=>a+(b.line_total||0),0);
+    const boards=je.filter(r=>isB(r.mat||r.material||'')).reduce((a,r)=>a+r.qty,0);
+    const billed=A.bills.filter(b=>b.job&&b.job.toLowerCase()===j.name.toLowerCase()).reduce((a,b)=>a+parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0),0);
     const labor=A.labor.filter(e=>e.job===j.name).reduce((a,e)=>a+(e.total||0),0);
     const budget=j.budgetDollars||j.budget_dollars||0;
     return{name:j.name,budget,spent,boards,billed,labor,remaining:budget-spent,pct:budget?Math.round(spent/budget*100):0,pos:new Set(je.map(r=>r.po||r.po_number)).size};
   });
-  return{
-    company:A.co,jobs,
+  return{company:A.co,jobs,
     totalSpend:A.raw.reduce((a,r)=>a+(r.lineTotal||r.line_total||0),0),
-    totalBilled:A.bills.reduce((a,b)=>a+(b.line_total||0),0),
+    totalBilled:A.bills.reduce((a,b)=>a+parseFloat(getBV(b,['line_total','Line Total','LINE TOTAL'])||0),0),
     totalLabor:A.labor.reduce((a,e)=>a+(e.total||0),0),
-    totalBoards:A.raw.filter(r=>isB(r.material||r.mat)).reduce((a,r)=>a+r.qty,0),
+    totalBoards:A.raw.filter(r=>isB(r.mat||r.material||'')).reduce((a,r)=>a+r.qty,0),
     totalBudget:A.jobs.reduce((a,j)=>a+(j.budgetDollars||j.budget_dollars||0),0),
     pendingPOs:[...new Set(A.raw.filter(r=>!r.building||!r.floor||!r.unit).map(r=>r.po||r.po_number))].length,
-    pendingBills:[...new Set(A.bills.filter(b=>!b.job||!b.building).map(b=>b.invoice_number))].length,
-    totalPOs:new Set(A.raw.map(r=>r.po||r.po_number)).size,
-  };
+    pendingBills:[...new Set(A.bills.filter(b=>!b.job||!b.building).map(b=>b.invoice_number||getBV(b,['Invoice Number','INVOICE NUMBER'])))].length,
+    totalPOs:new Set(A.raw.map(r=>r.po||r.po_number)).size};
 }
 
 async function sendAI(){
-  const inp=document.getElementById('ai-inp');
+  const inp=document.getElementById('ai-inp');if(!inp)return;
   const msg=inp.value.trim();if(!msg)return;
   inp.value='';
   if(!aiOpen)toggleAI();
-  document.getElementById('ai-quick').style.display='none';
+  const qk=document.getElementById('ai-quick');if(qk)qk.style.display='none';
   addAIMsg('user',msg);
   aiHistory.push({role:'user',content:msg});
   const typing=addTyping();
   const ctx=buildCtx();
-  const sys=`You are Claude, an AI assistant embedded in a drywall construction tracker for ${ctx.company}.
-
-LIVE DATA:
-- Jobs: ${ctx.jobs.length} | Total PO spend: $${Math.round(ctx.totalSpend).toLocaleString()} | Total billed: $${Math.round(ctx.totalBilled).toLocaleString()}
-- Total budget: $${Math.round(ctx.totalBudget).toLocaleString()} | Boards ordered: ${Math.round(ctx.totalBoards).toLocaleString()}
-- Labor & subs: $${Math.round(ctx.totalLabor).toLocaleString()} | POs missing location: ${ctx.pendingPOs} | Bills missing: ${ctx.pendingBills}
-
-JOBS:
-${ctx.jobs.map(j=>`${j.name}: Budget $${Math.round(j.budget).toLocaleString()}, Spent $${Math.round(j.spent).toLocaleString()} (${j.pct}%), Billed $${Math.round(j.billed).toLocaleString()}, Boards ${Math.round(j.boards).toLocaleString()}, Labor $${Math.round(j.labor).toLocaleString()}, $${Math.round(j.remaining).toLocaleString()} left, ${j.pos} POs`).join('\n')}
-
-Be concise, direct, and helpful. Use $ and numbers. Flag issues proactively.`;
-
+  const sys='You are Claude, an AI assistant embedded in a drywall construction tracker for '+ctx.company+'.\n\nLIVE DATA:\n- Jobs: '+ctx.jobs.length+' | PO spend: $'+Math.round(ctx.totalSpend).toLocaleString()+' | Billed: $'+Math.round(ctx.totalBilled).toLocaleString()+'\n- Budget: $'+Math.round(ctx.totalBudget).toLocaleString()+' | Boards: '+Math.round(ctx.totalBoards).toLocaleString()+' | Labor: $'+Math.round(ctx.totalLabor).toLocaleString()+'\n- POs missing location: '+ctx.pendingPOs+' | Bills missing location: '+ctx.pendingBills+'\n\nJOBS:\n'+ctx.jobs.map(j=>j.name+': Budget $'+Math.round(j.budget).toLocaleString()+', Spent $'+Math.round(j.spent).toLocaleString()+' ('+j.pct+'%), Billed $'+Math.round(j.billed).toLocaleString()+', Boards '+Math.round(j.boards).toLocaleString()+', Labor $'+Math.round(j.labor).toLocaleString()+', $'+Math.round(j.remaining).toLocaleString()+' left, '+j.pos+' POs').join('\n')+'\n\nBe concise, direct, helpful. Use $ and numbers. Flag issues.';
   try{
     const apiKey=localStorage.getItem('dw_ak')||'';
-    if(!apiKey){
-      typing.remove();
-      addAIMsg('ai','To use the AI assistant, go to Settings → Company and add your Anthropic API key. Get one free at console.anthropic.com — it only takes 2 minutes.');
-      return;
-    }
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,system:sys,messages:aiHistory})
-    });
+    if(!apiKey){typing.remove();addAIMsg('ai','To use AI assistant go to Settings → Company and add your Anthropic API key (free at console.anthropic.com).');return;}
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,system:sys,messages:aiHistory})});
     const data=await res.json();
     if(data.error)throw new Error(data.error.message);
     const reply=data.content[0].text;
     aiHistory.push({role:'assistant',content:reply});
-    typing.remove();
-    addAIMsg('ai',reply);
-  }catch(e){
-    typing.remove();
-    addAIMsg('ai','Error: '+e.message);
-  }
+    typing.remove();addAIMsg('ai',reply);
+  }catch(e){typing.remove();addAIMsg('ai','Error: '+e.message);}
 }
 
 function addAIMsg(role,text){
-  const el=document.getElementById('ai-msgs');
+  const el=document.getElementById('ai-msgs');if(!el)return;
   const d=document.createElement('div');
   d.className='ai-msg '+(role==='user'?'ai-msg-user':'ai-msg-ai');
   if(role!=='user'){const l=document.createElement('div');l.className='ai-msg-label';l.textContent='Claude';d.appendChild(l);}
   const t=document.createElement('div');t.style.whiteSpace='pre-wrap';t.textContent=text;d.appendChild(t);
-  el.appendChild(d);el.scrollTop=el.scrollHeight;
-  return d;
+  el.appendChild(d);el.scrollTop=el.scrollHeight;return d;
 }
 
 function addTyping(){
-  const el=document.getElementById('ai-msgs');
-  const d=document.createElement('div');
-  d.className='ai-typing';
+  const el=document.getElementById('ai-msgs');if(!el)return{remove:()=>{}};
+  const d=document.createElement('div');d.className='ai-typing';
   d.innerHTML='<span></span><span></span><span></span>';
-  el.appendChild(d);el.scrollTop=el.scrollHeight;
-  return d;
+  el.appendChild(d);el.scrollTop=el.scrollHeight;return d;
 }
 
-// API key in settings
 function addAPIKeyField(){
   if(document.getElementById('sak'))return;
   const co=document.getElementById('ss-company');if(!co)return;
   const div=document.createElement('div');div.className='fg';
-  div.innerHTML='<label class="flbl">Anthropic API Key <span style="font-weight:400;text-transform:none;color:var(--g400)">(for AI chat)</span></label><input id="sak" class="fi" type="password" placeholder="sk-ant-..." value="'+(localStorage.getItem('dw_ak')||'')+'"><div style="font-size:11px;color:var(--g400);margin-top:3px">Get free at <a href="https://console.anthropic.com" target="_blank" style="color:var(--blue)">console.anthropic.com</a> · saved locally only</div><button class="btn btns" style="margin-top:6px" onclick="saveAK()">Save API key</button>';
+  div.innerHTML='<label class="flbl">Anthropic API Key <span style="font-weight:400;text-transform:none;color:var(--g400)">(for AI chat)</span></label><input id="sak" class="fi" type="password" placeholder="sk-ant-..." value="'+(localStorage.getItem('dw_ak')||'')+'"><div style="font-size:11px;color:var(--g400);margin-top:3px">Free at <a href="https://console.anthropic.com" target="_blank" style="color:var(--blue)">console.anthropic.com</a></div><button class="btn btns" style="margin-top:6px" onclick="saveAK()">Save key</button>';
   const brow=co.querySelector('.brow');if(brow)co.insertBefore(div,brow);
 }
-function saveAK(){const v=document.getElementById('sak')?.value.trim();if(v){localStorage.setItem('dw_ak',v);alert('API key saved!');}else{localStorage.removeItem('dw_ak');alert('API key removed.');}}
+function saveAK(){const v=document.getElementById('sak')?.value.trim();if(v){localStorage.setItem('dw_ak',v);alert('API key saved!');}else{localStorage.removeItem('dw_ak');alert('Removed.');}}
 
 </script>
 </body>
-</html    <!-- BILLS & ACTUALS -->
-    <div id="sec-bills" class="sec">
-      <div class="alt alb" id="bills-sync-alert">Sync from sheet to load bills data. Bills must be set up via Zapier Zap 2.</div>
-
-      <!-- BILL ENTRY WIZARD -->
-      <div class="card">
-        <div class="ct">Bill entry wizard</div>
-        <div class="ws">
-          <div class="wsi on" id="bw1"><div class="wsd">1</div>Invoice</div><div class="wsl"></div>
-          <div class="wsi" id="bw2"><div class="wsd">2</div>Type</div><div class="wsl"></div>
-          <div class="wsi" id="bw3"><div class="wsd">3</div>Location</div><div class="wsl"></div>
-          <div class="wsi" id="bw4"><div class="wsd">4</div>Confirm</div>
-        </div>
-
-        <!-- Step 1: Invoice lookup -->
-        <div id="bwStep1">
-          <div class="fg"><label class="flbl">Invoice number</label>
-            <input id="bwInvInput" class="fi" type="text" placeholder="e.g. 1727196-00" style="font-size:18px;font-weight:700;font-family:var(--mono)" oninput="bwLookup(this.value)">
-          </div>
-          <div id="bwFound" class="hidden">
-            <div class="pop bl">
-              <div class="popt" id="bwFoundTitle"></div>
-              <div id="bwFoundLines"></div>
-              <div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap" id="bwFoundBadges"></div>
-            </div>
-            <div class="brow"><button class="btn btnp" onclick="bwGo(2)">Looks good — next ↗</button></div>
-          </div>
-          <div id="bwNotFound" class="hidden"><div class="alt ala">Invoice not found. Sync bills from sheet first.</div></div>
-        </div>
-
-        <!-- Step 2: Bill type -->
-        <div id="bwStep2" class="hidden">
-          <div style="font-size:13px;color:var(--g500);margin-bottom:14px;padding:9px;background:var(--g50);border-radius:8px" id="bwStep2Sum"></div>
-          <div class="ct">What type of bill is this?</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-            <div class="etc2" id="bwTypeMat" onclick="bwSetType('material')">
-              <div class="etico">🧱</div>
-              <div class="etnm">Material</div>
-              <div class="etd">Drywall, studs, screws, etc.</div>
-            </div>
-            <div class="etc2" id="bwTypeLab" onclick="bwSetType('labor')">
-              <div class="etico">👷</div>
-              <div class="etnm">Labor</div>
-              <div class="etd">Sub crews, hanging, framing, etc.</div>
-            </div>
-            <div class="etc2" id="bwTypeEquip" onclick="bwSetType('equipment')">
-              <div class="etico">🔧</div>
-              <div class="etnm">Equipment</div>
-              <div class="etd">Rentals, tools, machinery</div>
-            </div>
-            <div class="etc2" id="bwTypeOther" onclick="bwSetType('other')">
-              <div class="etico">📋</div>
-              <div class="etnm">Other</div>
-              <div class="etd">Misc job costs</div>
-            </div>
-          </div>
-          <div id="bwTypeWarning" class="hidden"><div class="alt ala" id="bwTypeWarningText"></div></div>
-          <div class="brow">
-            <button class="btn" onclick="bwGo(1)">← Back</button>
-            <button class="btn btnp" onclick="bwGo(3)">Next ↗</button>
-          </div>
-        </div>
-
-        <!-- Step 3: Location + category -->
-        <div id="bwStep3" class="hidden">
-          <div style="font-size:13px;color:var(--g500);margin-bottom:12px;padding:9px;background:var(--g50);border-radius:8px" id="bwStep3Sum"></div>
-          <div class="g4">
-            <div class="fg"><label class="flbl">Job</label><select id="bwJob" class="fse"><option value="">Select job...</option></select></div>
-            <div class="fg"><label class="flbl">Building #</label><input id="bwBldg" class="fi" placeholder="1, 2, A"></div>
-            <div class="fg"><label class="flbl">Floor</label><input id="bwFloor" class="fi" placeholder="1, 2, 3"></div>
-            <div class="fg"><label class="flbl">Unit</label><input id="bwUnit" class="fi" placeholder="101, 209"></div>
-          </div>
-
-          <!-- Labor category (shown only for labor bills) -->
-          <div id="bwLaborCat" class="hidden">
-            <div class="ct" style="margin-top:4px">Labor category</div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:12px" id="bwCatGrid">
-              <div class="etc2" id="bwCat-framing" onclick="bwSetCat('Framing')"><div class="etico">🏗️</div><div class="etnm">Framing</div></div>
-              <div class="etc2" id="bwCat-hanging" onclick="bwSetCat('Hanging')"><div class="etico">📋</div><div class="etnm">Hanging</div></div>
-              <div class="etc2" id="bwCat-finish" onclick="bwSetCat('Finish')"><div class="etico">✨</div><div class="etnm">Finish</div></div>
-              <div class="etc2" id="bwCat-punchout" onclick="bwSetCat('Punchout')"><div class="etico">🔨</div><div class="etnm">Punchout</div></div>
-              <div class="etc2" id="bwCat-other" onclick="bwSetCat('Other')"><div class="etico">➕</div><div class="etnm">Other</div></div>
-            </div>
-            <div id="bwCatOtherInput" class="hidden">
-              <div class="fg"><label class="flbl">Category name</label><input id="bwCatCustom" class="fi" placeholder="e.g. Insulation, Taping..."></div>
-            </div>
-          </div>
-
-          <!-- Material PO comparison (shown only for material bills) -->
-          <div id="bwMatComp" class="hidden">
-            <div class="ct" style="margin-top:4px">PO comparison — matching lines for this job/location</div>
-            <div id="bwMatCompContent" style="font-size:13px;color:var(--g400)">Select job and location above to see PO comparison.</div>
-          </div>
-
-          <div class="brow">
-            <button class="btn" onclick="bwGo(2)">← Back</button>
-            <button class="btn btnp" onclick="bwGo(4)">Review ↗</button>
-          </div>
-        </div>
-
-        <!-- Step 4: Confirm -->
-        <div id="bwStep4" class="hidden">
-          <div class="pop gr">
-            <div class="popt" style="color:var(--green)">Review before saving</div>
-            <div id="bwConfirmLines"></div>
-          </div>
-          <div class="alt alg" style="margin-top:9px">Saves to Supabase + writes job reference and category back to your BILL DATA sheet.</div>
-          <div class="brow">
-            <button class="btn" onclick="bwGo(3)">← Edit</button>
-            <button class="btn btng" onclick="bwSave()">Save everywhere ✓</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- TABS: Material vs Labor breakdown -->
-      <div class="tbr">
-        <button class="tbn on" onclick="showBillsTab('overview')" id="bilt-overview">Overview</button>
-        <button class="tbn" onclick="showBillsTab('material')" id="bilt-material">Material Bills</button>
-        <button class="tbn" onclick="showBillsTab('labor')" id="bilt-labor">Labor Bills</button>
-        <button class="tbn" onclick="showBillsTab('all')" id="bilt-all">All Lines</button>
-      </div>
-
-      <!-- Overview tab -->
-      <div id="billsTab-overview">
-        <div class="card"><div class="ct">Budget → PO ordered → Bills paid — by job</div><div id="bComp3"></div></div>
-      </div>
-
-      <!-- Material bills tab -->
-      <div id="billsTab-material" class="hidden">
-        <div class="card">
-          <div class="chdr">
-            <div class="ct" style="margin:0">Material bill line items</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <select class="fs2" id="bMatFJob" onchange="renderMatBills()"><option value="">All jobs</option></select>
-              <select class="fs2" id="bMatFBldg" onchange="renderMatBills()"><option value="">All bldgs</option></select>
-              <select class="fs2" id="bMatFFloor" onchange="renderMatBills()"><option value="">All floors</option></select>
-            </div>
-          </div>
-          <div class="tw" id="bMatTable"></div>
-        </div>
-      </div>
-
-      <!-- Labor bills tab -->
-      <div id="billsTab-labor" class="hidden">
-        <div class="card">
-          <div class="chdr">
-            <div class="ct" style="margin:0">Labor bill breakdown</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <select class="fs2" id="bLabFJob" onchange="renderLaborBills()"><option value="">All jobs</option></select>
-              <select class="fs2" id="bLabFCat" onchange="renderLaborBills()"><option value="">All categories</option></select>
-              <select class="fs2" id="bLabFFloor" onchange="renderLaborBills()"><option value="">All floors</option></select>
-            </div>
-          </div>
-          <div class="tw" id="bLabTable"></div>
-        </div>
-        <div class="card"><div class="ct">Labor by category — budget vs actual</div><div id="bLabCatBreakdown"></div></div>
-      </div>
-
-      <!-- All lines tab -->
-      <div id="billsTab-all" class="hidden">
-        <div class="card">
-          <div class="chdr">
-            <div class="ct" style="margin:0">All bill lines</div>
-            <select class="fs2" id="bAllFJob" onchange="renderAllBills()"><option value="">All jobs</option></select>
-          </div>
-          <div class="tw" id="bAllTable"></div>
-        </div>
-      </div>
-    </div>
-
->
+</html>
