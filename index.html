@@ -29,8 +29,8 @@
   --shadow-lg: 0 8px 32px rgba(0,0,0,.12);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);font-size:15px;}
-h1,h2,h3,h4{font-family:'Syne',sans-serif;font-weight:700;}
+html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.6;letter-spacing:0.01em;}
+h1,h2,h3,h4{font-family:'Syne',sans-serif;font-weight:700;letter-spacing:-0.01em;line-height:1.3;}
 
 /* ── LAYOUT ───────────────────────────────────── */
 #app{display:flex;min-height:100vh;}
@@ -71,9 +71,9 @@ h1,h2,h3,h4{font-family:'Syne',sans-serif;font-weight:700;}
 .nav-section{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);padding:12px 10px 6px;}
 .nav-item{
   display:flex;align-items:center;gap:10px;
-  padding:9px 12px;border-radius:8px;
-  cursor:pointer;font-size:14px;font-weight:500;color:rgba(255,255,255,.7);
-  transition:all .15s;margin-bottom:2px;position:relative;
+  padding:10px 14px;border-radius:8px;
+  cursor:pointer;font-size:14px;font-weight:500;color:rgba(255,255,255,.75);
+  transition:all .15s;margin-bottom:3px;position:relative;letter-spacing:0.01em;
 }
 .nav-item:hover{background:rgba(255,255,255,.08);color:#fff;}
 .nav-item.active{background:var(--accent);color:#fff;}
@@ -150,15 +150,15 @@ h1,h2,h3,h4{font-family:'Syne',sans-serif;font-weight:700;}
 .tbl-wrap{overflow-x:auto;border-radius:var(--radius);}
 table{width:100%;border-collapse:collapse;font-size:13.5px;}
 thead th{
-  background:var(--surface2);padding:10px 14px;text-align:left;
-  font-size:11px;text-transform:uppercase;letter-spacing:.06em;
-  color:var(--ink3);font-weight:600;border-bottom:1px solid var(--border);
+  background:var(--surface2);padding:11px 16px;text-align:left;
+  font-size:11px;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--ink3);font-weight:700;border-bottom:1px solid var(--border);
   white-space:nowrap;
 }
 tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
 tbody tr:last-child{border-bottom:none;}
 tbody tr:hover{background:var(--surface2);}
-td{padding:10px 14px;color:var(--ink2);}
+td{padding:12px 16px;color:var(--ink2);line-height:1.5;}
 td.num{font-family:'Syne',sans-serif;font-weight:600;color:var(--ink);}
 td strong{color:var(--ink);font-weight:600;}
 
@@ -175,10 +175,10 @@ td strong{color:var(--ink);font-weight:600;}
 .form-group{margin-bottom:16px;}
 label{display:block;font-size:13px;font-weight:600;color:var(--ink2);margin-bottom:6px;}
 input,select,textarea{
-  width:100%;padding:10px 14px;border-radius:8px;
+  width:100%;padding:11px 16px;border-radius:8px;
   border:1.5px solid var(--border);background:var(--surface);
-  font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);outline:none;
-  transition:border-color .15s;
+  font-family:'DM Sans',sans-serif;font-size:15px;color:var(--ink);outline:none;
+  transition:border-color .15s;line-height:1.5;
 }
 input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
@@ -213,7 +213,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 }
 .unit-tiles{display:flex;flex-wrap:wrap;gap:8px;}
 .unit-tile{
-  width:110px;border-radius:10px;padding:12px 10px;
+  width:130px;border-radius:12px;padding:14px 12px;
   border:2px solid transparent;cursor:pointer;
   transition:all .18s;position:relative;overflow:hidden;
   background:var(--surface);box-shadow:var(--shadow);
@@ -223,9 +223,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 .unit-tile.yellow{border-color:#F59E0B;background:#FFFBEB;}
 .unit-tile.red{border-color:#EF4444;background:#FEF2F2;}
 .unit-tile.gray{border-color:var(--border);background:var(--surface2);}
-.unit-num{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--ink);}
-.unit-boards{font-size:11px;color:var(--ink2);margin-top:4px;}
-.unit-spend{font-size:11px;font-weight:600;margin-top:2px;}
+.unit-num{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--ink);}
+.unit-boards{font-size:12px;color:var(--ink2);margin-top:5px;line-height:1.5;}
+.unit-spend{font-size:13px;font-weight:700;margin-top:4px;}
 .unit-tile.green .unit-spend{color:var(--green);}
 .unit-tile.yellow .unit-spend{color:var(--yellow);}
 .unit-tile.red .unit-spend{color:var(--red);}
@@ -673,15 +673,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
             </div>
             <div class="form-group">
               <label>Labor Category</label>
-              <select id="bwiz-labor-cat">
+              <select id="bwiz-labor-cat" onchange="toggleLaborOther()">
                 <option value="Framing">Framing</option>
                 <option value="Hanging">Hanging</option>
                 <option value="Punchout">Punchout</option>
                 <option value="Finish">Finish</option>
                 <option value="Layout">Layout</option>
                 <option value="Supervision">Supervision</option>
-                <option value="Other">Other</option>
+                <option value="Other">Other (type below)</option>
               </select>
+            </div>
+            <div class="form-group" id="bwiz-labor-other-wrap" style="display:none;">
+              <label>Describe Category</label>
+              <input type="text" id="bwiz-labor-other" placeholder="e.g. Taping, Fireproofing, Cleanup..."/>
             </div>
           </div>
 
@@ -1516,10 +1520,15 @@ function openBillModal(inv) {
       <div class="form-group"><label>Job</label>
         <select id="bm-job">${jobs.map(j => `<option value="${j}" ${j===existing.job?'selected':''}>${j}</option>`).join('')}</select></div>
       ${isLabor ? `<div class="form-group"><label>Category</label>
-        <select id="bm-cat">
+        <select id="bm-cat" onchange="toggleBmOther()">
           <option>Framing</option><option>Hanging</option><option>Punchout</option>
-          <option>Finish</option><option>Layout</option><option>Supervision</option><option>Other</option>
-        </select></div>` : `<div class="form-group"><label>Match to PO #</label>
+          <option>Finish</option><option>Layout</option><option>Supervision</option>
+          <option>Other</option>
+        </select></div>
+      <div class="form-group" id="bm-other-wrap" style="display:none;">
+        <label>Describe Category</label>
+        <input type="text" id="bm-other-input" placeholder="e.g. Taping, Fireproofing..."/>
+      </div>` : `<div class="form-group"><label>Match to PO #</label>
         <input type="text" id="bm-po" value="${existing.po||''}" placeholder="Optional PO number"/></div>`}
     </div>
     ${isLabor ? `<div class="form-row">
@@ -1537,11 +1546,14 @@ function openBillModal(inv) {
 }
 
 function saveBillMatch(inv, isLabor) {
+  const rawCat = document.getElementById('bm-cat')?.value || '';
+  const otherCat = document.getElementById('bm-other-input')?.value.trim() || '';
+  const finalCat = rawCat === 'Other' && otherCat ? otherCat : rawCat;
   const match = {
     job: document.getElementById('bm-job').value,
     isLabor,
     po: isLabor ? '' : (document.getElementById('bm-po')?.value || ''),
-    category: isLabor ? document.getElementById('bm-cat')?.value : '',
+    category: isLabor ? finalCat : '',
     building: isLabor ? document.getElementById('bm-bldg')?.value : '',
     floor: isLabor ? document.getElementById('bm-floor')?.value : '',
     unit: isLabor ? document.getElementById('bm-unit')?.value : '',
@@ -1656,9 +1668,14 @@ function initBillWizard() {
 function bwizLookup() {
   const inv = document.getElementById('bwiz-inv').value.trim();
   if (!inv) { document.getElementById('bwiz-preview').innerHTML = ''; return; }
-  const rows = S.bills.filter(b => String(b['INVOICE NUMBER']||b['Invoice Number']||'') === inv);
+  // Search by invoice number OR reference number
+  const rows = S.bills.filter(b => {
+    const invNum = String(b['INVOICE NUMBER']||b['Invoice Number']||'');
+    const refNum = String(b['REFERANCE NUMBER']||b['Reference Number']||b['REF']||'');
+    return invNum === inv || refNum === inv || invNum.includes(inv) || refNum.includes(inv);
+  });
   if (rows.length === 0) {
-    document.getElementById('bwiz-preview').innerHTML = `<div class="alert alert-yellow">Invoice #${inv} not in BILL DATA sheet. Sync first.</div>`;
+    document.getElementById('bwiz-preview').innerHTML = `<div class="alert alert-yellow">Invoice #${inv} not found in BILL DATA sheet. Try the reference number or sync first.</div>`;
     return;
   }
   bwizData.inv = inv;
@@ -1704,10 +1721,13 @@ function bwizStep(n) {
 
 function bwizSave() {
   const inv = bwizData.inv;
+  const laborCat = document.getElementById('bwiz-labor-cat')?.value;
+  const laborOther = document.getElementById('bwiz-labor-other')?.value.trim();
+  const finalCat = laborCat === 'Other' && laborOther ? laborOther : laborCat;
   const match = bwizData.isLabor ? {
     job: document.getElementById('bwiz-labor-job').value,
     isLabor: true,
-    category: document.getElementById('bwiz-labor-cat').value,
+    category: finalCat || 'Other',
     building: document.getElementById('bwiz-labor-bldg').value,
     floor: document.getElementById('bwiz-labor-floor').value,
     unit: document.getElementById('bwiz-labor-unit').value,
@@ -1831,23 +1851,29 @@ function renderJobMap() {
         </div>
         <div class="unit-tiles">`;
 
-      Object.keys(units).sort().forEach(u => {
+      Object.keys(units).sort((a,b) => {
+        if (a === 'N/A') return 1;
+        if (b === 'N/A') return -1;
+        return isNaN(+a) ? a.localeCompare(b) : +a - +b;
+      }).forEach(u => {
         const d = units[u];
-        // Determine color based on unit budget vs spend
-        const unitBudget = parseFloat(S.budgets[job]?.dollars || 0) / Math.max(Object.keys(units).length, 1);
+        const isNAUnit = u === 'N/A' || u === 'n/a';
+        // Color by % of floor budget used
+        const floorUnits = Object.keys(units).filter(x => x !== 'N/A').length || 1;
+        const unitShare = budget > 0 ? budget / floorUnits : 0;
         let color = 'gray';
-        if (budget > 0) {
-          const pct = (d.total / (budget / Object.values(bldgs[bldg]).reduce((s,f) => s + Object.keys(f).length, 0))) * 100;
+        if (budget > 0 && unitShare > 0) {
+          const pct = (d.total / unitShare) * 100;
           color = pct > 90 ? 'red' : pct > 75 ? 'yellow' : 'green';
         }
         const poCount = d.pos.size;
-        html += `<div class="unit-tile ${color}" onclick="openUnitModal('${job}','${bldg}','${fl}','${u}')">
-          <div class="unit-num">${u === 'N/A' ? '—' : u}</div>
-          <div class="unit-boards" style="font-size:10px;margin-top:4px;">📋 ${poCount} PO${poCount !== 1 ? 's' : ''}</div>
-          ${d.boards > 0 ? `<div class="unit-boards" style="font-size:10px;">🟦 ${Math.round(d.boards)} boards</div>` : ''}
-          <div class="unit-spend" style="font-size:12px;font-weight:700;margin-top:6px;">${fmt(d.total)}</div>
-          ${d.finish > 0 ? `<div style="font-size:9px;color:var(--ink3);">Finish: ${fmt(d.finish)}</div>` : ''}
-        </div>`;
+        const label = isNAUnit ? 'Floor General' : 'Unit ' + u;
+        html += \`<div class="unit-tile \${color}" onclick="openUnitModal('\${job}','\${bldg}','\${fl}','\${u}')" style="\${isNAUnit ? 'border-style:dashed;opacity:0.85;' : ''}">
+          <div class="unit-num" style="font-size:\${isNAUnit?'12px':'17px'};">\${isNAUnit ? 'Floor\nGeneral' : u}</div>
+          <div class="unit-boards">📋 \${poCount} PO\${poCount!==1?'s':''}</div>
+          \${d.boards > 0 ? \`<div class="unit-boards">🟦 \${Math.round(d.boards)} boards</div>\` : ''}
+          <div class="unit-spend">\${fmt(d.total)}</div>
+        </div>\`;
       });
 
       html += `</div></div>`;
@@ -2319,6 +2345,18 @@ function setSelectOptions(id, options, selected, allLabel) {
   const el = document.getElementById(id);
   if (!el) return;
   el.innerHTML = (allLabel ? `<option value="">${allLabel}</option>` : '') + options.map(o => `<option value="${o}" ${o===selected?'selected':''}>${o}</option>`).join('');
+}
+
+
+function toggleLaborOther() {
+  const cat = document.getElementById('bwiz-labor-cat')?.value;
+  const wrap = document.getElementById('bwiz-labor-other-wrap');
+  if (wrap) wrap.style.display = cat === 'Other' ? 'block' : 'none';
+}
+function toggleBmOther() {
+  const cat = document.getElementById('bm-cat')?.value;
+  const wrap = document.getElementById('bm-other-wrap');
+  if (wrap) wrap.style.display = cat === 'Other' ? 'block' : 'none';
 }
 
 // Close modals on overlay click
