@@ -791,7 +791,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
       </div>
       <div class="card">
         <div class="card-header"><span class="card-title">Material Banks</span>
-          <span style="font-size:12px;color:var(--ink3);">Per-job keyword tracking</span>
+          <span style="font-size:12px;color:var(--ink3);">Track by keyword — job total or per floor</span>
         </div>
         <div class="card-body">
           <div class="form-group"><label>Job</label>
@@ -800,8 +800,30 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
           <div id="mat-banks-list" style="margin-bottom:16px;"></div>
           <div class="divider"></div>
           <div style="font-weight:600;font-size:13px;margin-bottom:12px;">Add Material Bank</div>
-          <div class="form-group"><label>Keyword (fuzzy match)</label>
-            <input type="text" id="mb-kw" placeholder="e.g. 5/8 TYPE X or STUD or COMPOUND"/></div>
+          <div class="form-group">
+            <label>Keyword (fuzzy match)</label>
+            <input type="text" id="mb-kw" placeholder="e.g. 5/8 TYPE X or STUD or COMPOUND"/>
+          </div>
+          <div class="form-group">
+            <label>Scope</label>
+            <select id="mb-scope" onchange="toggleMbFloor()">
+              <option value="job">Whole Job Total</option>
+              <option value="floor">Specific Floor</option>
+              <option value="building">Specific Building</option>
+            </select>
+          </div>
+          <div id="mb-floor-row" style="display:none;">
+            <div class="form-row">
+              <div class="form-group"><label>Building</label>
+                <input type="text" id="mb-bldg" placeholder="e.g. R2"/></div>
+              <div class="form-group"><label>Floor</label>
+                <input type="number" id="mb-floor-num" placeholder="e.g. 3"/></div>
+            </div>
+          </div>
+          <div id="mb-bldg-row" style="display:none;">
+            <div class="form-group"><label>Building</label>
+              <input type="text" id="mb-bldg-only" placeholder="e.g. R2"/></div>
+          </div>
           <div class="form-row">
             <div class="form-group"><label>Qty Budget</label>
               <input type="number" id="mb-qty" placeholder="e.g. 5000"/></div>
@@ -1004,7 +1026,7 @@ let sb = null;
 
 // ── STATE ─────────────────────────────────────────
 let S = {
-  sheetId: localStorage.getItem('dw_sheet_id') || '12EYFZc6wuJOUqoz8iPD6e70iZrK2wzx3drTDncinuvg',
+  sheetId: localStorage.getItem('dw_sheet_id') || '12EYFZc6wuJOUqoz8iPD6e70iZrK2wzx3drTDncinuvg', // Pre-baked — auto-connects
   aiKey: localStorage.getItem('dw_ak') || '',
   jobs: JSON.parse(localStorage.getItem('dw_jobs') || '["JOB VILLAGES @ EAST OCEAN","JOB PIONEER LOFTS","LEGACY AT MARGATE"]'),
   budgets: JSON.parse(localStorage.getItem('dw_budgets') || '{}'),
@@ -1027,11 +1049,13 @@ window.onload = async () => {
     document.getElementById('sb-conn-status').style.color = 'var(--yellow)';
   }
 
-  // Load saved sheet ID into inputs
-  if (S.sheetId) {
-    document.getElementById('sheet-id-input').value = S.sheetId;
-    document.getElementById('settings-sheet-id').value = S.sheetId;
-  }
+  // Load sheet ID — always pre-baked, auto connects
+  document.getElementById('sheet-id-input').value = S.sheetId;
+  document.getElementById('settings-sheet-id').value = S.sheetId;
+  document.getElementById('sheet-connected-label').textContent = '✓ Sheet ready';
+  document.getElementById('sheet-connected-label').className = 'sheet-status ok';
+  document.getElementById('sheet-status-mini').textContent = '✓ Sheet connected';
+  document.getElementById('sheet-status-mini').className = 'sheet-status ok';
   if (S.aiKey) document.getElementById('settings-ai-key').value = S.aiKey;
 
   // Sheet ID input listener (sidebar)
@@ -1858,22 +1882,25 @@ function renderJobMap() {
       }).forEach(u => {
         const d = units[u];
         const isNAUnit = u === 'N/A' || u === 'n/a';
-        // Color by % of floor budget used
-        const floorUnits = Object.keys(units).filter(x => x !== 'N/A').length || 1;
-        const unitShare = budget > 0 ? budget / floorUnits : 0;
+        const floorUnitCount = Object.keys(units).filter(x => x !== 'N/A').length || 1;
         let color = 'gray';
-        if (budget > 0 && unitShare > 0) {
-          const pct = (d.total / unitShare) * 100;
+        if (budget > 0) {
+          const share = budget / floorUnitCount;
+          const pct = (d.total / share) * 100;
           color = pct > 90 ? 'red' : pct > 75 ? 'yellow' : 'green';
         }
         const poCount = d.pos.size;
-        const label = isNAUnit ? 'Floor General' : 'Unit ' + u;
-        html += \`<div class="unit-tile \${color}" onclick="openUnitModal('\${job}','\${bldg}','\${fl}','\${u}')" style="\${isNAUnit ? 'border-style:dashed;opacity:0.85;' : ''}">
-          <div class="unit-num" style="font-size:\${isNAUnit?'12px':'17px'};">\${isNAUnit ? 'Floor\nGeneral' : u}</div>
-          <div class="unit-boards">📋 \${poCount} PO\${poCount!==1?'s':''}</div>
-          \${d.boards > 0 ? \`<div class="unit-boards">🟦 \${Math.round(d.boards)} boards</div>\` : ''}
-          <div class="unit-spend">\${fmt(d.total)}</div>
-        </div>\`;
+        const tileStyle = isNAUnit ? 'border-style:dashed;opacity:0.85;' : '';
+        const unitLabel = isNAUnit ? 'General' : u;
+        const unitSub = isNAUnit ? 'Floor-wide' : '';
+        const boardsHtml = d.boards > 0 ? '<div class="unit-boards">🟦 ' + Math.round(d.boards) + ' boards</div>' : '';
+        html += '<div class="unit-tile ' + color + '" onclick="openUnitModal(\''+job+'\',\''+bldg+'\',\''+fl+'\',\''+u+'\' )" style="' + tileStyle + '">' +
+          '<div class="unit-num">' + unitLabel + '</div>' +
+          (unitSub ? '<div style="font-size:10px;color:var(--ink3);">' + unitSub + '</div>' : '') +
+          '<div class="unit-boards">📋 ' + poCount + ' PO' + (poCount!==1?'s':'') + '</div>' +
+          boardsHtml +
+          '<div class="unit-spend">' + fmt(d.total) + '</div>' +
+          '</div>';
       });
 
       html += `</div></div>`;
@@ -2022,31 +2049,63 @@ async function sbSaveBudgets() {
 function loadMatBanks() {
   const job = document.getElementById('mb-job-sel').value;
   const banks = S.matBanks[job] || [];
-  document.getElementById('mat-banks-list').innerHTML = banks.length === 0
-    ? '<div class="no-data">No material banks for this job yet.</div>'
-    : banks.map((b, i) => `
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
-          <div style="flex:1;">
-            <div style="font-weight:600;font-size:13px;">${b.keyword}</div>
-            <div style="font-size:12px;color:var(--ink3);">Qty: ${b.qty||'—'} · $${b.dollars||'—'}</div>
-          </div>
-          <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="removeMatBank('${job}',${i})">✕</button>
-        </div>`).join('');
+  if (banks.length === 0) {
+    document.getElementById('mat-banks-list').innerHTML = '<div class="no-data">No material banks yet. Add one below.</div>';
+    return;
+  }
+  let html = '';
+  banks.forEach((b, i) => {
+    const scopeTag = b.scope === 'floor' ? 'Bldg ' + (b.building||'') + ' FL' + (b.floor||'') : b.scope === 'building' ? 'Bldg ' + (b.building||'') : 'Job Total';
+    const qtyStr = b.qty ? 'Qty: ' + b.qty : '';
+    const dolStr = b.dollars ? '$' + Number(b.dollars).toLocaleString() : '';
+    const sep = qtyStr && dolStr ? ' · ' : '';
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">';
+    html += '<div style="flex:1;">';
+    html += '<div style="font-weight:600;font-size:13px;">' + b.keyword + '</div>';
+    html += '<div style="font-size:12px;color:var(--ink3);margin-top:3px;"><span class="badge badge-gray" style="font-size:10px;margin-right:6px;">' + scopeTag + '</span>' + qtyStr + sep + dolStr + '</div>';
+    html += '</div>';
+    html += '<button class="btn btn-ghost btn-sm" style="color:var(--red);padding:4px 8px;" onclick="removeMatBank(' + JSON.stringify(job) + ',' + i + ')">✕</button>';
+    html += '</div>';
+  });
+  document.getElementById('mat-banks-list').innerHTML = html;
+}
+
+function toggleMbFloor() {
+  const scope = document.getElementById('mb-scope').value;
+  document.getElementById('mb-floor-row').style.display = scope === 'floor' ? 'block' : 'none';
+  document.getElementById('mb-bldg-row').style.display = scope === 'building' ? 'block' : 'none';
 }
 
 function addMatBank() {
   const job = document.getElementById('mb-job-sel').value;
   const kw = document.getElementById('mb-kw').value.trim();
+  const scope = document.getElementById('mb-scope').value;
   if (!job || !kw) { showToast('Select a job and enter a keyword'); return; }
   if (!S.matBanks[job]) S.matBanks[job] = [];
-  S.matBanks[job].push({ keyword: kw, qty: document.getElementById('mb-qty').value, dollars: document.getElementById('mb-dollars').value });
+  const bank = {
+    keyword: kw,
+    qty: document.getElementById('mb-qty').value,
+    dollars: document.getElementById('mb-dollars').value,
+    scope: scope,
+  };
+  if (scope === 'floor') {
+    bank.building = document.getElementById('mb-bldg').value.trim();
+    bank.floor = document.getElementById('mb-floor-num').value.trim();
+    bank.label = 'Bldg ' + bank.building + ' FL' + bank.floor;
+  } else if (scope === 'building') {
+    bank.building = document.getElementById('mb-bldg-only').value.trim();
+    bank.label = 'Bldg ' + bank.building;
+  } else {
+    bank.label = 'Job Total';
+  }
+  S.matBanks[job].push(bank);
   localStorage.setItem('dw_matbanks', JSON.stringify(S.matBanks));
   document.getElementById('mb-kw').value = '';
   document.getElementById('mb-qty').value = '';
   document.getElementById('mb-dollars').value = '';
   loadMatBanks();
   renderBudgetVsActual();
-  showToast('Material bank added: ' + kw);
+  showToast('Bank added: ' + kw + ' (' + bank.label + ')');
 }
 
 function removeMatBank(job, idx) {
