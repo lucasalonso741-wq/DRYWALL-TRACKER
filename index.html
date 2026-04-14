@@ -4,7 +4,137 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AA Drywall Tracker</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js">
+// ═══════════════════════════════════════════════
+// AI ASSISTANT
+// ═══════════════════════════════════════════════
+function buildContext(){
+  const jobs = A.jobs.map(j => {
+    const je = A.raw.filter(r => r.job && r.job.toLowerCase() === j.name.toLowerCase());
+    const spent = je.reduce((a,r) => a+(r.lineTotal||r.line_total||0), 0);
+    const boards = je.filter(r => isB(r.material||r.mat)).reduce((a,r) => a+r.qty, 0);
+    const billed = A.bills.filter(b => b.job && b.job.toLowerCase() === j.name.toLowerCase()).reduce((a,b) => a+(b.line_total||0), 0);
+    const labor = A.labor.filter(e => e.job === j.name).reduce((a,e) => a+(e.total||0), 0);
+    return {
+      name: j.name,
+      budgetDollars: j.budgetDollars || j.budget_dollars || 0,
+      spent, boards, billed, labor,
+      poCount: new Set(je.map(r => r.po||r.po_number)).size,
+      remaining: (j.budgetDollars||j.budget_dollars||0) - spent,
+      percentUsed: j.budgetDollars ? Math.round(spent/(j.budgetDollars)*100) : 0
+    };
+  });
+  const pendingPOs = [...new Set(A.raw.filter(r => !r.building||!r.floor||!r.unit).map(r => r.po||r.po_number))];
+  const pendingBills = [...new Set(A.bills.filter(b => !b.job||!b.building).map(b => b.invoice_number))];
+  return {
+    jobs,
+    totalPOSpend: A.raw.reduce((a,r) => a+(r.lineTotal||r.line_total||0), 0),
+    totalBilled: A.bills.reduce((a,b) => a+(b.line_total||0), 0),
+    totalLabor: A.labor.reduce((a,e) => a+(e.total||0), 0),
+    totalBoards: A.raw.filter(r => isB(r.material||r.mat)).reduce((a,r) => a+r.qty, 0),
+    totalBudget: A.jobs.reduce((a,j) => a+(j.budgetDollars||j.budget_dollars||0), 0),
+    pendingPOs: pendingPOs.length,
+    pendingBills: pendingBills.length,
+    totalPOs: new Set(A.raw.map(r => r.po||r.po_number)).size,
+    totalBillLines: A.bills.length,
+    laborEntries: A.labor.length,
+    boardKeywords: A.bkw,
+    companyName: A.co
+  };
+}
+
+async function sendAI(){
+  const input = document.getElementById('ai-input');
+  const msg = input.value.trim();
+  if(!msg) return;
+  input.value = '';
+  appendAIMsg('user', msg);
+  const btn = document.getElementById('ai-send-btn');
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const context = buildContext();
+    const systemPrompt = `You are an AI assistant embedded inside a drywall construction tracker app for ${context.companyName}. 
+You have access to live data from their tracker. Here is the current state:
+
+SUMMARY:
+- Total jobs: ${context.jobs.length}
+- Total PO spend: $${Math.round(context.totalPOSpend).toLocaleString()}
+- Total billed: $${Math.round(context.totalBilled).toLocaleString()}
+- Total labor & subs: $${Math.round(context.totalLabor).toLocaleString()}
+- Total budget: $${Math.round(context.totalBudget).toLocaleString()}
+- Total boards ordered: ${Math.round(context.totalBoards).toLocaleString()}
+- POs missing location: ${context.pendingPOs}
+- Bills missing location: ${context.pendingBills}
+- Total POs: ${context.totalPOs}
+- Total bill lines: ${context.totalBillLines}
+
+JOBS:
+${context.jobs.map(j => `- ${j.name}: Budget $${Math.round(j.budgetDollars).toLocaleString()}, Spent $${Math.round(j.spent).toLocaleString()} (${j.percentUsed}%), Billed $${Math.round(j.billed).toLocaleString()}, Boards ${Math.round(j.boards).toLocaleString()}, Labor $${Math.round(j.labor).toLocaleString()}, ${j.poCount} POs, $${Math.round(j.remaining).toLocaleString()} remaining`).join('\n')}
+
+Answer questions about this data concisely and helpfully. You can analyze trends, flag issues, compare jobs, and give recommendations. Keep responses under 200 words unless asked for detail.`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': (document.getElementById('sak')?document.getElementById('sak').value:localStorage.getItem('dw_ak')||''), 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: msg }]
+      })
+    });
+    const data = await response.json();
+    if(data.error) throw new Error(data.error.message);
+    const reply = data.content[0].text;
+    appendAIMsg('claude', reply);
+  } catch(e) {
+    if(e.message && e.message.includes('x-api-key')) {
+      appendAIMsg('claude', 'To activate the AI assistant, go to Settings → Company and add your Anthropic API key. Get one free at console.anthropic.com');
+    } else {
+      appendAIMsg('claude', 'Error: ' + e.message);
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send';
+  }
+}
+
+function aiQuick(msg){
+  document.getElementById('ai-input').value = msg;
+  sendAI();
+}
+
+function appendAIMsg(role, text){
+  const el = document.getElementById('ai-messages');
+  const isUser = role === 'user';
+  const div = document.createElement('div');
+  div.style.cssText = 'border-radius:8px;padding:10px 13px;max-width:85%;' + (isUser ? 'align-self:flex-end;background:var(--blue);color:white' : 'align-self:flex-start;background:var(--blue-lt)');
+  if(!isUser){
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'font-size:12px;font-weight:700;color:var(--blue);margin-bottom:4px';
+    lbl.textContent = 'Claude';
+    div.appendChild(lbl);
+  }
+  const txt = document.createElement('div');
+  txt.style.cssText = 'font-size:13px;white-space:pre-wrap;' + (isUser ? 'color:white' : 'color:var(--g800)');
+  txt.textContent = text;
+  div.appendChild(txt);
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+// Add API key field to settings
+function addAPIKeyField(){
+  const co = document.getElementById('ss-company');
+  if(!co || document.getElementById('api-key-field')) return;
+  const div = document.createElement('div');
+  div.className = 'fg';
+  div.id = 'api-key-field';
+  div.innerHTML = '<label class="flbl">Anthropic API Key <span style="font-weight:400;text-transform:none;color:var(--g400)">(for AI Assistant)</span></label><input id="sak" class="fi" type="password" placeholder="sk-ant-..."><div style="font-size:11px;color:var(--g400);margin-top:3px">Get your free API key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--blue)">console.anthropic.com</a></div>';
+  const btn = co.querySelector('.brow');
+  if(btn) co.insertBefore(div, btn);
+}
+
+</script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--navy:#0D1B2A;--navy2:#1A2E42;--navy3:#243B55;--blue:#1E6FBF;--blue2:#2481D7;--blue-lt:#E8F2FC;--green:#1A7A4A;--green-lt:#E6F5ED;--amber:#B45309;--amber-lt:#FEF3C7;--red:#B91C1C;--red-lt:#FEE2E2;--g50:#F8FAFC;--g100:#F1F5F9;--g200:#E2E8F0;--g300:#CBD5E1;--g400:#94A3B8;--g500:#64748B;--g600:#475569;--g700:#334155;--g800:#1E293B;--g900:#0F172A;--font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;--r:10px;--rl:14px}
@@ -170,6 +300,10 @@ tr:hover td{background:var(--g50)}.tdb{font-weight:700;color:var(--g900)}.tdm{fo
     </div>
     <div class="sb-i" onclick="go('settings')" id="nav-settings">
       <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>Settings
+    </div>
+    <div class="sb-i" onclick="go('ai')" id="nav-ai">
+      <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
+      AI Assistant
     </div>
   </div>
   <div class="sb-div"></div>
@@ -463,9 +597,9 @@ const db = createClient(SUPA_URL, SUPA_KEY);
 const JC=['#1E6FBF','#1A7A4A','#B45309','#7C3AED','#0F766E','#BE185D','#C2410C'];
 const JL=['#E8F2FC','#E6F5ED','#FEF3C7','#EDE9FE','#CCFBF1','#FCE7F3','#FFF7ED'];
 const BKD=['denshield','shaft liner','durock','1/2 reg','5/8 type x','5/8 typex','1/2 drywall','5/8 drywall','mr board','mold defense','densglass','sheetrock','blueboard','greenboard','gypsum board'];
-const SURL='https://script.google.com/macros/s/AKfycby9CNomi7Ju-wC8ioYjJ_P4z9HfsnD1ZforowMLBKhivjHIL4VP9P5QhNwVEHzdFwfa/exec';
+const SURL='https://script.google.com/macros/s/AKfycbwGkzE1G4No7xeJqj2qcTMNeSoYuX-FYnLaVh6TZVTdIUxGx9EfXeCXq7DFDjd57F3q/exec';
 
-let A={pc:'GYPSUM',co:'AA Drywall',logo:null,su:'https://script.google.com/macros/s/AKfycby9CNomi7Ju-wC8ioYjJ_P4z9HfsnD1ZforowMLBKhivjHIL4VP9P5QhNwVEHzdFwfa/exec',bill_url:'',jobs:[],raw:[],bills:[],labor:[],bkw:[...BKD],abt:'ov',ast:'company',aet:'labor',abj:null,ppo:null};
+let A={pc:'GYPSUM',co:'AA Drywall',logo:null,su:'https://script.google.com/macros/s/AKfycbwGkzE1G4No7xeJqj2qcTMNeSoYuX-FYnLaVh6TZVTdIUxGx9EfXeCXq7DFDjd57F3q/exec',bill_url:'',jobs:[],raw:[],bills:[],labor:[],bkw:[...BKD],abt:'ov',ast:'company',aet:'labor',abj:null,ppo:null};
 
 // ── SUPABASE DB OPERATIONS ──
 async function dbLoad(){
@@ -562,7 +696,7 @@ function brand(){
 function upLogo(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=async e=>{A.logo=e.target.result;await dbSaveSetting();brand();};r.readAsDataURL(f);}
 async function rmLogo(){A.logo=null;await dbSaveSetting();brand();document.getElementById('lpv').classList.add('hidden');document.getElementById('lht').style.display='inline';}
 
-const PM={dash:{t:'Dashboard',s:'Overview of all active jobs'},po:{t:'PO Tracking',s:'Entry and tracking'},bills:{t:'Bills & Actuals',s:'Paid vs ordered'},boards:{t:'Board Tracker',s:'Drywall board counts from PO data'},labor:{t:'Labor & Subs',s:'Weekly entries'},budget:{t:'Budget Bank',s:'Job, material, board and labor budgets'},breakdown:{t:'Job Breakdown',s:'Drill down by job, floor, unit, date'},raw:{t:'Raw Data',s:'Synced from Google Sheets'},settings:{t:'Settings',s:'Company, jobs, and connections'}};
+const PM={dash:{t:'Dashboard',s:'Overview of all active jobs'},po:{t:'PO Tracking',s:'Entry and tracking'},bills:{t:'Bills & Actuals',s:'Paid vs ordered'},boards:{t:'Board Tracker',s:'Drywall board counts from PO data'},labor:{t:'Labor & Subs',s:'Weekly entries'},budget:{t:'Budget Bank',s:'Job, material, board and labor budgets'},breakdown:{t:'Job Breakdown',s:'Drill down by job, floor, unit, date'},raw:{t:'Raw Data',s:'Synced from Google Sheets'},settings:{t:'Settings',s:'Company, jobs, and connections'},ai:{t:'AI Assistant',s:'Ask Claude to update, analyze, or customize your tracker'}};
 
 function go(p){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('on'));
@@ -579,7 +713,7 @@ function go(p){
   if(p==='budget')rBP();
   if(p==='breakdown'){fBDF();rBD();}
   if(p==='raw')rRaw();
-  if(p==='settings'){brand();rSt();}
+  if(p==='settings'){brand();rSt();addAPIKeyField();}
 }
 function oSB(){document.getElementById('sb').classList.add('open');document.getElementById('ovl').classList.add('show');}
 function cSB(){document.getElementById('sb').classList.remove('open');document.getElementById('ovl').classList.remove('show');}
@@ -937,6 +1071,136 @@ async function init(){
   try{if(sessionStorage.getItem('dwa')==='1'){document.getElementById('lock').style.display='none';document.getElementById('aw').style.display='block';rDash();}}catch(e){}
 }
 init();
+
+// ═══════════════════════════════════════════════
+// AI ASSISTANT
+// ═══════════════════════════════════════════════
+function buildContext(){
+  const jobs = A.jobs.map(j => {
+    const je = A.raw.filter(r => r.job && r.job.toLowerCase() === j.name.toLowerCase());
+    const spent = je.reduce((a,r) => a+(r.lineTotal||r.line_total||0), 0);
+    const boards = je.filter(r => isB(r.material||r.mat)).reduce((a,r) => a+r.qty, 0);
+    const billed = A.bills.filter(b => b.job && b.job.toLowerCase() === j.name.toLowerCase()).reduce((a,b) => a+(b.line_total||0), 0);
+    const labor = A.labor.filter(e => e.job === j.name).reduce((a,e) => a+(e.total||0), 0);
+    return {
+      name: j.name,
+      budgetDollars: j.budgetDollars || j.budget_dollars || 0,
+      spent, boards, billed, labor,
+      poCount: new Set(je.map(r => r.po||r.po_number)).size,
+      remaining: (j.budgetDollars||j.budget_dollars||0) - spent,
+      percentUsed: j.budgetDollars ? Math.round(spent/(j.budgetDollars)*100) : 0
+    };
+  });
+  const pendingPOs = [...new Set(A.raw.filter(r => !r.building||!r.floor||!r.unit).map(r => r.po||r.po_number))];
+  const pendingBills = [...new Set(A.bills.filter(b => !b.job||!b.building).map(b => b.invoice_number))];
+  return {
+    jobs,
+    totalPOSpend: A.raw.reduce((a,r) => a+(r.lineTotal||r.line_total||0), 0),
+    totalBilled: A.bills.reduce((a,b) => a+(b.line_total||0), 0),
+    totalLabor: A.labor.reduce((a,e) => a+(e.total||0), 0),
+    totalBoards: A.raw.filter(r => isB(r.material||r.mat)).reduce((a,r) => a+r.qty, 0),
+    totalBudget: A.jobs.reduce((a,j) => a+(j.budgetDollars||j.budget_dollars||0), 0),
+    pendingPOs: pendingPOs.length,
+    pendingBills: pendingBills.length,
+    totalPOs: new Set(A.raw.map(r => r.po||r.po_number)).size,
+    totalBillLines: A.bills.length,
+    laborEntries: A.labor.length,
+    boardKeywords: A.bkw,
+    companyName: A.co
+  };
+}
+
+async function sendAI(){
+  const input = document.getElementById('ai-input');
+  const msg = input.value.trim();
+  if(!msg) return;
+  input.value = '';
+  appendAIMsg('user', msg);
+  const btn = document.getElementById('ai-send-btn');
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const context = buildContext();
+    const systemPrompt = `You are an AI assistant embedded inside a drywall construction tracker app for ${context.companyName}. 
+You have access to live data from their tracker. Here is the current state:
+
+SUMMARY:
+- Total jobs: ${context.jobs.length}
+- Total PO spend: $${Math.round(context.totalPOSpend).toLocaleString()}
+- Total billed: $${Math.round(context.totalBilled).toLocaleString()}
+- Total labor & subs: $${Math.round(context.totalLabor).toLocaleString()}
+- Total budget: $${Math.round(context.totalBudget).toLocaleString()}
+- Total boards ordered: ${Math.round(context.totalBoards).toLocaleString()}
+- POs missing location: ${context.pendingPOs}
+- Bills missing location: ${context.pendingBills}
+- Total POs: ${context.totalPOs}
+- Total bill lines: ${context.totalBillLines}
+
+JOBS:
+${context.jobs.map(j => `- ${j.name}: Budget $${Math.round(j.budgetDollars).toLocaleString()}, Spent $${Math.round(j.spent).toLocaleString()} (${j.percentUsed}%), Billed $${Math.round(j.billed).toLocaleString()}, Boards ${Math.round(j.boards).toLocaleString()}, Labor $${Math.round(j.labor).toLocaleString()}, ${j.poCount} POs, $${Math.round(j.remaining).toLocaleString()} remaining`).join('\n')}
+
+Answer questions about this data concisely and helpfully. You can analyze trends, flag issues, compare jobs, and give recommendations. Keep responses under 200 words unless asked for detail.`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': (document.getElementById('sak')?document.getElementById('sak').value:localStorage.getItem('dw_ak')||''), 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: msg }]
+      })
+    });
+    const data = await response.json();
+    if(data.error) throw new Error(data.error.message);
+    const reply = data.content[0].text;
+    appendAIMsg('claude', reply);
+  } catch(e) {
+    if(e.message && e.message.includes('x-api-key')) {
+      appendAIMsg('claude', 'To activate the AI assistant, go to Settings → Company and add your Anthropic API key. Get one free at console.anthropic.com');
+    } else {
+      appendAIMsg('claude', 'Error: ' + e.message);
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send';
+  }
+}
+
+function aiQuick(msg){
+  document.getElementById('ai-input').value = msg;
+  sendAI();
+}
+
+function appendAIMsg(role, text){
+  const el = document.getElementById('ai-messages');
+  const isUser = role === 'user';
+  const div = document.createElement('div');
+  div.style.cssText = 'border-radius:8px;padding:10px 13px;max-width:85%;' + (isUser ? 'align-self:flex-end;background:var(--blue);color:white' : 'align-self:flex-start;background:var(--blue-lt)');
+  if(!isUser){
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'font-size:12px;font-weight:700;color:var(--blue);margin-bottom:4px';
+    lbl.textContent = 'Claude';
+    div.appendChild(lbl);
+  }
+  const txt = document.createElement('div');
+  txt.style.cssText = 'font-size:13px;white-space:pre-wrap;' + (isUser ? 'color:white' : 'color:var(--g800)');
+  txt.textContent = text;
+  div.appendChild(txt);
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+// Add API key field to settings
+function addAPIKeyField(){
+  const co = document.getElementById('ss-company');
+  if(!co || document.getElementById('api-key-field')) return;
+  const div = document.createElement('div');
+  div.className = 'fg';
+  div.id = 'api-key-field';
+  div.innerHTML = '<label class="flbl">Anthropic API Key <span style="font-weight:400;text-transform:none;color:var(--g400)">(for AI Assistant)</span></label><input id="sak" class="fi" type="password" placeholder="sk-ant-..."><div style="font-size:11px;color:var(--g400);margin-top:3px">Get your free API key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--blue)">console.anthropic.com</a></div>';
+  const btn = co.querySelector('.brow');
+  if(btn) co.insertBefore(div, btn);
+}
+
 </script>
 </body>
 </html>
