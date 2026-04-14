@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0b1220">
+<title>Drywall Tracker</title>
+
+<!-- PWA manifest so it installs as a phone app -->
+<link rel="manifest" href='data:application/manifest+json,{"name":"Drywall Tracker","short_name":"Drywall","start_url":".","display":"standalone","background_color":"%230b1220","theme_color":"%230b1220","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 192 192%22%3E%3Crect width=%22192%22 height=%22192%22 fill=%22%23f59e0b%22 rx=%2224%22/%3E%3Ctext x=%2296%22 y=%22130%22 font-size=%22110%22 font-weight=%22900%22 text-anchor=%22middle%22 fill=%22%230b1220%22%3EDT%3C/text%3E%3C/svg%3E","sizes":"192x192","type":"image/svg+xml"}]}'>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  :root {
+    --bg: #0b1220;
+    --panel: #121a2e;
+    --panel-2: #1a2440;
+    --border: #2a3757;
+    --ink: #e7ecf5;
+    --ink-dim: #9aa8c6;
+    --accent: #f59e0b;
+    --accent-ink: #0b1220;
+    --ok: #22c55e;
+    --warn: #eab308;
+    --bad: #ef4444;
+    --info: #3b82f6;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 16px; line-height: 1.4; }
+  body { min-height: 100vh; padding-bottom: 80px; }
+  h1,h2,h3,h4 { margin: 0 0 8px; font-weight: 700; letter-spacing: -0.01em; }
+  h1 { font-size: 22px; }
+  h2 { font-size: 18px; }
+  h3 { font-size: 16px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  button { font: inherit; cursor: pointer; }
+  input, select, textarea {
+    font: inherit; background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+    width: 100%; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  label { display: block; font-size: 13px; color: var(--ink-dim); margin-bottom: 4px; margin-top: 12px; }
+
+  /* Header */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 10px 14px; display: flex; align-items: center; gap: 10px;
+  }
+  .logo-img { height: 32px; width: auto; border-radius: 4px; }
+  .logo-fallback {
+    width: 32px; height: 32px; background: var(--accent); color: var(--accent-ink);
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 14px;
+  }
+  .co-name { font-weight: 700; font-size: 15px; flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-chip {
+    background: var(--panel-2); padding: 6px 10px; border-radius: 999px;
+    font-size: 12px; color: var(--ink-dim); border: 1px solid var(--border);
+  }
+  .user-chip .role { color: var(--accent); font-weight: 700; }
+
+  /* Tab bar */
+  nav.tabs {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+    background: var(--panel); border-top: 1px solid var(--border);
+    display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    padding: 6px 4px; padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  }
+  nav.tabs button {
+    flex: 0 0 auto; min-width: 64px;
+    background: transparent; color: var(--ink-dim); border: none;
+    padding: 8px 12px; border-radius: 8px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  nav.tabs button.active { background: var(--accent); color: var(--accent-ink); }
+  nav.tabs button .icon { font-size: 18px; }
+  nav.tabs button .badge {
+    background: var(--bad); color: white; font-size: 9px;
+    border-radius: 999px; padding: 1px 5px; margin-left: 2px;
+  }
+
+  /* Main content */
+  main { padding: 14px; max-width: 900px; margin: 0 auto; }
+  .panel { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .row > * { flex: 1; }
+  .row-tight { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  /* Buttons */
+  .btn {
+    display: inline-block; padding: 12px 18px; border-radius: 8px;
+    background: var(--accent); color: var(--accent-ink); border: none;
+    font-weight: 700; font-size: 15px; text-align: center;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn.secondary { background: var(--panel-2); color: var(--ink); border: 1px solid var(--border); }
+  .btn.danger { background: var(--bad); color: white; }
+  .btn.ok { background: var(--ok); color: white; }
+  .btn.ghost { background: transparent; color: var(--accent); }
+  .btn.small { padding: 6px 12px; font-size: 13px; }
+  .btn.block { display: block; width: 100%; }
+
+  /* Cards / tiles */
+  .tile {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px; margin-bottom: 8px;
+  }
+  .tile-row {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 10px;
+  }
+  .tile-title { font-weight: 700; font-size: 15px; }
+  .tile-sub { color: var(--ink-dim); font-size: 13px; margin-top: 2px; }
+
+  /* Status badges */
+  .badge-ok { background: var(--ok); color: white; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .badge-warn { background: var(--warn); color: var(--accent-ink); padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .badge-bad { background: var(--bad); color: white; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .badge-info { background: var(--info); color: white; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+
+  /* Progress bar */
+  .bar { background: var(--bg); border-radius: 6px; height: 10px; overflow: hidden; border: 1px solid var(--border); }
+  .bar > div { height: 100%; transition: width 0.3s; }
+  .bar-ok > div { background: var(--ok); }
+  .bar-warn > div { background: var(--warn); }
+  .bar-bad > div { background: var(--bad); }
+
+  /* Empty state */
+  .empty { text-align: center; color: var(--ink-dim); padding: 30px 10px; }
+  .empty h3 { color: var(--ink-dim); }
+
+  /* Grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; color: var(--ink-dim); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 12px; text-transform: uppercase; }
+  td { padding: 8px; border-bottom: 1px solid var(--border); }
+
+  /* Login screen */
+  .login-wrap {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .login-card { width: 100%; max-width: 380px; }
+  .login-card h1 { text-align: center; margin-bottom: 4px; }
+  .login-card .sub { text-align: center; color: var(--ink-dim); margin-bottom: 20px; font-size: 14px; }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    z-index: 100; display: flex; align-items: flex-end; justify-content: center;
+    animation: fadein 0.15s ease;
+  }
+  @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+  .modal {
+    background: var(--panel); border-radius: 16px 16px 0 0;
+    width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto;
+    padding: 18px; border-top: 1px solid var(--border);
+    animation: slideup 0.2s ease;
+  }
+  @keyframes slideup { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @media (min-width: 600px) {
+    .modal-backdrop { align-items: center; }
+    .modal { border-radius: 16px; }
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+    background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--border); border-left: 4px solid var(--accent);
+    padding: 12px 18px; border-radius: 8px; z-index: 200;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    animation: slidedown 0.2s ease; max-width: 90vw;
+  }
+  @keyframes slidedown { from { transform: translate(-50%, -20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+  .toast.ok { border-left-color: var(--ok); }
+  .toast.bad { border-left-color: var(--bad); }
+
+  /* Hidden */
+  .hidden { display: none !important; }
+
+  /* Utility */
+  .muted { color: var(--ink-dim); }
+  .num { font-variant-numeric: tabular-nums; }
+  .right { text-align: right; }
+  .center { text-align: center; }
+  .mt { margin-top: 10px; }
+  .mb { margin-bottom: 10px; }
+  .big-num { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+  details summary { cursor: pointer; padding: 8px 0; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN (shown before auth) -->
+<div id="loginScreen" class="login-wrap hidden">
+  <div class="login-card panel">
+    <h1>Drywall Tracker</h1>
+    <div class="sub">Sign in or create an account</div>
+    <label>Email</label>
+    <input id="loginEmail" type="email" autocomplete="email" placeholder="you@company.com">
+    <label>Password</label>
+    <input id="loginPassword" type="password" autocomplete="current-password" placeholder="6+ characters">
+    <div class="mt">
+      <button class="btn block" onclick="doLogin()">Sign In</button>
+    </div>
+    <hr>
+    <div id="signupToggleRow" class="center">
+      <button class="btn ghost small" onclick="toggleSignup()">First time? Create an account ↓</button>
+    </div>
+    <div id="signupExtra" class="hidden">
+      <h3 style="margin-top: 14px">Create Account</h3>
+      <div class="muted" style="font-size: 13px; margin-bottom: 10px">
+        Use the email and password you entered above, then add your name here.
+      </div>
+      <label>Your Name</label>
+      <input id="signupName" placeholder="Full name">
+      <button class="btn block mt" onclick="doSignup()">Create Account</button>
+      <div class="muted center mt" style="font-size: 12px;">
+        The first account becomes admin. Others start as employees.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP (shown after auth) -->
+<div id="appScreen" class="hidden">
+  <header>
+    <div id="logoSlot">
+      <div class="logo-fallback">DT</div>
+    </div>
+    <div class="co-name" id="coName">Drywall Tracker</div>
+    <div class="user-chip" id="userChip">...</div>
+  </header>
+
+  <main id="mainContent">
+    <!-- Rendered by JS based on current tab -->
+  </main>
+
+  <nav class="tabs" id="tabBar">
+    <!-- Rendered by JS -->
+  </nav>
+</div>
+
+<!-- Modal container -->
+<div id="modalHost"></div>
+
+<!-- Toast container -->
+<div id="toastHost"></div>
+
+<script>
+// ============================================================
+// CONFIG — these are PUBLIC keys and safe to ship in the frontend.
+// The anon key only works together with RLS policies we set up in SQL.
+// ============================================================
+const SUPA_URL = 'https://svvjsumhkbezbyskxxej.supabase.co';
+const SUPA_KEY = 'sb_publishable_4HfeK566v2NHwXwZISd75g_c2muZNID';
+
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true }
+});
+
+// ============================================================
+// STATE
+// ============================================================
+const S = {
+  user: null,          // auth user object
+  profile: null,       // profiles row { id, email, role, full_name }
+  settings: null,      // app_settings row { company_name, logo_url }
+  tab: 'dashboard',
+  currentJobId: null,  // selected job for dashboard
+  data: {
+    jobs: [], buildings: [], floors: [], units: [],
+    materials: [], aliases: [], budgets: [], vendors: [],
+    pos: [], poLines: [], bills: [], billLines: []
+  }
+};
+
+// ============================================================
+// UTILS
+// ============================================================
+function $(id) { return document.getElementById(id); }
+function el(tag, props = {}, children = []) {
+  const e = document.createElement(tag);
+  for (const k in props) {
+    if (k === 'class') e.className = props[k];
+    else if (k === 'html') e.innerHTML = props[k];
+    else if (k.startsWith('on')) e.addEventListener(k.substring(2).toLowerCase(), props[k]);
+    else e.setAttribute(k, props[k]);
+  }
+  (Array.isArray(children) ? children : [children]).forEach(c => {
+    if (c == null || c === false) return;
+    if (typeof c === 'string') e.appendChild(document.createTextNode(c));
+    else e.appendChild(c);
+  });
+  return e;
+}
+function toast(msg, kind = '') {
+  const t = el('div', { class: 'toast ' + kind }, msg);
+  $('toastHost').appendChild(t);
+  setTimeout(() => t.remove(), 2800);
+}
+function money(n) { return '$' + (Number(n)||0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function num(n) { return (Number(n)||0).toLocaleString(); }
+function isAdmin() { return S.profile && S.profile.role === 'admin'; }
+
+// ============================================================
+// MODAL
+// ============================================================
+function openModal(title, bodyEl, footerBtns = []) {
+  closeModal();
+  const body = el('div', { class: 'modal' }, [
+    el('div', { class: 'row-tight', style: 'justify-content: space-between; margin-bottom: 14px;' }, [
+      el('h2', {}, title),
+      el('button', { class: 'btn secondary small', onClick: closeModal }, '✕')
+    ]),
+    bodyEl,
+    footerBtns.length ? el('div', { class: 'row mt' }, footerBtns) : null
+  ]);
+  const backdrop = el('div', { class: 'modal-backdrop', id: 'currentModal',
+    onClick: (e) => { if (e.target.id === 'currentModal') closeModal(); } }, body);
+  $('modalHost').appendChild(backdrop);
+}
+function closeModal() {
+  const m = $('currentModal'); if (m) m.remove();
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+async function doLogin() {
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
+  if (!email) return toast('Enter your email', 'bad');
+  if (!password) return toast('Enter your password', 'bad');
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) return toast(error.message, 'bad');
+  await initSession();
+}
+function toggleSignup() {
+  $('signupExtra').classList.toggle('hidden');
+  if (!$('signupExtra').classList.contains('hidden')) {
+    // Scroll the name field into view when opening signup
+    setTimeout(() => $('signupName').focus(), 100);
+  }
+}
+async function doSignup() {
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
+  const name = $('signupName').value.trim();
+  if (!email) return toast('Enter your email at the top', 'bad');
+  if (!password) return toast('Enter a password at the top', 'bad');
+  if (password.length < 6) return toast('Password must be 6+ characters', 'bad');
+  if (!name) return toast('Enter your name', 'bad');
+  const { data, error } = await sb.auth.signUp({ email, password });
+  if (error) return toast(error.message, 'bad');
+  // If email confirmation is ON in Supabase, there's no session yet. Handle both cases.
+  if (data.session) {
+    // Signed in — save name into profile
+    if (data.user && name) {
+      await sb.from('profiles').update({ full_name: name }).eq('id', data.user.id);
+    }
+    toast('Account created! Signing in...', 'ok');
+    await initSession();
+  } else {
+    // Email confirmation required
+    toast('Account created. Check your email to confirm, then sign in.', 'ok');
+  }
+}
+async function doLogout() {
+  if (!confirm('Sign out?')) return;
+  await sb.auth.signOut();
+  location.reload();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+async function initSession() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    $('loginScreen').classList.remove('hidden');
+    $('appScreen').classList.add('hidden');
+    return;
+  }
+  S.user = session.user;
+  // Load profile
+  const { data: prof } = await sb.from('profiles').select('*').eq('id', S.user.id).single();
+  S.profile = prof || { id: S.user.id, email: S.user.email, role: 'employee' };
+  // Load app settings
+  const { data: settings } = await sb.from('app_settings').select('*').eq('id', 1).single();
+  S.settings = settings || { company_name: 'Drywall Tracker', logo_url: null };
+  // Render shell
+  $('loginScreen').classList.add('hidden');
+  $('appScreen').classList.remove('hidden');
+  applyBranding();
+  renderShell();
+  await loadAllData();
+  render();
+}
+
+function applyBranding() {
+  $('coName').textContent = S.settings.company_name || 'Drywall Tracker';
+  const slot = $('logoSlot');
+  slot.innerHTML = '';
+  if (S.settings.logo_url) {
+    const img = el('img', { class: 'logo-img', src: S.settings.logo_url, alt: 'logo' });
+    img.onerror = () => { slot.innerHTML = '<div class="logo-fallback">DT</div>'; };
+    slot.appendChild(img);
+  } else {
+    slot.appendChild(el('div', { class: 'logo-fallback' }, 'DT'));
+  }
+  $('userChip').innerHTML = `${S.profile.full_name || S.profile.email} <span class="role">${S.profile.role.toUpperCase()}</span>`;
+  $('userChip').onclick = doLogout;
+  $('userChip').style.cursor = 'pointer';
+}
+
+function renderShell() {
+  const tabs = [
+    { id: 'dashboard', icon: '📊', label: 'Dash' },
+    { id: 'queue',     icon: '📥', label: 'Queue' },
+    { id: 'pos',       icon: '📦', label: 'POs' },
+    { id: 'bills',     icon: '🧾', label: 'Bills' },
+    { id: 'materials', icon: '📋', label: 'Materials' },
+    { id: 'budgets',   icon: '💰', label: 'Budgets' },
+    { id: 'jobs',      icon: '🏗️', label: 'Jobs' },
+    { id: 'settings',  icon: '⚙️', label: 'Settings' }
+  ];
+  const bar = $('tabBar');
+  bar.innerHTML = '';
+  tabs.forEach(t => {
+    const btn = el('button', {
+      class: S.tab === t.id ? 'active' : '',
+      onClick: () => { S.tab = t.id; renderShell(); render(); }
+    }, [
+      el('span', { class: 'icon' }, t.icon),
+      el('span', {}, t.label)
+    ]);
+    // Badge for queue
+    if (t.id === 'queue') {
+      const unmapped = S.data.poLines.filter(l => !l.material_id).length +
+                       S.data.billLines.filter(l => !l.material_id).length;
+      const unassignedPOs = S.data.pos.filter(p => !p.unit_id && !p.floor_id && !p.building_id && !p.job_id).length;
+      const unassignedBills = S.data.bills.filter(b => !b.unit_id && !b.floor_id && !b.building_id && !b.job_id).length;
+      const total = unmapped + unassignedPOs + unassignedBills;
+      if (total > 0) btn.querySelector('span').appendChild(el('span', { class: 'badge' }, String(total)));
+    }
+    bar.appendChild(btn);
+  });
+}
+
+// ============================================================
+// DATA LOADING
+// ============================================================
+async function loadAllData() {
+  const [jobs, buildings, floors, units, materials, aliases, budgets, vendors,
+         pos, poLines, bills, billLines] = await Promise.all([
+    sb.from('jobs').select('*').order('name'),
+    sb.from('buildings').select('*'),
+    sb.from('floors').select('*'),
+    sb.from('units').select('*'),
+    sb.from('materials').select('*').order('name'),
+    sb.from('description_aliases').select('*'),
+    sb.from('budgets').select('*'),
+    sb.from('vendors').select('*').order('name'),
+    sb.from('purchase_orders').select('*').order('created_at', { ascending: false }),
+    sb.from('po_line_items').select('*'),
+    sb.from('bills').select('*').order('created_at', { ascending: false }),
+    sb.from('bill_line_items').select('*')
+  ]);
+  S.data.jobs       = jobs.data      || [];
+  S.data.buildings  = buildings.data || [];
+  S.data.floors     = floors.data    || [];
+  S.data.units      = units.data     || [];
+  S.data.materials  = materials.data || [];
+  S.data.aliases    = aliases.data   || [];
+  S.data.budgets    = budgets.data   || [];
+  S.data.vendors    = vendors.data   || [];
+  S.data.pos        = pos.data       || [];
+  S.data.poLines    = poLines.data   || [];
+  S.data.bills      = bills.data     || [];
+  S.data.billLines  = billLines.data || [];
+  if (!S.currentJobId && S.data.jobs.length) S.currentJobId = S.data.jobs[0].id;
+  renderShell();
+}
+
+async function reload() { await loadAllData(); render(); }
+
+// ============================================================
+// HELPERS — location lookups
+// ============================================================
+function jobById(id)      { return S.data.jobs.find(j => j.id === id); }
+function buildingById(id) { return S.data.buildings.find(b => b.id === id); }
+function floorById(id)    { return S.data.floors.find(f => f.id === id); }
+function unitById(id)     { return S.data.units.find(u => u.id === id); }
+function materialById(id) { return S.data.materials.find(m => m.id === id); }
+function vendorById(id)   { return S.data.vendors.find(v => v.id === id); }
+
+function buildingsOfJob(jobId)   { return S.data.buildings.filter(b => b.job_id === jobId); }
+function floorsOfBuilding(bId)   { return S.data.floors.filter(f => f.building_id === bId); }
+function unitsOfFloor(fId)       { return S.data.units.filter(u => u.floor_id === fId); }
+
+function locationLabel(row) {
+  if (!row) return '—';
+  if (row.unit_id) {
+    const u = unitById(row.unit_id);
+    if (!u) return '—';
+    const f = floorById(u.floor_id), b = buildingById(f?.building_id), j = jobById(b?.job_id);
+    return `${j?.name || '?'} › ${b?.name || '?'} › Flr ${f?.floor_number || '?'} › ${u.unit_number}`;
+  }
+  if (row.floor_id) {
+    const f = floorById(row.floor_id), b = buildingById(f?.building_id), j = jobById(b?.job_id);
+    return `${j?.name || '?'} › ${b?.name || '?'} › Floor ${f?.floor_number || '?'}`;
+  }
+  if (row.building_id) {
+    const b = buildingById(row.building_id), j = jobById(b?.job_id);
+    return `${j?.name || '?'} › ${b?.name || '?'}`;
+  }
+  if (row.job_id) {
+    const j = jobById(row.job_id);
+    return j?.name || '?';
+  }
+  return 'Unassigned';
+}
+
+// ============================================================
+// RENDER ROUTER
+// ============================================================
+function render() {
+  const main = $('mainContent');
+  main.innerHTML = '';
+  switch (S.tab) {
+    case 'dashboard': return renderDashboard(main);
+    case 'queue':     return renderQueue(main);
+    case 'pos':       return renderPOs(main);
+    case 'bills':     return renderBills(main);
+    case 'materials': return renderMaterials(main);
+    case 'budgets':   return renderBudgets(main);
+    case 'jobs':      return renderJobs(main);
+    case 'settings':  return renderSettings(main);
+  }
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard(main) {
+  if (!S.data.jobs.length) {
+    main.appendChild(el('div', { class: 'panel empty' }, [
+      el('h3', {}, 'No jobs yet'),
+      el('p', {}, 'Create your first job in the Jobs tab.'),
+      isAdmin() ? el('button', { class: 'btn', onClick: () => { S.tab = 'jobs'; renderShell(); render(); } }, 'Go to Jobs') : null
+    ]));
+    return;
+  }
+
+  const jobSel = el('select', { onChange: (e) => { S.currentJobId = e.target.value; render(); } },
+    S.data.jobs.map(j => el('option', { value: j.id, ...(j.id === S.currentJobId ? { selected: 'selected' } : {}) }, j.name))
+  );
+  main.appendChild(el('div', { class: 'panel' }, [
+    el('label', {}, 'Current Job'),
+    jobSel
+  ]));
+
+  const job = jobById(S.currentJobId);
+  if (!job) return;
+
+  // Totals for this job
+  const jobBuildings = buildingsOfJob(job.id);
+  const buildingIds = jobBuildings.map(b => b.id);
+  const jobFloors = S.data.floors.filter(f => buildingIds.includes(f.building_id));
+  const floorIds = jobFloors.map(f => f.id);
+  const jobUnits = S.data.units.filter(u => floorIds.includes(u.floor_id));
+  const unitIds = jobUnits.map(u => u.id);
+
+  const jobPOs = S.data.pos.filter(p =>
+    p.job_id === job.id || buildingIds.includes(p.building_id) ||
+    floorIds.includes(p.floor_id) || unitIds.includes(p.unit_id));
+  const jobBills = S.data.bills.filter(b =>
+    b.job_id === job.id || buildingIds.includes(b.building_id) ||
+    floorIds.includes(b.floor_id) || unitIds.includes(b.unit_id));
+
+  const poTotal = jobPOs.reduce((s, p) => s + (Number(p.total)||0), 0);
+  const billTotal = jobBills.reduce((s, b) => s + (Number(b.total)||0), 0);
+
+  // Summary card
+  const summary = el('div', { class: 'panel' }, [
+    el('h2', {}, job.name),
+    job.address ? el('div', { class: 'muted' }, job.address) : null,
+    el('div', { class: 'grid-3 mt' }, [
+      el('div', {}, [ el('div', { class: 'muted' }, 'Buildings'), el('div', { class: 'big-num' }, num(jobBuildings.length)) ]),
+      el('div', {}, [ el('div', { class: 'muted' }, 'Units'), el('div', { class: 'big-num' }, num(jobUnits.length)) ]),
+      el('div', {}, [ el('div', { class: 'muted' }, 'POs'), el('div', { class: 'big-num' }, num(jobPOs.length)) ])
+    ]),
+    el('div', { class: 'grid-2 mt' }, [
+      el('div', {}, [ el('div', { class: 'muted' }, 'PO Total'), el('div', { class: 'big-num' }, money(poTotal)) ]),
+      el('div', {}, [ el('div', { class: 'muted' }, 'Billed'), el('div', { class: 'big-num' }, money(billTotal)) ])
+    ])
+  ]);
+  main.appendChild(summary);
+
+  // Buildings & units breakdown
+  jobBuildings.forEach(b => {
+    const panel = el('div', { class: 'panel' }, [
+      el('h3', {}, b.name),
+      ...floorsOfBuilding(b.id).map(f => renderFloorCard(f))
+    ]);
+    main.appendChild(panel);
+  });
+}
+
+function renderFloorCard(floor) {
+  const units = unitsOfFloor(floor.id);
+  return el('details', {}, [
+    el('summary', {}, `Floor ${floor.floor_number} — ${units.length} units`),
+    el('div', { style: 'padding-left: 10px' }, units.map(u => renderUnitTile(u)))
+  ]);
+}
+
+function renderUnitTile(unit) {
+  // Gather budgets + usage for this unit
+  const budgets = S.data.budgets.filter(b => b.unit_id === unit.id);
+  const poLinesAtUnit = S.data.poLines.filter(l => {
+    const po = S.data.pos.find(p => p.id === l.po_id);
+    return po && po.unit_id === unit.id;
+  });
+
+  const rows = budgets.map(b => {
+    const mat = materialById(b.material_id);
+    const used = poLinesAtUnit
+      .filter(l => l.material_id === b.material_id)
+      .reduce((s, l) => s + (Number(l.qty)||0), 0);
+    const pct = b.budget_qty > 0 ? (used / b.budget_qty * 100) : 0;
+    const barKind = pct > 100 ? 'bar-bad' : pct > 85 ? 'bar-warn' : 'bar-ok';
+    return el('div', { style: 'margin: 6px 0' }, [
+      el('div', { class: 'row-tight', style: 'justify-content: space-between' }, [
+        el('span', {}, `${mat?.name || '?'} (${mat?.uom || ''})`),
+        el('span', { class: 'num' }, `${num(used)} / ${num(b.budget_qty)}`)
+      ]),
+      el('div', { class: 'bar ' + barKind }, el('div', { style: `width: ${Math.min(pct, 100)}%` }))
+    ]);
+  });
+
+  return el('div', { class: 'tile' }, [
+    el('div', { class: 'tile-row' }, [
+      el('div', {}, [
+        el('div', { class: 'tile-title' }, `Unit ${unit.unit_number}${unit.model ? ' · ' + unit.model : ''}`),
+        el('div', { class: 'tile-sub' }, `${budgets.length} budget${budgets.length !== 1 ? 's' : ''} · ${poLinesAtUnit.length} line items`)
+      ])
+    ]),
+    rows.length ? el('div', { class: 'mt' }, rows) : el('div', { class: 'muted', style: 'font-size: 13px; margin-top: 6px' }, 'No budgets set')
+  ]);
+}
+
+// ============================================================
+// QUEUE — items needing attention
+// ============================================================
+function renderQueue(main) {
+  // Unassigned POs (no location set)
+  const unassignedPOs = S.data.pos.filter(p => !p.unit_id && !p.floor_id && !p.building_id && !p.job_id);
+  const unassignedBills = S.data.bills.filter(b => !b.unit_id && !b.floor_id && !b.building_id && !b.job_id);
+  // Unmapped line items (no material_id)
+  const unmappedPoLines = S.data.poLines.filter(l => !l.material_id);
+  const unmappedBillLines = S.data.billLines.filter(l => !l.material_id);
+
+  if (!unassignedPOs.length && !unassignedBills.length && !unmappedPoLines.length && !unmappedBillLines.length) {
+    main.appendChild(el('div', { class: 'panel empty' }, [
+      el('h3', {}, 'All caught up'),
+      el('p', {}, 'No POs, bills, or materials waiting for you.')
+    ]));
+    return;
+  }
+
+  if (unassignedPOs.length) {
+    const p = el('div', { class: 'panel' }, [ el('h2', {}, `Unassigned POs (${unassignedPOs.length})`) ]);
+    unassignedPOs.forEach(po => {
+      const vendor = vendorById(po.vendor_id);
+      const lineCount = S.data.poLines.filter(l => l.po_id === po.id).length;
+      p.appendChild(el('div', { class: 'tile' }, [
+        el('div', { class: 'tile-row' }, [
+          el('div', {}, [
+            el('div', { class: 'tile-title' }, `PO #${po.po_number || '—'} · ${money(po.total)}`),
+            el('div', { class: 'tile-sub' }, `${vendor?.name || 'Unknown vendor'} · ${lineCount} line items · ${po.po_date || '—'}`)
+          ]),
+          isAdmin() ? el('button', { class: 'btn small', onClick: () => openAssignPO(po) }, 'Assign') : null
+        ])
+      ]));
+    });
+    main.appendChild(p);
+  }
+
+  if (unassignedBills.length) {
+    const p = el('div', { class: 'panel' }, [ el('h2', {}, `Unassigned Bills (${unassignedBills.length})`) ]);
+    unassignedBills.forEach(bill => {
+      const vendor = vendorById(bill.vendor_id);
+      p.appendChild(el('div', { class: 'tile' }, [
+        el('div', { class: 'tile-row' }, [
+          el('div', {}, [
+            el('div', { class: 'tile-title' }, `Bill #${bill.invoice_number || '—'} · ${money(bill.total)}`),
+            el('div', { class: 'tile-sub' }, `${vendor?.name || 'Unknown'} · ${bill.bill_date || '—'}`)
+          ]),
+          isAdmin() ? el('button', { class: 'btn small', onClick: () => openAssignBill(bill) }, 'Assign') : null
+        ])
+      ]));
+    });
+    main.appendChild(p);
+  }
+
+  if (unmappedPoLines.length || unmappedBillLines.length) {
+    const p = el('div', { class: 'panel' }, [
+      el('h2', {}, `Materials Needing Mapping (${unmappedPoLines.length + unmappedBillLines.length})`),
+      el('div', { class: 'muted', style: 'font-size: 13px; margin-bottom: 10px' },
+        'First time seeing these descriptions. Tell us what material each one is.')
+    ]);
+    [...unmappedPoLines.map(l => ({ ...l, _src: 'po' })),
+     ...unmappedBillLines.map(l => ({ ...l, _src: 'bill' }))].forEach(line => {
+      p.appendChild(el('div', { class: 'tile' }, [
+        el('div', { class: 'tile-row' }, [
+          el('div', {}, [
+            el('div', { class: 'tile-title' }, line.raw_description),
+            el('div', { class: 'tile-sub' }, `${line._src.toUpperCase()} · qty ${num(line.qty)} ${line.uom || ''} · ${money(line.line_total)}`)
+          ]),
+          isAdmin() ? el('button', { class: 'btn small', onClick: () => openMapMaterial(line) }, 'Map') : null
+        ])
+      ]));
+    });
+    main.appendChild(p);
+  }
+}
+
+// ============================================================
+// ASSIGN PO / BILL to location
+// ============================================================
+function openAssignPO(po) { openAssignLocation('PO', po, 'purchase_orders'); }
+function openAssignBill(bill) { openAssignLocation('Bill', bill, 'bills'); }
+
+function openAssignLocation(kind, row, tableName) {
+  const state = { job_id: null, building_id: null, floor_id: null, unit_id: null };
+
+  const form = el('div', {});
+
+  function rebuild() {
+    form.innerHTML = '';
+    // Job
+    form.appendChild(el('label', {}, 'Job'));
+    form.appendChild(el('select', {
+      onChange: (e) => { state.job_id = e.target.value || null; state.building_id = null; state.floor_id = null; state.unit_id = null; rebuild(); }
+    }, [
+      el('option', { value: '' }, '— pick job —'),
+      ...S.data.jobs.map(j => el('option', { value: j.id, ...(j.id === state.job_id ? { selected: 'selected' } : {}) }, j.name))
+    ]));
+
+    if (state.job_id) {
+      // Building
+      form.appendChild(el('label', {}, 'Building (or leave blank to assign at Job level)'));
+      form.appendChild(el('select', {
+        onChange: (e) => { state.building_id = e.target.value || null; state.floor_id = null; state.unit_id = null; rebuild(); }
+      }, [
+        el('option', { value: '' }, '— whole job —'),
+        ...buildingsOfJob(state.job_id).map(b => el('option', { value: b.id, ...(b.id === state.building_id ? { selected: 'selected' } : {}) }, b.name))
+      ]));
+    }
+    if (state.building_id) {
+      form.appendChild(el('label', {}, 'Floor (or leave blank for whole building)'));
+      form.appendChild(el('select', {
+        onChange: (e) => { state.floor_id = e.target.value || null; state.unit_id = null; rebuild(); }
+      }, [
+        el('option', { value: '' }, '— whole building —'),
+        ...floorsOfBuilding(state.building_id).map(f => el('option', { value: f.id, ...(f.id === state.floor_id ? { selected: 'selected' } : {}) }, `Floor ${f.floor_number}`))
+      ]));
+    }
+    if (state.floor_id) {
+      form.appendChild(el('label', {}, 'Unit (or leave blank for whole floor)'));
+      form.appendChild(el('select', {
+        onChange: (e) => { state.unit_id = e.target.value || null; rebuild(); }
+      }, [
+        el('option', { value: '' }, '— whole floor —'),
+        ...unitsOfFloor(state.floor_id).map(u => el('option', { value: u.id, ...(u.id === state.unit_id ? { selected: 'selected' } : {}) }, `Unit ${u.unit_number}`))
+      ]));
+    }
+
+    // Summary
+    const labelRow = { unit_id: state.unit_id, floor_id: state.floor_id, building_id: state.building_id, job_id: state.job_id };
+    form.appendChild(el('div', { class: 'panel mt', style: 'background: var(--panel-2)' }, [
+      el('div', { class: 'muted' }, 'Will be assigned to:'),
+      el('div', { class: 'big-num', style: 'font-size: 16px' }, locationLabel(labelRow))
+    ]));
+  }
+
+  rebuild();
+
+  openModal(`Assign ${kind} to location`, form, [
+    el('button', { class: 'btn secondary', onClick: closeModal }, 'Cancel'),
+    el('button', { class: 'btn', onClick: async () => {
+      if (!state.job_id) return toast('Pick at least a job', 'bad');
+      // Collapse: only set the most specific level. Others stay null.
+      const payload = {
+        job_id: state.unit_id || state.floor_id || state.building_id ? null : state.job_id,
+        building_id: state.unit_id || state.floor_id ? null : state.building_id,
+        floor_id: state.unit_id ? null : state.floor_id,
+        unit_id: state.unit_id,
+        assigned_at: new Date().toISOString(),
+        status: 'assigned'
+      };
+      // But we actually want the highest-specificity non-null only; ensure that.
+      // Clear all, then set the lowest specified
+      payload.job_id = null; payload.building_id = null; payload.floor_id = null; payload.unit_id = null;
+      if (state.unit_id) payload.unit_id = state.unit_id;
+      else if (state.floor_id) payload.floor_id = state.floor_id;
+      else if (state.building_id) payload.building_id = state.building_id;
+      else payload.job_id = state.job_id;
+
+      const { error } = await sb.from(tableName).update(payload).eq('id', row.id);
+      if (error) return toast(error.message, 'bad');
+      toast(`${kind} assigned`, 'ok');
+      closeModal();
+      await reload();
+    } }, 'Save')
+  ]);
+}
+
+// ============================================================
+// MAP MATERIAL — tell the app what this description is
+// ============================================================
+function openMapMaterial(line) {
+  const state = { choice: 'existing', material_id: '', new_name: line.raw_description, new_uom: line.uom || 'each', new_category: '' };
+
+  const form = el('div');
+
+  function rebuild() {
+    form.innerHTML = '';
+    form.appendChild(el('div', { class: 'panel', style: 'background: var(--panel-2); margin-bottom: 14px' }, [
+      el('div', { class: 'muted' }, 'Raw description from QB:'),
+      el('div', { class: 'big-num', style: 'font-size: 16px' }, line.raw_description)
+    ]));
+
+    form.appendChild(el('div', { class: 'row-tight' }, [
+      el('button', { class: 'btn small ' + (state.choice === 'existing' ? '' : 'secondary'), onClick: () => { state.choice = 'existing'; rebuild(); } }, 'Match existing'),
+      el('button', { class: 'btn small ' + (state.choice === 'new' ? '' : 'secondary'), onClick: () => { state.choice = 'new'; rebuild(); } }, 'Create new')
+    ]));
+
+    if (state.choice === 'existing') {
+      if (!S.data.materials.length) {
+        form.appendChild(el('div', { class: 'empty' }, 'No materials in catalog yet. Switch to "Create new".'));
+      } else {
+        form.appendChild(el('label', {}, 'Pick existing material'));
+        form.appendChild(el('select', {
+          onChange: (e) => state.material_id = e.target.value
+        }, [
+          el('option', { value: '' }, '— pick —'),
+          ...S.data.materials.map(m => el('option', { value: m.id }, `${m.name} (${m.uom})`))
+        ]));
+      }
+    } else {
+      form.appendChild(el('label', {}, 'Material name (what YOU call it)'));
+      const nameInput = el('input', { value: state.new_name, onInput: (e) => state.new_name = e.target.value });
+      form.appendChild(nameInput);
+
+      form.appendChild(el('label', {}, 'Unit of measure'));
+      form.appendChild(el('select', { onChange: (e) => state.new_uom = e.target.value },
+        ['sheets','sticks','gallons','pails','bags','lbs','each','$'].map(u =>
+          el('option', { value: u, ...(u === state.new_uom ? { selected: 'selected' } : {}) }, u)
+        )
+      ));
+
+      form.appendChild(el('label', {}, 'Category (optional tag)'));
+      form.appendChild(el('select', { onChange: (e) => state.new_category = e.target.value }, [
+        el('option', { value: '' }, '— none —'),
+        ...['boards','metal_studs','metal_track','finish','fasteners','labor','other'].map(c =>
+          el('option', { value: c }, c)
+        )
+      ]));
+    }
+  }
+  rebuild();
+
+  openModal('Map material', form, [
+    el('button', { class: 'btn secondary', onClick: closeModal }, 'Cancel'),
+    el('button', { class: 'btn', onClick: async () => {
+      let materialId;
+      if (state.choice === 'existing') {
+        if (!state.material_id) return toast('Pick a material', 'bad');
+        materialId = state.material_id;
+      } else {
+        if (!state.new_name.trim()) return toast('Enter a name', 'bad');
+        const { data, error } = await sb.from('materials').insert({
+          name: state.new_name.trim(),
+          uom: state.new_uom,
+          category: state.new_category || null
+        }).select().single();
+        if (error) return toast(error.message, 'bad');
+        materialId = data.id;
+      }
+      // Save alias so future PO lines with this description auto-map
+      await sb.from('description_aliases').upsert({
+        raw_description: line.raw_description,
+        material_id: materialId
+      }, { onConflict: 'raw_description' });
+
+      // Update this line item and any other lines with the same raw_description
+      await sb.from('po_line_items').update({ material_id: materialId })
+        .eq('raw_description', line.raw_description).is('material_id', null);
+      await sb.from('bill_line_items').update({ material_id: materialId })
+        .eq('raw_description', line.raw_description).is('material_id', null);
+
+      toast('Material mapped', 'ok');
+      closeModal();
+      await reload();
+    } }, 'Save Mapping')
+  ]);
+}
+
+// ============================================================
+// POs tab — list + manual add (for entering already-pulled QB data)
+// ============================================================
+function renderPOs(main) {
+  if (isAdmin()) {
+    main.appendChild(el('div', { class: 'panel' }, [
+      el('h2', {}, 'Purchase Orders'),
+      el('div', { class: 'muted', style: 'font-size: 13px; margin-bottom: 10px' },
+        'Log a PO from QuickBooks. Enter header + line items, then assign it to a location.'),
+      el('button', { class: 'btn block', onClick: openNewPO }, '+ Log New PO')
+    ]));
+  }
+
+  if (!S.data.pos.length) {
+    main.appendChild(el('div', { class: 'panel empty' }, 'No POs yet'));
+    return;
+  }
+
+  const p = el('div', { class: 'panel' });
+  S.data.pos.forEach(po => {
+    const vendor = vendorById(po.vendor_id);
+    const lines = S.data.poLines.filter(l => l.po_id === po.id);
+    const unmappedCount = lines.filter(l => !l.material_id).length;
+    const status = po.job_id || po.building_id || po.floor_id || po.unit_id ? 'assigned' : 'unassigned';
+    p.appendChild(el('div', { class: 'tile' }, [
+      el('div', { class: 'tile-row' }, [
+        el('div', { style: 'flex: 1; min-width: 0' }, [
+          el('div', { class: 'tile-title' }, [
+            `PO #${po.po_number || '—'} · ${money(po.total)} `,
+            status === 'assigned'
+              ? el('span', { class: 'badge-ok' }, 'ASSIGNED')
+              : el('span', { class: 'badge-warn' }, 'UNASSIGNED'),
+            unmappedCount > 0 ? el('span', { class: 'badge-bad', style: 'margin-left: 6px' }, `${unmappedCount} unmapped`) : null
+          ]),
+          el('div', { class: 'tile-sub' }, `${vendor?.name || '—'} · ${po.po_date || '—'} · ${lines.length} lines`),
+          el('div', { class: 'tile-sub' }, locationLabel(po))
+        ]),
+        el('button', { class: 'btn small secondary', onClick: () => openPODetail(po) }, 'View')
+      ])
+    ]));
+  });
+  main.appendChild(p);
+}
+
+function openNewPO() {
+  const state = {
+    po_number: '', vendor_id: '', vendor_name: '', po_date: new Date().toISOString().slice(0,10),
+    total: 0, lines: [{ raw_description: '', qty: 0, unit_cost: 0, line_total: 0, uom: '' }]
+  };
+  const form = el('div');
+
+  function addLine() { state.lines.push({ raw_description: '', qty: 0, unit_cost: 0, line_total: 0, uom: '' }); rebuild(); }
+  function removeLine(i) { state.lines.splice(i,1); rebuild(); }
+
+  function recomputeTotal() {
+    state.total = state.lines.reduce((s,l) => s + (Number(l.line_total)||0), 0);
+    const el2 = form.querySelector('#poTotal');
+    if (el2) el2.textContent = money(state.total);
+  }
+
+  function rebuild() {
+    form.innerHTML = '';
+    form.appendChild(el('label', {}, 'PO Number'));
+    form.appendChild(el('input', { value: state.po_number, onInput: (e) => state.po_number = e.target.value }));
+
+    form.appendChild(el('label', {}, 'Vendor'));
+    form.appendChild(el('input', { value: state.vendor_name, placeholder: 'Type vendor name (new or existing)',
+      onInput: (e) => state.vendor_name = e.target.value }));
+
+    form.appendChild(el('label', {}, 'Date'));
+    form.appendChild(el('input', { type: 'date', value: state.po_date, onInput: (e) => state.po_date = e.target.value }));
+
+    form.appendChild(el('hr'));
+    form.appendChild(el('h3', {}, 'Line Items'));
+
+    state.lines.forEach((line, i) => {
+      const linePanel = el('div', { class: 'panel', style: 'background: var(--panel-2); margin-bottom: 8px' });
+      linePanel.appendChild(el('div', { class: 'row-tight', style: 'justify-content: space-between' }, [
+        el('div', { class: 'muted' }, `Line ${i+1}`),
+        state.lines.length > 1
+          ? el('button', { class: 'btn small danger', onClick: () => removeLine(i) }, 'Remove')
+          : null
+      ]));
+      linePanel.appendChild(el('label', {}, 'Description (exact text from QB)'));
+      linePanel.appendChild(el('input', { value: line.raw_description, onInput: (e) => line.raw_description = e.target.value }));
+      linePanel.appendChild(el('div', { class: 'grid-3 mt' }, [
+        el('div', {}, [
+          el('label', { style: 'margin-top:0' }, 'Qty'),
+          el('input', { type: 'number', step: '0.01', value: line.qty, onInput: (e) => { line.qty = Number(e.target.value)||0; line.line_total = line.qty * line.unit_cost; recomputeTotal(); } })
+        ]),
+        el('div', {}, [
+          el('label', { style: 'margin-top:0' }, 'UOM'),
+          el('input', { value: line.uom, placeholder: 'sheets', onInput: (e) => line.uom = e.target.value })
+        ]),
+        el('div', {}, [
+          el('label', { style: 'margin-top:0' }, 'Unit $'),
+          el('input', { type: 'number', step: '0.01', value: line.unit_cost, onInput: (e) => { line.unit_cost = Number(e.target.value)||0; line.line_total = line.qty * line.unit_cost; recomputeTotal(); } })
+        ])
+      ]));
+      linePanel.appendChild(el('label', {}, 'Line Total'));
+      linePanel.appendChild(el('input', { type: 'number', step: '0.01', value: line.line_total, onInput: (e) => { line.line_total = Number(e.target.value)||0; recomputeTotal(); } }));
+      form.appendChild(linePanel);
+    });
+
+    form.appendChild(el('button', { class: 'btn secondary block', onClick: addLine }, '+ Add another line'));
+    form.appendChild(el('div', { class: 'panel mt', style: 'background: var(--panel-2)' }, [
+      el('div', { class: 'muted' }, 'PO Total'),
+      el('div', { class: 'big-num', id: 'poTotal' }, money(state.total))
+    ]));
+  }
+  rebuild();
+
+  openModal('Log New PO', form, [
+    el('button', { class: 'btn secondary', onClick: closeModal }, 'Cancel'),
+    el('button', { class: 'btn', onClick: async () => {
+      if (!state.vendor_name.trim()) return toast('Enter vendor', 'bad');
+      if (!state.lines.some(l => l.raw_description.trim())) return toast('Add at least one line with description', 'bad');
+
+      // Find or create vendor
+      let vendor = S.data.vendors.find(v => v.name.toLowerCase() === state.vendor_name.trim().toLowerCase());
+      if (!vendor) {
+        const { data } = await sb.from('vendors').insert({ name: state.vendor_name.trim() }).select().single();
+        vendor = data;
+      }
+
+      // Create PO
+      recomputeTotal();
+      const { data: po, error: poErr } = await sb.from('purchase_orders').insert({
+        po_number: state.po_number || null,
+        vendor_id: vendor?.id || null,
+        po_date: state.po_date || null,
+        total: state.total,
+        status: 'unmatched'
+      }).select().single();
+      if (poErr) return toast(poErr.message, 'bad');
+
+      // Build line items, auto-map via aliases where possible
+      const aliasMap = Object.fromEntries(S.data.aliases.map(a => [a.raw_description, a.material_id]));
+      const lineRows = state.lines
+        .filter(l => l.raw_description.trim())
+        .map(l => ({
+          po_id: po.id,
+          raw_description: l.raw_description.trim(),
+          qty: l.qty, unit_cost: l.unit_cost, line_total: l.line_total, uom: l.uom || null,
+          material_id: aliasMap[l.raw_description.trim()] || null
+        }));
+      await sb.from('po_line_items').insert(lineRows);
+
+      toast('PO saved. Now assign it and map any new materials.', 'ok');
+      closeModal();
+      await reload();
+    } }, 'Save PO')
+  ]);
+}
+
+function openPODetail(po) {
+  const lines = S.data.poLines.filter(l => l.po_id === po.id);
+  const vendor = vendorById(po.vendor_id);
+  const body = el('div', {}, [
+    el('div', { class: 'panel', style: 'background: var(--panel-2)' }, [
+      el('div', {}, [ el('span', { class: 'muted' }, 'Vendor: '), vendor?.name || '—' ]),
+      el('div', {}, [ el('span', { class: 'muted' }, 'Date: '), po.po_date || '—' ]),
+      el('div', {}, [ el('span', { class: 'muted' }, 'Total: '), money(po.total) ]),
+      el('div', {}, [ el('span', { class: 'muted' }, 'Location: '), locationLabel(po) ])
+    ]),
+    el('h3', { class: 'mt' }, 'Line Items'),
+    ...lines.map(l => {
+      const mat = materialById(l.material_id);
+      return el('div', { class: 'tile' }, [
+        el('div', { class: 'tile-title' }, l.raw_description),
+        el('div', { class: 'tile-sub' },
+          `${num(l.qty)} ${l.uom || ''} @ ${money(l.unit_cost)} = ${money(l.line_total)}`),
+        el('div', { class: 'tile-sub' }, mat ? `→ ${mat.name}` : '(needs mapping)')
+      ]);
+    })
+  ]);
+  const btns = [];
+  if (isAdmin()) {
+    if (!(po.job_id || po.building_id || po.floor_id || po.unit_id)) {
+      btns.push(el('button', { class: 'btn', onClick: () => { closeModal(); openAssignPO(po); } }, 'Assign Location'));
+    } else {
+      btns.push(el('button', { class: 'btn secondary', onClick: () => { closeModal(); openAssignPO(po); } }, 'Reassign'));
+    }
+    btns.push(el('button', { class: 'btn danger', onClick: async () => {
+      if (!confirm('Delete this PO and all its line items?')) return;
+      await sb.from('purchase_orders').delete().eq('id', po.id);
+      toast('Deleted', 'ok');
+      closeModal(); await reload();
+    } }, 'Delete'));
+  }
+  btns.push(el('button', { class: 'btn secondary', onClick: closeModal }, 'Close'));
+  openModal(`PO #${po.po_number || '—'}`, body, btns);
+}
+
+// ============================================================
+// BILLS tab — same shape as POs
+// ============================================================
+function renderBills(main) {
+  if (isAdmin()) {
+    main.appendChild(el('div', { class: 'panel' }, [
+      el('h2', {}, 'Bills'),
+      el('div', { class: 'muted', style: 'font-size: 13px; margin-bottom: 10px' }, 'Log a bill from QuickBooks.'),
+      el('button', { class: 'btn block', onClick: openNewBill }, '+ Log New Bill')
+    ]));
+  }
+  if (!S.data.bills.length) {
+    main.appendChild(el('div', { class: 'panel empty' }, 'No bills yet'));
+    return;
+  }
+  const p = el('div', { class: 'panel' });
+  S.data.bills.forEach(bill => {
+    const vendor = vendorById(bill.vendor_id);
+    const lines = S.data.billLines.filter(l => l.bill_id === bill.id);
+    const status = bill.job_id || bill.building_id || bill.floor_id || bill.unit_id ? 'assigned' : 'unassigned';
+    p.appendChild(el('div', { class: 'tile' }, [
+      el('div', { class: 'tile-row' }, [
+        el('div', { style: 'flex: 1; min-width: 0' }, [
+          el('div', { class: 'tile-title' }, [
+            `Bill #${bill.invoice_number || '—'} · ${money(bill.total)} `,
+            status === 'assigned' ? el('span', { class: 'badge-ok' }, 'ASSIGNED') : el('span', { class: 'badge-warn' }, 'UNASSIGNED')
+          ]),
+          el('div', { class: 'tile-sub' }, `${vendor?.name || '—'} · ${bill.bill_date || '—'} · ${lines.length} lines`),
+          el('div', { class: 'tile-sub' }, locationLabel(bill))
+        ]),
+        el('button', { class: 'btn small secondary', onClick: () => openBillDetail(bill) }, 'View')
+      ])
+    ]));
+  });
+  main.appendChild(p);
+}
+
+function openNewBill() {
+  const state = {
+    invoice_number: '', vendor_name: '', bill_date: new Date().toISOString().slice(0,10),
+    total: 0, lines: [{ raw_description: '', qty: 0, unit_cost: 0, line_total: 0, uom: '' }]
+  };
+  const form = el('div');
+
+  function addLine() { state.lines.push({ raw_description: '', qty: 0, unit_cost: 0, line_total: 0, uom: '' }); rebuild(); }
+  function removeLine(i) { state.lines.splice(i,1); rebuild(); }
+  function recomputeTotal() {
+    state.total = state.lines.reduce((s,l) => s + (Number(l.line_total)||0), 0);
+    const el2 = form.querySelector('#billTotal');
+    if (el2) el2.textContent = money(state.total);
+  }
+
+  function rebuild() {
+    form.innerHTML = '';
+    form.appendChild(el('label', {}, 'Invoice Number'));
+    form.appendChild(el('input', { value: state.invoice_number, onInput: (e) => state.invoice_number = e.target.value }));
+    form.appendChild(el('label', {}, 'Vendor'));
+    form.appendChild(el('input', { value: state.vendor_name, placeholder: 'Type vendor name',
+      onInput: (e) => state.vendor_name = e.target.value }));
+    form.appendChild(el('label', {}, 'Date'));
+    form.appendChild(el('input', { type: 'date', value: state.bill_date, onInput: (e) => state.bill_date = e.target.value }));
+
+    form.appendChild(el('hr'));
+    form.appendChild(el('h3', {}, 'Line Items'));
+
+    state.lines.forEach((line, i) => {
+      const linePanel = el('div', { class: 'panel', style: 'background: var(--panel-2); margin-bottom: 8px' });
+      linePanel.appendChild(el('div', { class: 'row-tight', style: 'justify-content: space-between' }, [
+        el('div', { class: 'muted' }, `Line ${i+1}`),
+        state.lines.length > 1 ? el('button', { class: 'btn small danger', onClick: () => removeLine(i) }, 'Remove') : null
+      ]));
+      linePanel.appendChild(el('label', {}, 'Description'));
+      linePanel.appendChild(el('input', { value: line.raw_description, onInput: (e) => line.raw_description = e.target.value }));
+      linePanel.appendChild(el('div', { class: 'grid-3 mt' }, [
+        el('div', {}, [
+          el('label', { style: 'margin-top:0' }, 'Qty'),
+          el('input', { type: 'number', step: '0.01', value: line.qty, onInput: (e) => { line.qty = Number(e.target.value)||0; line.line_total = line.qty * line.unit_cost; recomputeTotal(); } })
+        ]),
+        el('div', {}, [
+          el('label', { style: 'margin-top:0' }, 'UOM'),
+          el('input', { value: line.uom, placeholder: 'sheets', onInput: (e) => line.uom = e.target.value })
+        ]),
+        el('div', {}, [
+          el('label', { style: 'margin-top:0' }, 'Unit $'),
+          el('input', { type: 'number', step: '0.01', value: line.unit_cost, onInput: (e) => { line.unit_cost = Number(e.target.value)||0; line.line_total = line.qty * line.unit_cost; recomputeTotal(); } })
+        ])
+      ]));
+      linePanel.appendChild(el('label', {}, 'Line Total'));
+      linePanel.appendChild(el('input', { type: 'number', step: '0.01', value: line.line_total, onInput: (e) => { line.line_total = Number(e.target.value)||0; recomputeTotal(); } }));
+      form.appendChild(linePanel);
+    });
+
+    form.appendChild(el('button', { class: 'btn secondary block', onClick: addLine }, '+ Add another line'));
+    form.appendChild(el('div', { class: 'panel mt', style: 'background: var(--panel-2)' }, [
+      el('div', { class: 'muted' }, 'Bill Total'),
+      el('div', { class: 'big-num', id: 'billTotal' }, money(state.total))
+    ]));
+  }
+  rebuild();
+
+  openModal('Log New Bill', form, [
+    el('button', { class: 'btn secondary', onClick: closeModal }, 'Cancel'),
+    el('button', { class: 'btn', onClick: async () => {
+      if (!state.vendor_name.trim()) return toast('Enter vendor', 'bad');
+      let vendor = S.data.vendors.find(v => v.name.toLowerCase() === state.vendor_name.trim().toLowerCase());
+      if (!vendor) {
+        const { data } = await sb.from('vendors').insert({ name: state.vendor_name.trim() }).select().single();
+        vendor = data;
+      }
+      recomputeTotal();
+      const { data: bill, error } = await sb.from('bills').insert({
+        invoice_number: state.invoice_number || null,
+        vendor_id: vendor?.id || null,
+        bill_date: state.bill_date || null,
+        total: state.total,
+        status: 'unmatched'
+      }).select().single();
+      if (error) return toast(error.message, 'bad');
+      const aliasMap = Object.fromEntries(S.data.aliases.map(a => [a.raw_description, a.material_id]));
+      const lineRows = state.lines.filter(l => l.raw_description.trim()).map(l => ({
+        bill_id: bill.id,
+        raw_description: l.raw_description.trim(),
+        qty: l.qty, unit_cost: l.unit_cost, line_total: l.line_total, uom: l.uom || null,
+        material_id: aliasMap[l.raw_description.trim()] || null
+      }));
+      await sb.from('bill_line_items').insert(lineRows);
+      toast('Bill saved', 'ok');
+      closeModal(); await reload();
+    } }, 'Save Bill')
+  ]);
+}
+
+function openBillDetail(bill) {
+  const lines = S.data.billLines.filter(l => l.bill_id === bill.id);
+  const vendor = vendorById(bill.vendor_id);
+  const body = el('div', {}, [
+    el('div', { class: 'panel', style: 'background: var(--panel-2)' }, [
+      el('div', {}, [ el('span', { class: 'muted' }, 'Vendor: '), vendor?.name || '—' ]),
+      el('div', {}, [ el('span', { class: 'muted' }, 'Date: '), bill.bill_date || '—' ]),
+      el('div', {}, [ el('span', { class: 'muted' }, 'Total: '), money(bill.total) ]),
+      el('div', {}, [ el('span', { class: 'muted' }, 'Location: '), locationLabel(bill) ])
+    ]),
+    el('h3', { class: 'mt' }, 'Line Items'),
+    ...lines.map(l => {
+      const mat = materialById(l.material_id);
+      return el('div', { class: 'tile' }, [
+        el('div', { class: 'tile-title' }, l.raw_description),
+        el('div', { class: 'tile-sub' }, `${num(l.qty)} ${l.uom || ''} @ ${money(l.unit_cost)} = ${money(l.line_total)}`),
+        el('div', { class: 'tile-sub' }, mat ? `→ ${mat.name}` : '(needs mapping)')
+      ]);
+    })
+  ]);
+  const btns = [];
+  if (isAdmin()) {
+    const assigned = bill.job_id || bill.building_id || bill.floor_id || bill.unit_id;
+    btns.push(el('button', { class: 'btn' + (assigned ? ' secondary' : ''),
+      onClick: () => { closeModal(); openAssignBill(bill); } }, assigned ? 'Reassign' : 'Assign Location'));
+    btns.push(el('button', { class: 'btn danger', onClick: async () => {
+      if (!confirm('Delete this bill?')) return;
+      await sb.from('bills').delete().eq('id', bill.id);
+      toast('Deleted', 'ok');
+      closeModal(); await reload();
+    } }, 'Delete'));
+  }
+  btns.push(el('button', { class: 'btn secondary', onClick: closeModal }, 'Close'));
+  openModal(`Bill #${bill.invoice_number || '—'}`, body, btns);
+}
+
+// ============================================================
+// MATERIALS tab
+// ============================================================
+function renderMaterials(main) {
+  if (isAdmin()) {
+    main.appendChild(el('div', { class: 'panel' }, [
+      el('h2', {}, 'Material Catalog'),
+      el('button', { class: 'btn block', onClick: openNewMaterial }, '+ Add Material')
+    ]));
+  }
+  if (!S.data.materials.length) {
+    main.appendChild(el('div', { class: 'panel empty' }, 'No materials yet'));
+    return;
+  }
+  const p = el('div', { class: 'panel' });
+  S.data.materials.forEach(m => {
+    const aliases = S.data.aliases.filter(a => a.material_id === m.id);
+    p.appendChild(el('div', { class: 'tile' }, [
+      el('div', { class: 'tile-row' }, [
+        el('div', {}, [
+          el('div', { class: 'tile-title' }, `${m.name} (${m.uom})`),
+          el('div', { class: 'tile-sub' }, `${m.category || 'no category'} · ${aliases.length} alias${aliases.length !== 1 ? 'es' : ''}`)
+        ]),
+        isAdmin() ? el('button', { class: 'btn small secondary', onClick: () => openEditMaterial(m) }, 'Edit') : null
+      ])
+    ]));
+  });
+  main.appendChild(p);
+}
+
+function openNewMaterial() {
+  const state = { name: '', uom: 'sheets', category: '' };
+  const form = el('div');
+  form.appendChild(el('label', {}, 'Name'));
+  form.appendChild(el('input', { onInput: (e) => state.name = e.target.value }));
+  form.appendChild(el('label', {}, 'Unit of measure'));
+  form.appendChild(el('select', { onChange: (e) => state.uom = e.target.value },
+    ['sheets','sticks','gallons','pails','bags','lbs','each','$'].map(u =>
+      el('option', { value: u, ...(u === 'sheets' ? { selected: 'selected' } : {}) }, u))));
+  form.appendChild(el('label', {}, 'Category (optional)'));
+  form.appendChild(el('select', { onChange: (e) => state.category = e.target.value }, [
+    el('option', { value: '' }, '— none —'),
+    ...['boards','metal_studs','metal_track','finish','fasteners','labor','other'].map(c =>
+      el('option', { value: c }, c))
+  ]));
+  openModal('New Material', form, [
+    el('button', { class: 'btn secondary', onClick: closeModal }, 'Cancel'),
+    el('button', { class: 'btn', onClick: async () => {
+      if (!state.name.trim()) return toast('Name required', 'bad');
+      const { error } = await sb.from('materials').insert({
+        name: state.name.trim(), uom: state.uom, category: state.category || null
+      });
+      if (error) return toast(error.message, 'bad');
+      toast('Material added', 'ok');
+      closeModal(); await reload();
+    } }, 'Save')
+  ]);
+}
+
+function openEditMaterial(m) {
+  const state = { name: m.name, uom: m.uom, category: m.category || '' };
+  const aliases = S.data.aliases.filter(a => a.material_id === m.id);
+  const form = el('div');
+  form.appendChild(el('label', {}, 'Name'));
+  form.appendChild(el('input', { value: state.name, onInput: (e) => state.name = e.target.value }));
+  form.appendChild(el('label', {}, 'Unit of measure'));
+  form.appendChild(el('select', { onChange: (e) => state.uom = e.target.value },
+    ['sheets','sticks','gallons','pails','bags','lbs','each','$'].map(u =>
+      el('option', { value: u, ...(u === m.uom ? { selected: 'selected' } : {}) }, u))));
+  form.appendChild(el('label', {}, 'Category'));
+  form.appendChild(el('select', { onChange: (e) => state.category = e.target.value }, [
+    el('option', { value: '' }, '— none —'),
+    ...['boards','metal_studs','metal_track','finish','fasteners','labor','other'].map(c =>
+      el('option', { value: c, ...(c === m.category ? { selected: 'selected' } : {}) }, c))
+  ]));
+  if (aliases.length) {
+    form.appendChild(el('hr'));
+    form.appendChild(el('h3', {}, 'Known descriptions (aliases)'));
+    aliases.forEach(a => {
+      form.appendChild(el('div', { class: 'tile' }, [
+        el('div', { class: 'tile-row' }, [
+          el('div', { class: 'tile-title', style: 'font-size: 13px' }, a.raw_description),
+          el('button', { class: 'btn small danger', onClick: async () => {
+            if (!confirm('Remove this alias? Future line items with this description will need mapping again.')) return;
+            await sb.from('description_aliases').delete().eq('id', a.id);
+            toast('Alias removed', 'ok'); closeModal(); await reload();
+          } }, '×')
+        ])
+      ]));
+    });
+  }
+  openModal('Edit Material', form, [
+    el('button', { class: 'btn danger', onClick: async () => {
+      if (!confirm(`Delete "${m.name}"? Line items using it will become unmapped.`)) return;
+      await sb.from('materials').delete().eq('id', m.id);
+      toast('Deleted', 'ok'); closeModal(); await reload();
+    } }, 'Delete'),
+    el('button', { class: 'btn secondary', onClick: closeModal }, 'Cancel'),
+    el('button', { class: 'btn', onClick: async () => {
+      const { error } = await sb.from('materials').update({
+        name: state.name.trim(), uom: state.uom, category: state.category || null
+      }).eq('id', m.id);
+      if (error) return toast(error.message, 'bad');
+      toast('Saved', 'ok'); closeModal(); await reload();
+    } }, 'Save')
+  ]);
+}
+
+// ============================================================
+// BUDGETS tab
+// ============================================================
+function renderBudgets(main) {
+  if (isAdmin()) {
+    main.appendChild(el('div', { class: 'panel' }, [
+      el('h2', {}, 'Budgets'),
+      el('div', { class: 'muted', style: 'font-size: 13px; margin-bottom: 10px' },
+        'Set how much of each material you expect at each location (unit, floor, building, or whole job).'),
+      el('button', { class: 'btn block', onClick: openNewBudget }, '+ Add Budget')
+    ]));
+  }
+  if (!S.data.budgets.length) {
+    main.appendChild(el('div', { class: 'panel empty' }, 'No budgets set yet'));
+    return;
+  }
+  const p = el('div', { class: 'panel' });
+  S.data.budgets.forEach(b => {
+    const m = materialById(b.material_id);
+    p.appendChild(el('div', { class: 'tile' }, [
+      el('div', { class: 'tile-row' }, [
+        el('div', {}, [
+          el('div', { class: 'tile-title' }, `${m?.name || '?'} (${m?.uom || ''})`),
+          el('div', { class: 'tile-sub' }, locationLabel(b)),
+          el('div', { class: 'tile-sub' }, `Budget: ${num(b.budget_qty)} ${m?.uom || ''}`)
+        ]),
+        isAdmin() ? el('button', { class: 'btn small danger', onClick: async () => {
+          if (!confirm('Delete this budget?')) return;
+          await sb.from('budgets').delete().eq('id', b.id);
+          toast('Deleted', 'ok'); await reload();
+        } }, 'Delete') : null
+      ])
+    ]));
+  });
+  main.appendChild(p);
+}
+
+function openNewBudget() {
+  if (!S.data.materials.length) return toast('Add materials first', 'bad');
+  if (!S.data.jobs.length) return toast('Add a job first', 'bad');
+  const state = { material_id: '', budget_qty: 0, job_id: '', building_id: '', floor_id: '', unit_id: '' };
+  const form = el('div');
+
+  function rebuild() {
+    form.innerHTML = '';
+    form.appendChild(el('label', {}, 'Material'));
+    form.appendChild(el('select', { onChange: (e) => state.material_id = e.target.value }, [
+      el('option', { value: '' }, '— pick —'),
+      ...S.data.materials.map(m => el('option', { value: m.id }, `${m.name} (${m.uom})`))
+    ]));
+    form.appendChild(el('label', {}, 'Budget quantity'));
+    form.appendChild(el('input', { type: 'number', step: '0.01',
+      onInput: (e) => state.budget_qty = Number(e.target.value)||0 }));
+
+    form.appendChild(el('hr'));
+    form.appendChild(el('h3', {}, 'Apply at level'));
+
+    form.appendChild(el('label', {}, 'Job'));
+    form.appendChild(el('select', {
+      onChange: (e) => { state.job_id = e.target.value; state.building_id = ''; state.floor_id = ''; state.unit_id = ''; rebuild(); }
+    }, [
+      el('option', { value: '' }, '— pick —'),
+      ...S.data.jobs.map(j => el('option', { value: j.id, ...(j.id === state.job_id ? { selected: 'selected' } : {}) }, j.name))
+    ]));
+
+    if (state.job_id) {
+      form.appendChild(el('label', {}, 'Building (blank = whole job)'));
+      form.appendChild(el('select', {
+        onChange: (e) => { state.building_id = e.target.value; state.floor_id = ''; state.unit_id = ''; rebuild(); }
+      }, [
+        el('option', { value: '' }, '— whole job —'),
+        ...buildingsOfJob(state.job_id).map(b => el('option', { value: b.id, ...(b.id === state.building_id ? { selected: 'selected' } : {}) }, b.name))
+      ]));
+    }
+    if (state.building_id) {
+      form.appendChild(el('label', {}, 'Floor (blank = whole building)'));
+      form.appendChild(el('select', {
+        onChange: (e) => { state.floor_id = e.target.value; state.unit_id = ''; rebuild(); }
+      }, [
+        el('option', { value: '' }, '— whole building —'),
+        ...floorsOfBuilding(state.building_id).map(f => el('option', { value: f.id, ...(f.id === state.floor_id ? { selected: 'selected' } : {}) }, `Floor ${f.floor_number}`))
+      ]));
+    }
+    if (state.floor_id) {
+      form.appendChild(el('label', {}, 'Unit (blank = whole floor)'));
+      form.appendChild(el('select', {
+        onChange: (e) => { state.unit_id = e.target.value; rebuild(); }
+      }, [
+        el('option', { value: '' }, '— whole floor —'),
+        ...unitsOfFloor(state.floor_id).map(u => el('option', { value: u.id, ...(u.id === state.unit_id ? { selected: 'selected' } : {}) }, `Unit ${u.unit_number}`))
+      ]));
+    }
+  }
+  rebuild();
+
+  openModal('New Budget', form, [
+    el('button', { class: 'btn secondary', onClick: closeModal }, 'Cancel'),
+    el('button', { class: 'btn', onClick: async () => {
+      if (!state.material_id) return toast('Pick a material', 'bad');
+      if (!state.job_id) return toast('Pick at least a job', 'bad');
+      if (!state.budget_qty) return toast('Enter a quantity', 'bad');
+      const payload = {
+        material_id: state.material_id,
+        budget_qty: state.budget_qty,
+        job_id: null, building_id: null, floor_id: null, unit_id: null
+      };
+      if (state.unit_id) payload.unit_id = state.unit_id;
+      else if (state.floor_id) payload.floor_id = state.floor_id;
+      else if (state.building_id) payload.building_id = state.building_id;
+      else payload.job_id = state.job_id;
+      const { error } = await sb.from('budgets').insert(payload);
+      if (error) return toast(error.message, 'bad');
+      toast('Budget saved', 'ok');
+      closeModal(); await reload();
+    } }, 'Save')
+  ]);
+}
+
+// ============================================================
+// JOBS tab — setup jobs, buildings, floors, units
+// ============================================================
+function renderJobs(main) {
+  if (isAdmin()) {
+    main.appendChild(el('div', { class: 'panel' }, [
+      el('h2', {}, 'Jobs'),
+      el('button', { class: 'btn block', onClick: openNewJob }, '+ New Job')
+    ]));
+  }
+  if (!S.data.jobs.length) {
+    main.appendChild(el('div', { class: 'panel empty' }, 'No jobs yet'));
+    return;
+  }
+  S.data.jobs.forEach(job => {
+    const bs = buildingsOfJob(job.id);
+    const p = el('div', { class: 'panel' }, [
+      el('div', { class: 'row-tight', style: 'justify-content: space-between' }, [
+        el('div', {}, [
+          el('h2', {}, job.name),
+          job.address ? el('div', { class: 'muted' }, job.address) : null
+        ]),
+        isAdmin() ? el('button', { class: 'btn small', onClick: () => openAddBuilding(job) }, '+ Building') : null
+      ])
+    ]);
+    bs.forEach(b => {
+      const fs = floorsOfBuilding(b.id);
+      const bPanel = el('div', { class: 'tile' }, [
+        el('div', { class: 'row-tight', style: 'justify-content: space-between' }, [
+          el('div', { class: 'tile-title' }, b.name),
+          isAdmin() ? el('button', { class: 'btn small secondary', onClick: () => openAddFloor(b) }, '+ Floor') : null
+        ])
+      ]);
+      fs.forEach(f => {
+        const us = unitsOfFloor(f.id);
+        const fPanel = el('details', {}, [
+          el('summary', {}, `Floor ${f.floor_number} — ${us.length} units`),
+          el('div', { style: 'padding: 8px 0' }, [
+            isAdmin() ? el('button', { class: 'btn small', onClick: () => openAddUnits(f) }, '+ Add Units') : null,
+            ...us.map(u => el('div', { class: 'tile', style: 'margin-top: 6px' }, [
+              el('div', { class: 'tile-row' }, [
+                el('div', { class: 'tile-title' }, `Unit ${u.unit_number}${u.model ? ' · ' + u.model : ''}`),
+                isAdmin() ? el('button', { class: 'btn small danger', onClick: async () => {
+                  if (!confirm('Delete this unit?')) return;
+                  await sb.from('units').delete().eq('id', u.id);
+                  toast('Deleted', 'ok'); await reload();
+                } }, '×') : null
+              ])
+            ]))
+          ])
+        ]);
+        bPanel.appendChild(fPanel);
+      });
+      p.appendChild(bPanel);
+    });
+    if (isAdmin()) {
+      p.appendChild(el('button', { class: 'btn danger small mt', onClick: async () => {
+        if (!confirm(`Delete job "${job.name}" and all its buildings/floors/units? This cannot be undone.`)) return;
+        await sb.from('jobs').delete().eq('id', job.id);
+        toast('Deleted', 'ok'); await reload();
+      } }, 'Delete Job'));
+    }
+    main.appendChild(p);
+  });
+}
+
+function openNewJob() {
+  const state = { name: '', address: '', start_date: '' };
+  const form = el('div');
+  form.appendChild(el('label', {}, 'Job Name'));
+  form.appendChild(el('input', { onInput: (e) => state.name = e.target.value, placeholder: 'e.g. Villas Phase 2' }));
+  form.appendChild(el('label', {}, 'Address'));
+  form.appendChild(el('input', { onInput: (e) => state.address = e.target.value }));
+  form.appendChild(el('label', {}, 'Start Date'));
+  form.appendChild(el('input', { type: 'date', onInput: (e) => state.start_date = e.target.value }));
+  openModal('New Job', form, [
+    el('button', { class: 'btn secondary', onClick: closeModal }, 'Cancel'),
+    el('button', { class: 'btn', onClick: async () => {
+      if (!state.name.trim()) return toast('Name required', 'bad');
+      const { error } = await sb.from('jobs').insert({
+        name: state.name.trim(), address: state.address || null, start_date: state.start_date || null
+      });
+      if (error) return toast(error.message, 'bad');
+      toast('Job created', 'ok'); closeModal(); await reload();
+    } }, 'Save')
+  ]);
+}
+
+function openAddBuilding(job) {
+  const state = { name: '' };
+  const form = el('div');
+  form.appendChild(el('label', {}, 'Building Name'));
+  form.appendChild(el('input', { placeholder: 'e.g. Building 2', onInput: (e) => state.name = e.target.value }));
+  openModal(`Add Building to ${job.name}`, form, [
+    el('button', { class: 'btn secondary', onClick: closeModal }, 'Cancel'),
+    el('button', { class: 'btn', onClick: async () => {
+      if (!state.name.trim()) return toast('Name required', 'bad');
+      const { error } = await sb.from('buildings').insert({ job_id: job.id, name: state.name.trim() });
+      if (error) return toast(error.message, 'bad');
+      toast('Building added', 'ok'); closeModal(); await reload();
+    } }, 'Save')
+  ]);
+}
+
+function openAddFloor(building) {
+  const state = { floor_number: '' };
+  const form = el('div');
+  form.appendChild(el('label', {}, 'Floor Number'));
+  form.appendChild(el('input', { placeholder: 'e.g. 1 or G', onInput: (e) => state.floor_number = e.target.value }));
+  openModal(`Add Floor to ${building.name}`, form, [
+    el('button', { class: 'btn secondary', onClick: closeModal }, 'Cancel'),
+    el('button', { class: 'btn', onClick: async () => {
+      if (!state.floor_number.trim()) return toast('Floor number required', 'bad');
+      const { error } = await sb.from('floors').insert({ building_id: building.id, floor_number: state.floor_number.trim() });
+      if (error) return toast(error.message, 'bad');
+      toast('Floor added', 'ok'); closeModal(); await reload();
+    } }, 'Save')
+  ]);
+}
+
+function openAddUnits(floor) {
+  const state = { bulk: '', model: '' };
+  const form = el('div');
+  form.appendChild(el('div', { class: 'muted', style: 'font-size: 13px; margin-bottom: 8px' },
+    'Enter unit numbers separated by commas, or a range like 301-310'));
+  form.appendChild(el('label', {}, 'Unit Numbers'));
+  form.appendChild(el('input', { placeholder: '301, 302, 303  OR  301-315', onInput: (e) => state.bulk = e.target.value }));
+  form.appendChild(el('label', {}, 'Model (optional, applied to all)'));
+  form.appendChild(el('input', { placeholder: 'e.g. A3', onInput: (e) => state.model = e.target.value }));
+  openModal(`Add Units to Floor ${floor.floor_number}`, form, [
+    el('button', { class: 'btn secondary', onClick: closeModal }, 'Cancel'),
+    el('button', { class: 'btn', onClick: async () => {
+      if (!state.bulk.trim()) return toast('Enter unit numbers', 'bad');
+      let units = [];
+      const rangeMatch = state.bulk.trim().match(/^(\d+)\s*-\s*(\d+)$/);
+      if (rangeMatch) {
+        const a = parseInt(rangeMatch[1]), b = parseInt(rangeMatch[2]);
+        for (let n = Math.min(a,b); n <= Math.max(a,b); n++) units.push(String(n));
+      } else {
+        units = state.bulk.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      const rows = units.map(u => ({ floor_id: floor.id, unit_number: u, model: state.model || null }));
+      const { error } = await sb.from('units').insert(rows);
+      if (error) return toast(error.message, 'bad');
+      toast(`${rows.length} unit(s) added`, 'ok'); closeModal(); await reload();
+    } }, 'Save')
+  ]);
+}
+
+// ============================================================
+// SETTINGS tab — company name, logo, user management
+// ============================================================
+function renderSettings(main) {
+  if (!isAdmin()) {
+    main.appendChild(el('div', { class: 'panel' }, [
+      el('h2', {}, 'Account'),
+      el('div', {}, `Signed in as ${S.profile.email}`),
+      el('div', { class: 'muted' }, `Role: ${S.profile.role}`),
+      el('button', { class: 'btn mt', onClick: doLogout }, 'Sign Out')
+    ]));
+    return;
+  }
+
+  // Branding
+  const branding = el('div', { class: 'panel' }, [
+    el('h2', {}, 'Branding'),
+    el('label', {}, 'Company Name'),
+    el('input', { id: 'setCoName', value: S.settings.company_name || '' }),
+    el('label', {}, 'Logo'),
+    S.settings.logo_url ? el('div', { style: 'margin: 6px 0' }, [
+      el('img', { src: S.settings.logo_url, style: 'max-height: 60px; max-width: 200px; border-radius: 6px' })
+    ]) : el('div', { class: 'muted', style: 'font-size: 13px' }, 'No logo uploaded'),
+    el('input', { id: 'logoFile', type: 'file', accept: 'image/*', style: 'margin-top: 6px' }),
+    el('div', { class: 'row-tight mt' }, [
+      el('button', { class: 'btn', onClick: saveBranding }, 'Save Branding'),
+      S.settings.logo_url ? el('button', { class: 'btn danger', onClick: removeLogo }, 'Remove Logo') : null
+    ])
+  ]);
+  main.appendChild(branding);
+
+  // Users
+  const users = el('div', { class: 'panel' }, [
+    el('h2', {}, 'Users'),
+    el('div', { class: 'muted', style: 'font-size: 13px; margin-bottom: 10px' },
+      'To add a new user: have them go to this site and click "Create account". They\'ll come in as an employee; you can promote them below.'),
+    el('div', { id: 'userList' }, 'Loading...')
+  ]);
+  main.appendChild(users);
+  loadUsers();
+
+  // Account
+  main.appendChild(el('div', { class: 'panel' }, [
+    el('h2', {}, 'Account'),
+    el('div', {}, `Signed in as ${S.profile.email}`),
+    el('div', { class: 'muted' }, `Role: ${S.profile.role}`),
+    el('button', { class: 'btn danger mt', onClick: doLogout }, 'Sign Out')
+  ]));
+}
+
+async function saveBranding() {
+  const newName = $('setCoName').value.trim();
+  const file = $('logoFile').files[0];
+  let logoUrl = S.settings.logo_url;
+  if (file) {
+    if (file.size > 2 * 1024 * 1024) return toast('Logo too large (max 2MB)', 'bad');
+    const ext = file.name.split('.').pop();
+    const path = `logo-${Date.now()}.${ext}`;
+    const { error: upErr } = await sb.storage.from('branding').upload(path, file, { upsert: true });
+    if (upErr) return toast(upErr.message, 'bad');
+    const { data: urlData } = sb.storage.from('branding').getPublicUrl(path);
+    logoUrl = urlData.publicUrl;
+  }
+  const { error } = await sb.from('app_settings').update({
+    company_name: newName || 'Drywall Tracker',
+    logo_url: logoUrl,
+    updated_at: new Date().toISOString()
+  }).eq('id', 1);
+  if (error) return toast(error.message, 'bad');
+  S.settings.company_name = newName;
+  S.settings.logo_url = logoUrl;
+  applyBranding();
+  toast('Saved', 'ok');
+}
+
+async function removeLogo() {
+  if (!confirm('Remove logo?')) return;
+  await sb.from('app_settings').update({ logo_url: null }).eq('id', 1);
+  S.settings.logo_url = null;
+  applyBranding();
+  toast('Logo removed', 'ok');
+  render();
+}
+
+async function loadUsers() {
+  const { data } = await sb.from('profiles').select('*').order('created_at');
+  const box = $('userList');
+  if (!box) return;
+  if (!data || !data.length) { box.textContent = 'No users'; return; }
+  box.innerHTML = '';
+  data.forEach(u => {
+    box.appendChild(el('div', { class: 'tile' }, [
+      el('div', { class: 'tile-row' }, [
+        el('div', {}, [
+          el('div', { class: 'tile-title' }, u.full_name || u.email),
+          el('div', { class: 'tile-sub' }, `${u.email} · ${u.role}`)
+        ]),
+        u.id !== S.profile.id ? el('button', { class: 'btn small',
+          onClick: async () => {
+            const newRole = u.role === 'admin' ? 'employee' : 'admin';
+            if (!confirm(`Change ${u.email} to ${newRole}?`)) return;
+            await sb.from('profiles').update({ role: newRole }).eq('id', u.id);
+            toast('Updated', 'ok'); loadUsers();
+          }
+        }, u.role === 'admin' ? 'Demote' : 'Promote') : null
+      ])
+    ]));
+  });
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+window.addEventListener('load', initSession);
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT') location.reload();
+});
+</script>
+</body>
+</html>
