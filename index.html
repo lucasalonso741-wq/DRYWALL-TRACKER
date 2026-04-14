@@ -2147,24 +2147,45 @@ ${S.rows.slice(0,20).map(r => `PO#${r['PO NUMBER']||''} ${r['JOB']||''} ${r['MAT
 
 Answer questions about jobs, POs, budgets, boards, and spending. Be concise and helpful.`;
 
-  if (!S.aiKey) {
-    removeLastAIMsg();
-    addAIMsg('No AI key set — go to Settings and add your Anthropic API key to use the AI assistant.', 'ai');
-    return;
-  }
+  // Try Supabase Edge Function first (secure - no key in browser)
+  const EDGE_URL = 'https://svvjsumhkbezbyskxxej.supabase.co/functions/v1/ai-chat';
+  const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2dmpzdW1oa2JlemJ5c2t4eGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2MDE2NzUsImV4cCI6MjA2MDE3NzY3NX0.R8TRtVGjGOKCiXFCGHcBsJD5dqhWHEjX4bZtpFmHVMA';
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch(EDGE_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': S.aiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: context, messages: [{ role: 'user', content: q }] })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + SB_ANON,
+        'apikey': SB_ANON,
+      },
+      body: JSON.stringify({ question: q, context })
     });
     const data = await res.json();
     removeLastAIMsg();
-    addAIMsg(data.content?.[0]?.text || 'No response', 'ai');
+    if (data.answer) { addAIMsg(data.answer, 'ai'); return; }
+    throw new Error(data.error || 'Edge function not ready');
   } catch(e) {
-    removeLastAIMsg();
-    addAIMsg('Error: ' + e.message, 'ai');
+    if (S.aiKey) {
+      try {
+        const res2 = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': S.aiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: context, messages: [{ role: 'user', content: q }] })
+        });
+        const d2 = await res2.json();
+        removeLastAIMsg();
+        addAIMsg(d2.content?.[0]?.text || 'No response', 'ai');
+      } catch(e2) { removeLastAIMsg(); addAIMsg('Error: ' + e2.message, 'ai'); }
+    } else {
+      removeLastAIMsg();
+      addAIMsg('Almost ready! Deploy the ai-chat Edge Function in Supabase, or add your API key in Settings.', 'ai');
+    }
   }
 }
 
