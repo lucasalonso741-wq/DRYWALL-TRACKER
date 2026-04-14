@@ -352,7 +352,7 @@ function go(p) {
   if(p==='breakdown'){fBDF();rBD();}
   if(p==='jobmap'){fSel('jmap-sel',A.jobs.map(j=>j.name).sort(),'Select a job...');}
   if(p==='raw')rRaw();
-  if(p==='settings'){brand();rSt();setTimeout(addApiKeyField,100);}
+  if(p==='settings'){brand();rSt();const sak=document.getElementById('sak');if(sak)sak.value=localStorage.getItem('dw_ak')||'';}
 }
 
 // ═══════════════════════════════════════════
@@ -1194,7 +1194,10 @@ tr:hover td{background:var(--g50)}.tdb{font-weight:700;color:var(--g900)}.tdm{fo
     </div>
 
     <div id="sec-bills" class="sec">
-      <div class="alt alb" id="bills-status">Hit Sync to load invoices. All bills from your BILL DATA sheet appear here.</div>
+      <div class="alt alb" id="bills-status" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+  <span>Hit Sync to load invoices from your BILL DATA sheet. Bills saved in Supabase load automatically.</span>
+  <button class="btn btns btnp" onclick="syncBillsOnly()" style="flex-shrink:0">🔄 Sync Bills Now</button>
+</div>
 
       <div class="tbr">
         <button class="tbn on" onclick="showBT2('inbox')" id="bt2-inbox">📥 Unprocessed <span id="inbox-count" style="background:#F59E0B;color:white;font-size:10px;font-weight:700;padding:2px 6px;border-radius:9px;margin-left:4px">0</span></button>
@@ -1470,7 +1473,15 @@ tr:hover td{background:var(--g50)}.tdb{font-weight:700;color:var(--g900)}.tdm{fo
               <span id="lht" style="font-size:12px;color:var(--g400)">PNG or SVG recommended</span>
             </div>
           </div>
-          <div class="brow" style="justify-content:flex-start"><button class="btn btnp" onclick="svCo()">Save settings</button></div>
+          <div class="fg" id="api-key-section">
+            <label class="flbl">Anthropic API Key <span style="font-weight:400;text-transform:none;color:var(--g400)">(for AI chat button)</span></label>
+            <input id="sak" class="fi" type="password" placeholder="sk-ant-api03-...">
+            <div style="font-size:11px;color:var(--g400);margin-top:4px">Get free at <a href="https://console.anthropic.com" target="_blank" style="color:var(--blue)">console.anthropic.com</a> → API Keys → Create. Saved in your browser only.</div>
+          </div>
+          <div class="brow" style="justify-content:flex-start">
+            <button class="btn btnp" onclick="svCo()">Save company settings</button>
+            <button class="btn btng" onclick="saveAK()">Save API key</button>
+          </div>
         </div>
       </div>
       <div id="ss-jobs" class="hidden">
@@ -2294,7 +2305,7 @@ function go(p) {
   if(p==='breakdown'){fBDF();rBD();}
   if(p==='jobmap'){fSel('jmap-sel',A.jobs.map(j=>j.name).sort(),'Select a job...');}
   if(p==='raw')rRaw();
-  if(p==='settings'){brand();rSt();setTimeout(addApiKeyField,100);}
+  if(p==='settings'){brand();rSt();const sak=document.getElementById('sak');if(sak)sak.value=localStorage.getItem('dw_ak')||'';}
 }
 
 // ═══════════════════════════════════════════
