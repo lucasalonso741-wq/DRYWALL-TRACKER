@@ -1348,7 +1348,7 @@ async function sbSet(key, value) {
 
 async function loadSharedData() {
   // Load all shared data from Supabase in parallel
-  const [budgets, targets, matBanks, assignments, billAssignments, actuals, logo] = await Promise.all([
+  const [budgets, targets, matBanks, assignments, billAssignments, actuals, logo, jobs] = await Promise.all([
     sbGet('budgets'),
     sbGet('targets'),
     sbGet('matBanks'),
@@ -1356,6 +1356,7 @@ async function loadSharedData() {
     sbGet('billAssignments'),
     sbGet('actuals'),
     sbGet('logo'),
+    sbGet('jobs'),
   ]);
   if (budgets) S.budgets = budgets;
   if (targets) S.targets = targets;
@@ -1363,6 +1364,7 @@ async function loadSharedData() {
   if (assignments) S.assignments = assignments;
   if (billAssignments) S.billAssignments = billAssignments;
   if (actuals) S.actuals = actuals;
+  if (jobs && Array.isArray(jobs)) S.jobs = jobs;
   // Logo: prefer Supabase (shared) over localStorage (local)
   if (logo) {
     localStorage.setItem('dw_logo', logo);
@@ -1563,7 +1565,7 @@ function categorize(desc) {
   if (!desc) return 'other';
   const d = String(desc).toUpperCase();
   // BOARDS — all drywall panel types
-  if (/DRYWALL|GYPSUM|1\/2|5\/8|DENSHIELD|SHAFT.?LINER|DUROCK|FIRECODE|ULTRALIGHT|MR.?BOARD|TYPE.?X|GREENBOARD|HARDIBOARD|REGULAR.?BOARD|DW$|4X8|4X10|4X12|4X16/.test(d)) return 'boards';
+  if (/DRYWALL|DENSHIELD|SHAFT.?LINER|DUROCK|FIRECODE|ULTRALIGHT|MR.?BOARD|TYPE.?X|GREENBOARD|HARDIBOARD|REGULAR.?BOARD/.test(d) || /^[0-9\/]+\s*(DW|REG|REGULAR)\b/.test(d) || /\b(1\/2|5\/8|5\/4|1\/4)\s*(DW|REGULAR|MOLD|TYPE|DENIAL|BOARD)\b/.test(d)) return 'boards';
   // METAL — studs and track
   if (/STUD|TRACK|RUNNER|FURRING|METAL|ANGLE|CHANNEL|HAT.?CHAN|RESILIENT/.test(d)) return 'metal';
   // FINISH — all finishing materials
@@ -2598,6 +2600,29 @@ function loadMatBanks() {
 }
 
 
+
+function removeBillMatch(inv) {
+  if (!confirm('Remove this bill assignment? This will put it back in the unmatched inbox.')) return;
+  if (S.billAssignments) delete S.billAssignments[inv];
+  if (S.actuals) delete S.actuals[inv];
+  Promise.all([saveSharedData('billAssignments'), saveSharedData('actuals')]).then(() => {
+    updateInboxBadge();
+    renderInbox();
+    showToast('✓ Bill assignment removed — back in inbox');
+  });
+}
+
+function removeActual(inv) {
+  if (!confirm('Remove this cost entry?')) return;
+  if (S.actuals) delete S.actuals[inv];
+  if (S.billAssignments) delete S.billAssignments[inv];
+  Promise.all([saveSharedData('actuals'), saveSharedData('billAssignments')]).then(() => {
+    renderActuals();
+    updateInboxBadge();
+    showToast('✓ Removed — bill back in inbox');
+  });
+}
+
 function quickSaveMatBank(job, idx) {
   const qty = document.getElementById('mbq-qty-' + idx)?.value;
   const dol = document.getElementById('mbq-dol-' + idx)?.value;
@@ -2640,7 +2665,9 @@ function addMatBank() {
     bank.label = 'Job Total';
   }
   S.matBanks[job].push(bank);
-  saveSharedData('matBanks');
+  saveSharedData('matBanks').then ? 
+    saveSharedData('matBanks').then(() => showToast('✓ Material bank saved')) :
+    (saveSharedData('matBanks'), showToast('✓ Material bank saved'));
   document.getElementById('mb-kw').value = '';
   document.getElementById('mb-qty').value = '';
   document.getElementById('mb-dollars').value = '';
@@ -2810,9 +2837,43 @@ function renderSettings() {
   const jobs = getJobs();
   document.getElementById('settings-jobs-list').innerHTML = jobs.map(j => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
-      <span style="font-weight:600;">${j}</span>
-      <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="removeJob('${j}')">Remove</button>
+      <span style="font-weight:600;cursor:pointer;color:var(--accent);" onclick="renameJob('${j}')" title="Click to rename">✏️ ${j}</span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-primary btn-sm" onclick="renameJob('${j}')">Rename</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="removeJob('${j}')">Remove</button>
+      </div>
     </div>`).join('');
+}
+
+
+function renameJob(oldName) {
+  const newName = prompt('Rename "' + oldName + '" to:', oldName);
+  if (!newName || newName.trim() === oldName) return;
+  const n = newName.trim().toUpperCase();
+  // Update jobs list
+  const idx = S.jobs.indexOf(oldName);
+  if (idx > -1) S.jobs[idx] = n;
+  // Update all PO assignments
+  let count = 0;
+  Object.keys(S.assignments).forEach(po => {
+    if (S.assignments[po].job === oldName) { S.assignments[po].job = n; count++; }
+  });
+  // Update budgets
+  if (S.budgets[oldName]) { S.budgets[n] = S.budgets[oldName]; delete S.budgets[oldName]; }
+  if (S.targets && S.targets[oldName]) { S.targets[n] = S.targets[oldName]; delete S.targets[oldName]; }
+  if (S.matBanks && S.matBanks[oldName]) { S.matBanks[n] = S.matBanks[oldName]; delete S.matBanks[oldName]; }
+  // Update actuals
+  if (S.actuals) Object.values(S.actuals).forEach(a => { if (a.job === oldName) a.job = n; });
+  // Save everything
+  Promise.all([
+    saveSharedData('jobs'), saveSharedData('assignments'), saveSharedData('budgets'),
+    saveSharedData('targets'), saveSharedData('matBanks'), saveSharedData('actuals')
+  ]).then(() => {
+    renderSettings();
+    populateJobSelects();
+    renderDashboard();
+    showToast('✓ Renamed to "' + n + '" — updated ' + count + ' PO assignments');
+  });
 }
 
 function removeJob(j) {
@@ -2945,7 +3006,7 @@ const JOB_ALIASES = {
   'LOFTS': 'JOB PIONEER LOFTS',
   'MARGATE': 'LEGACY AT MARGATE',
   'LEGACY': 'LEGACY AT MARGATE',
-  'LUDLAM': 'JOB VILLAGES @ EAST OCEAN',
+  // LUDLAM is its own job — not Villages
 };
 
 function fuzzyDetectJob(text) {
@@ -3149,7 +3210,7 @@ function renderActuals() {
         loc.items.forEach(a => {
           html += '<div style="display:flex;justify-content:space-between;padding:7px 0 7px 16px;border-bottom:1px solid var(--border);font-size:13px;">';
           html += '<div><span class="badge ' + (a.isLabor?'badge-blue':'badge-orange') + '" style="margin-right:8px;">' + (a.isLabor?'Labor':'Material') + '</span>' + a.vendor + (a.category?' · '+a.category:'') + (a.unit&&a.unit!=='N/A'?' · Unit '+a.unit:'') + '</div>';
-          html += '<div style="font-weight:700;">' + fmt(a.total) + '</div></div>';
+          html += '<div style="display:flex;align-items:center;gap:8px;"><div style="font-weight:700;">' + fmt(a.total) + '</div><button onclick="removeActual(' + JSON.stringify(a.inv) + ')" style="background:none;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;">✕ undo</button></div></div>';
         });
         html += '</div>';
       });
