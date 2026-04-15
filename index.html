@@ -495,6 +495,26 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 </head>
 <body>
 
+<!-- ══ LOGIN SCREEN ══════════════════════════════ -->
+<div id="login-screen" style="display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0A1628,#1a2f4e);display:flex;align-items:center;justify-content:center;">
+  <div style="background:rgba(255,255,255,.06);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:48px 40px;width:360px;text-align:center;box-shadow:0 32px 80px rgba(0,0,0,.5);">
+    <div id="login-logo-wrap" style="width:72px;height:72px;border-radius:16px;background:linear-gradient(135deg,#FF6B35,#c026d3);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 20px;">
+      <img id="login-logo-img" src="" style="display:none;width:72px;height:72px;border-radius:16px;object-fit:cover;" alt=""/>
+      <span id="login-logo-icon">🏗️</span>
+    </div>
+    <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:#fff;margin-bottom:6px;">AA Drywall</div>
+    <div style="font-size:14px;color:rgba(255,255,255,.4);margin-bottom:32px;">Job Tracking Platform</div>
+    <input id="login-pw" type="password" placeholder="Enter passcode" autocomplete="off"
+      style="width:100%;padding:14px 18px;border-radius:10px;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:15px;text-align:center;letter-spacing:4px;margin-bottom:14px;outline:none;box-sizing:border-box;"
+      onkeydown="if(event.key==='Enter')tryLogin()"/>
+    <button onclick="tryLogin()" style="width:100%;padding:14px;border-radius:10px;border:none;cursor:pointer;background:linear-gradient(135deg,#FF6B35,#e05a2b);color:#fff;font-size:16px;font-weight:700;font-family:'Syne',sans-serif;">Enter</button>
+    <div id="login-err" style="color:#FCA5A5;font-size:13px;margin-top:10px;display:none;">Incorrect passcode</div>
+  </div>
+</div>
+
+<!-- ══ MAIN APP ═══════════════════════════════════ -->
+<div id="app-wrap" style="display:none;">
+
 <!-- ══════════════════════════════════════════════
      SIDEBAR
 ══════════════════════════════════════════════ -->
@@ -673,6 +693,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
         <button class="btn btn-ghost btn-sm" onclick="nav('jobmap')">View Map →</button>
       </div>
       <div id="dash-jobs-list"></div>
+        <div id="dash-priceboard" style="margin-top:16px;"></div>
     </div>
   </div>
 
@@ -1388,6 +1409,12 @@ window.onload = async () => {
     document.getElementById('last-sync-label').textContent = 'Last sync: ' + new Date(S.lastSync).toLocaleTimeString();
   }
 
+  // Hide app by default, show login screen  
+  const appEl = document.getElementById('app-wrap');
+  if (appEl) appEl.style.display = 'none';
+  const loginEl = document.getElementById('login-screen');
+  if (loginEl) loginEl.style.display = 'none';
+
   // Check auth first
   const isAuthed = checkAuth();
 
@@ -1477,9 +1504,10 @@ async function syncAll() {
   btn.innerHTML = '⟳ Sync Now';
   // Always re-render after sync so data shows up
   if (S.rows.length > 0) {
-    renderDashboard();
-    updateInboxBadge();
-    populateJobSelects();
+    try { renderDashboard(); } catch(e) {}
+    try { renderHome(); } catch(e) {}
+    try { updateInboxBadge(); } catch(e) {}
+    try { populateJobSelects(); } catch(e) {}
   }
 }
 
@@ -3219,6 +3247,8 @@ async function tryLogin() {
   const pw = document.getElementById('login-pw').value.trim().toLowerCase();
   if (pw === PASSCODE) {
     document.getElementById('login-screen').style.display = 'none';
+    const appEl = document.getElementById('app-wrap');
+    if (appEl) appEl.style.display = 'block';
     localStorage.setItem('dw_auth', '1');
     sessionStorage.setItem('dw_auth', '1');
     loadLogo();
@@ -3238,13 +3268,17 @@ async function tryLogin() {
 
 function checkAuth() {
   const authed = localStorage.getItem('dw_auth') === '1' || sessionStorage.getItem('dw_auth') === '1';
+  const loginEl = document.getElementById('login-screen');
+  const appEl = document.getElementById('app-wrap');
   if (authed) {
-    document.getElementById('login-screen').style.display = 'none';
+    if (loginEl) loginEl.style.display = 'none';
+    if (appEl) appEl.style.display = 'block';
     loadLogo();
     return true;
   } else {
-    document.getElementById('login-screen').style.display = 'flex';
-    setTimeout(() => document.getElementById('login-pw')?.focus(), 100);
+    if (loginEl) loginEl.style.display = 'flex';
+    if (appEl) appEl.style.display = 'none';
+    setTimeout(() => document.getElementById('login-pw')?.focus(), 200);
     return false;
   }
 }
@@ -3624,7 +3658,7 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
 
   <!-- ── MATERIAL ESTIMATOR MODAL ──────────────────── -->
   <div id="estimator-modal" class="modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.5);overflow-y:auto;">
-    <div style="background:var(--surface);border-radius:16px;max-width:1150pxmargin:40px auto;padding:0;box-shadow:0 24px 80px rgba(0,0,0,.3);">
+    <div style="background:var(--surface);border-radius:16px;max-width:1200px;width:95vwmargin:40px auto;padding:0;box-shadow:0 24px 80px rgba(0,0,0,.3);">
       <div style="padding:20px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
         <div>
           <div style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;" id="est-modal-title">Material Estimator</div>
@@ -3639,5 +3673,6 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
       </div>
     </div>
   </div>
+</div><!-- end app-wrap -->
 </body>
 </html>
