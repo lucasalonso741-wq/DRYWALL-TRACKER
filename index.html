@@ -1391,22 +1391,18 @@ window.onload = async () => {
   // Check auth first
   const isAuthed = checkAuth();
 
-  if (isAuthed) {
-    // Already logged in - load data then render
-    showToast('Loading...');
-    loadSharedData().then(() => {
-      return syncAll();
-    }).then(() => {
-      renderDashboard();
-      updateInboxBadge();
+  // ALWAYS load data - whether authed or not
+  // This means data is ready the moment someone logs in
+  loadSharedData().then(() => syncAll()).then(() => {
+    if (isAuthed) {
       nav('home');
       showToast('✓ Synced');
-    }).catch(e => {
-      console.warn('Load error:', e);
-      nav('home');
-    });
+    }
+  }).catch(e => console.warn('Init load error:', e));
+
+  if (isAuthed) {
+    nav('home');
   }
-  // If not authed, login screen shows - data loads after login via tryLogin()
 };
 
 // ── NAVIGATION ────────────────────────────────────
@@ -1479,6 +1475,12 @@ async function syncAll() {
 
   btn.disabled = false;
   btn.innerHTML = '⟳ Sync Now';
+  // Always re-render after sync so data shows up
+  if (S.rows.length > 0) {
+    renderDashboard();
+    updateInboxBadge();
+    populateJobSelects();
+  }
 }
 
 async function fetchRawData() {
@@ -3630,7 +3632,7 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
         </div>
         <button onclick="closeEstimator()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--ink3);">✕</button>
       </div>
-      <div style="padding:20px 28px;" id="est-modal-body">Loading...</div>
+      <div style="padding:20px 28px;" id="est-modal-body" style="overflow-x:auto;padding:20px;">Loading...</div>
       <div style="padding:16px 28px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">
         <button class="btn btn-ghost" onclick="closeEstimator()">Cancel</button>
         <button class="btn btn-primary" onclick="saveEstimate()">💾 Save Estimate</button>
