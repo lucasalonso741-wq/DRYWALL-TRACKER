@@ -425,6 +425,30 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
   margin-bottom:10px;font-size:13px;
 }
 
+
+/* ── MOBILE RESPONSIVE ───────────────────────────────────── */
+@media (max-width: 768px) {
+  #sidebar { width: 100%; height: auto; position: fixed; bottom: 0; top: auto; z-index: 200; flex-direction: row; overflow-x: auto; padding: 8px; }
+  .nav-section { display: none; }
+  .nav-item { flex-direction: column; gap: 2px; padding: 6px 10px; font-size: 11px; min-width: 60px; text-align: center; }
+  .nav-icon { font-size: 20px; }
+  #sidebar .sidebar-logo { display: none; }
+  #sidebar .sidebar-sheet { display: none; }
+  #main { margin-left: 0; padding-bottom: 80px; }
+  .stats-row { grid-template-columns: repeat(2, 1fr) !important; }
+  .charts-row { grid-template-columns: 1fr !important; }
+  .form-row { flex-direction: column; }
+  .home-quick-grid { grid-template-columns: repeat(3, 1fr); }
+  .card { margin-bottom: 12px; }
+  #page-header { padding: 12px 16px; }
+  .page { padding: 12px; }
+  .li-table { font-size: 12px; }
+  .li-table th, .li-table td { padding: 8px 8px; }
+}
+@media (min-width: 769px) {
+  #sidebar { position: fixed; top: 0; left: 0; height: 100vh; }
+}
+
 /* ── RESPONSIVE ───────────────────────────────── */
 @media(max-width:768px){
   #sidebar{transform:translateX(-100%);}
@@ -701,31 +725,39 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 
         <!-- Step 2 -->
         <div id="pow-s2" style="display:none">
+          <div class="form-group" style="margin-bottom:14px;">
+            <label>Job</label>
+            <select id="pow-job" onchange="powUpdateJob()">
+              <option value="">Select job...</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:14px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;">
+              <input type="checkbox" id="pow-no-location" onchange="togglePOLocation(this.checked)" style="width:auto;margin:0;"/>
+              Custom/house job — skip building, floor & unit
+            </label>
+          </div>
+          <div id="pow-location-fields">
           <div class="form-row">
-            <div class="form-group">
-              <label>Job</label>
-              <select id="pow-job" onchange="powUpdateJob()">
-                <option value="">Select job...</option>
-              </select>
-            </div>
             <div class="form-group">
               <label>Building</label>
               <input type="text" id="pow-building" placeholder="e.g. R2"/>
             </div>
-          </div>
-          <div class="form-row">
             <div class="form-group">
               <label>Floor</label>
               <input type="number" id="pow-floor" placeholder="e.g. 3"/>
             </div>
+          </div>
+          <div class="form-row">
             <div class="form-group">
               <label>Unit</label>
               <input type="text" id="pow-unit" placeholder="e.g. 301 or N/A"/>
             </div>
+            <div class="form-group">
+              <label>Model</label>
+              <input type="text" id="pow-model" placeholder="e.g. B4"/>
+            </div>
           </div>
-          <div class="form-group">
-            <label>Model</label>
-            <input type="text" id="pow-model" placeholder="e.g. B4"/>
           </div>
           <div style="display:flex;gap:10px;">
             <button class="btn btn-ghost" onclick="powStep(1)">← Back</button>
@@ -920,12 +952,24 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
             <select id="bj-sel" onchange="loadJobBudget()"></select>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Budget Qty (boards)</label>
-              <input type="number" id="bj-qty" placeholder="e.g. 5000"/>
+            <div class="form-group"><label>Total $ Budget</label>
+              <input type="number" id="bj-dollars" placeholder="e.g. 80000"/>
             </div>
-            <div class="form-group"><label>Budget $ (total)</label>
-              <input type="number" id="bj-dollars" placeholder="e.g. 200000"/>
+            <div class="form-group"><label>Board Qty Budget</label>
+              <input type="number" id="bj-qty" placeholder="e.g. 500"/>
             </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Material $ Budget</label>
+              <input type="number" id="bj-mat-dollars" placeholder="e.g. 50000"/>
+            </div>
+            <div class="form-group"><label>Labor $ Budget</label>
+              <input type="number" id="bj-labor-dollars" placeholder="e.g. 30000"/>
+            </div>
+          </div>
+          <div class="form-group"><label>Target Price Per Board ($)</label>
+            <input type="number" id="bj-ppb" placeholder="e.g. 145" step="0.01"/>
+            <div style="font-size:11px;color:var(--ink3);margin-top:4px;">Used to track actual $/board vs target on dashboard</div>
           </div>
           <button class="btn btn-primary" onclick="saveJobBudget()">Save Budget</button>
         </div>
@@ -1211,18 +1255,100 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 let sb = null;
 
 // ── STATE ─────────────────────────────────────────
+// SHEET ID is hardcoded - all users auto-connect
+// Shared data (budgets, assignments, actuals) stored in Supabase
+// so ALL users see the same data in real time
+
 let S = {
-  sheetId: localStorage.getItem('dw_sheet_id') || '12EYFZc6wuJOUqoz8iPD6e70iZrK2wzx3drTDncinuvg', // Pre-baked — auto-connects
+  sheetId: '12EYFZc6wuJOUqoz8iPD6e70iZrK2wzx3drTDncinuvg',
   aiKey: localStorage.getItem('dw_ak') || '',
-  jobs: JSON.parse(localStorage.getItem('dw_jobs') || '["JOB VILLAGES @ EAST OCEAN","JOB PIONEER LOFTS","LEGACY AT MARGATE"]'),
-  budgets: JSON.parse(localStorage.getItem('dw_budgets') || '{}'),
-  matBanks: JSON.parse(localStorage.getItem('dw_matbanks') || '{}'),
-  assignments: JSON.parse(localStorage.getItem('dw_assignments') || '{}'), // po# -> {job,building,floor,unit,model}
-  billAssignments: JSON.parse(localStorage.getItem('dw_bill_assignments') || '{}'),
-  rows: [], // RAW DATA
-  bills: [], // BILL DATA
-  lastSync: localStorage.getItem('dw_last_sync') || null,
+  jobs: ["JOB VILLAGES @ EAST OCEAN","JOB PIONEER LOFTS","LEGACY AT MARGATE"],
+  budgets: {},       // loaded from Supabase
+  targets: {},       // price-per-board targets, loaded from Supabase
+  matBanks: {},      // loaded from Supabase
+  assignments: {},   // PO assignments, loaded from Supabase
+  billAssignments: {},// bill matches, loaded from Supabase
+  actuals: {},       // confirmed bills, loaded from Supabase
+  rows: [],
+  bills: [],
+  lastSync: null,
 };
+
+// ── SUPABASE SHARED DATA LAYER ─────────────────────────────
+// All user-entered data goes to ONE table: app_data
+// Structure: { key: string, value: jsonb }
+// This means ALL users share the same state
+
+const SB_TABLE = 'app_data';
+
+// NOTE: Run this SQL in Supabase SQL editor to create the table:
+// CREATE TABLE IF NOT EXISTS app_data (key TEXT PRIMARY KEY, value JSONB);
+// ALTER TABLE app_data ENABLE ROW LEVEL SECURITY;
+// CREATE POLICY "anon_all" ON app_data FOR ALL TO anon USING (true) WITH CHECK (true);
+
+async function sbGet(key) {
+  try {
+    const res = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?key=eq.' + encodeURIComponent(key) + '&select=value&limit=1', {
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' }
+    });
+    if (!res.ok) { console.warn('sbGet HTTP error:', res.status); return null; }
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) return data[0].value;
+    return null;
+  } catch(e) { console.warn('sbGet error:', e); return null; }
+}
+
+async function sbSet(key, value) {
+  try {
+    // Upsert: insert or update if key exists
+    const res = await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
+      method: 'POST',
+      headers: {
+        'apikey': SB_KEY,
+        'Authorization': 'Bearer ' + SB_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({ key, value })
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.warn('sbSet error:', res.status, err);
+    }
+  } catch(e) { console.warn('sbSet error:', e); }
+}
+
+async function loadSharedData() {
+  // Load all shared data from Supabase in parallel
+  const [budgets, targets, matBanks, assignments, billAssignments, actuals, logo] = await Promise.all([
+    sbGet('budgets'),
+    sbGet('targets'),
+    sbGet('matBanks'),
+    sbGet('assignments'),
+    sbGet('billAssignments'),
+    sbGet('actuals'),
+    sbGet('logo'),
+  ]);
+  if (budgets) S.budgets = budgets;
+  if (targets) S.targets = targets;
+  if (matBanks) S.matBanks = matBanks;
+  if (assignments) S.assignments = assignments;
+  if (billAssignments) S.billAssignments = billAssignments;
+  if (actuals) S.actuals = actuals;
+  // Logo: prefer Supabase (shared) over localStorage (local)
+  if (logo) {
+    localStorage.setItem('dw_logo', logo);
+  }
+  loadLogo();
+  console.log('Shared data loaded from Supabase ✓');
+}
+
+async function saveSharedData(key) {
+  // Save specific key to Supabase
+  const val = S[key];
+  await sbSet(key, val);
+}
+
 
 // ── INIT ──────────────────────────────────────────
 window.onload = async () => {
@@ -1260,14 +1386,12 @@ window.onload = async () => {
     document.getElementById('last-sync-label').textContent = 'Last sync: ' + new Date(S.lastSync).toLocaleTimeString();
   }
 
-  // Load saved actuals
-  S.actuals = JSON.parse(localStorage.getItem('dw_actuals') || '{}');
+  // Load ALL shared data from Supabase first (so all users see same state)
+  showToast('Loading shared data...');
+  await loadSharedData();
 
-  if (S.sheetId) {
-    await syncAll();
-  } else {
-    renderDashboard();
-  }
+  // Always sync sheet - it's hardcoded
+  await syncAll();
 };
 
 // ── NAVIGATION ────────────────────────────────────
@@ -1451,62 +1575,92 @@ function addJob() {
 // ── DASHBOARD ─────────────────────────────────────
 function renderDashboard() {
   const rows = S.rows;
-  const totalSpend = rows.reduce((s, r) => s + parseFloat(r['LINE TOTAL'] || r['Line Total'] || 0), 0);
-  const totalBoards = rows.filter(r => isBoard(r['MATERIAL'] || r['Material'])).reduce((s, r) => s + parseFloat(r['QTY'] || r['Qty'] || 0), 0);
-
-  let totalBudget = 0;
-  Object.values(S.budgets).forEach(b => totalBudget += parseFloat(b.dollars || 0));
-
-  document.getElementById('d-spend').textContent = fmt(totalSpend);
-  document.getElementById('d-budget').textContent = fmt(totalBudget);
-  document.getElementById('d-boards').textContent = Math.round(totalBoards).toLocaleString();
-
-  const remaining = totalBudget - totalSpend;
-  const remEl = document.getElementById('d-remaining');
-  remEl.textContent = fmt(Math.abs(remaining));
-  remEl.className = 'stat-val ' + (remaining >= 0 ? 'green' : 'red');
-
-  const pct = totalBudget > 0 ? ((totalSpend / totalBudget) * 100).toFixed(1) : '—';
-  document.getElementById('d-pct').textContent = totalBudget > 0 ? pct + '% used' : 'No budget set';
-
-  const uniqPOs = [...new Set(rows.map(r => String(r['PO NUMBER'] || r['PO #'] || '')).filter(Boolean))];
-  document.getElementById('d-pos').textContent = uniqPOs.length;
-
-  const unassigned = uniqPOs.filter(po => {
-    const poRows = rows.filter(r => String(r['PO NUMBER'] || r['PO #'] || '') === po);
-    return poRows.every(r => !r['BUILDING'] && !r['FLOOR']);
-  });
-  document.getElementById('d-unassigned').textContent = unassigned.length + ' need assignment';
-
-  // Active jobs
   const jobs = getJobs();
-  const jobHtml = jobs.map(job => {
-    const jobRows = rows.filter(r => (r['JOB'] || r['Job'] || '') === job);
-    const spend = jobRows.reduce((s, r) => s + parseFloat(r['LINE TOTAL'] || r['Line Total'] || 0), 0);
-    const boards = jobRows.filter(r => isBoard(r['MATERIAL'] || r['Material'])).reduce((s, r) => s + parseFloat(r['QTY'] || r['Qty'] || 0), 0);
-    const jobPos = [...new Set(jobRows.map(r => String(r['PO NUMBER'] || '')).filter(Boolean))];
-    const budget = S.budgets[job]?.dollars || 0;
-    const pctUsed = budget > 0 ? Math.min((spend / budget) * 100, 100) : 0;
-    const progColor = pctUsed > 90 ? 'red' : pctUsed > 70 ? 'yellow' : 'green';
-    return `<div class="inbox-item" onclick="nav('breakdown');document.getElementById('bd-job').value='${job}';renderBreakdown();">
-      <div>
-        <div class="inbox-title">${job}</div>
-        <div class="inbox-sub">${jobPos.length} POs · ${Math.round(boards)} boards</div>
-        ${budget > 0 ? `<div class="prog-wrap" style="margin-top:8px;width:200px;"><div class="prog-bar ${progColor}" style="width:${pctUsed}%"></div></div>` : ''}
-      </div>
-      <div style="text-align:right">
-        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;">${fmt(spend)}</div>
-        ${budget > 0 ? `<div style="font-size:12px;color:var(--ink3);">${fmt(budget)} budget</div>` : '<span class="badge badge-gray">No budget</span>'}
-      </div>
-    </div>`;
-  }).join('');
-  document.getElementById('dash-jobs-list').innerHTML = jobHtml || '<div class="empty"><div class="empty-title">No data yet</div><div class="empty-sub">Sync your sheet to get started</div></div>';
+  const totalSpend = rows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
+  const totalBoards = rows.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0);
+  const totalBudget = Object.values(S.budgets).reduce((s,b)=>s+parseFloat(b.dollars||0),0);
+  const uniqPOs = [...new Set(rows.map(r=>String(r['PO NUMBER']||'')).filter(Boolean))];
 
-  // Charts
+  // Stat cards
+  document.getElementById('stat-spend').textContent = fmt(totalSpend);
+  document.getElementById('stat-budget').textContent = totalBudget ? fmt(totalBudget) : '$0';
+  document.getElementById('stat-remaining').textContent = totalBudget ? fmt(totalBudget - totalSpend) : fmt(totalSpend);
+  document.getElementById('stat-pos').textContent = uniqPOs.length;
+  document.getElementById('stat-boards').textContent = Math.round(totalBoards);
+
+  // Per-board dashboard
+  const pbSection = document.getElementById('dash-priceboard');
+  if (pbSection) {
+    let pbHtml = '';
+    jobs.forEach(job => {
+      const jobRows = rows.filter(r => (r['JOB']||r['Job']||'') === job);
+      const jobSpend = jobRows.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0);
+      const jobBoards = jobRows.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0);
+      const budget = parseFloat(S.budgets[job]?.dollars||0);
+      const target = parseFloat(S.targets&&S.targets[job]?.pricePerBoard||0);
+      const currentPPB = jobBoards > 0 ? jobSpend / jobBoards : 0;
+      const pct = budget > 0 ? Math.min((jobSpend/budget)*100,100) : 0;
+      const barColor = pct > 90 ? 'red' : pct > 70 ? 'yellow' : 'green';
+      const ppbColor = target > 0 ? (currentPPB > target ? 'var(--red)' : 'var(--green)') : 'var(--ink)';
+
+      pbHtml += '<div class="card" style="margin-bottom:16px;">';
+      pbHtml += '<div class="card-header"><span class="card-title" style="font-size:15px;">' + job.replace('JOB ','') + '</span>';
+      pbHtml += '<span style="font-size:13px;color:var(--ink3);">' + Math.round(jobBoards) + ' boards · ' + fmt(jobSpend) + '</span></div>';
+      pbHtml += '<div class="card-body" style="padding-top:8px;">';
+
+      // Progress bar
+      if (budget > 0) {
+        pbHtml += '<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink3);margin-bottom:4px;"><span>Budget used</span><span>' + fmt(jobSpend) + ' / ' + fmt(budget) + ' (' + pct.toFixed(0) + '%)</span></div>';
+        pbHtml += '<div class="prog-wrap"><div class="prog-bar ' + barColor + '" style="width:' + pct + '%"></div></div></div>';
+      }
+
+      // Price per board row
+      pbHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">';
+      pbHtml += '<div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">';
+      pbHtml += '<div style="font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Current $/Board</div>';
+      pbHtml += '<div style="font-size:22px;font-weight:800;color:' + ppbColor + ';">' + (currentPPB>0?'$'+currentPPB.toFixed(0):'—') + '</div></div>';
+
+      pbHtml += '<div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">';
+      pbHtml += '<div style="font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Target $/Board</div>';
+      pbHtml += '<div style="display:flex;align-items:center;justify-content:center;gap:6px;">';
+      pbHtml += '<div style="font-size:22px;font-weight:800;">' + (target>0?'$'+target.toFixed(0):'—') + '</div>';
+      pbHtml += '<button data-job="' + job.replace(/"/g,'') + '" onclick="setTargetPPB(this.dataset.job)" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;">Edit</button>';
+      pbHtml += '</div></div>';
+
+      pbHtml += '<div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">';
+      pbHtml += '<div style="font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Boards</div>';
+      pbHtml += '<div style="font-size:22px;font-weight:800;">' + Math.round(jobBoards) + '</div>';
+      if (S.budgets[job]?.qty) pbHtml += '<div style="font-size:11px;color:var(--ink3);">/ ' + S.budgets[job].qty + ' budgeted</div>';
+      pbHtml += '</div></div>';
+
+      // Alert if over target
+      if (target > 0 && currentPPB > target) {
+        pbHtml += '<div class="alert alert-yellow" style="margin-top:10px;font-size:13px;">⚠️ Over target by $' + (currentPPB-target).toFixed(0) + '/board — check material costs</div>';
+      }
+
+      pbHtml += '</div></div>';
+    });
+    pbSection.innerHTML = pbHtml || '<div class="no-data">No job data yet</div>';
+  }
+
   renderCharts(rows, jobs);
 }
 
-let chartJobs = null, chartCats = null;
+function setTargetPPB(job) {
+  const current = S.targets&&S.targets[job]?.pricePerBoard||'';
+  const val = prompt('Target price per board for ' + job.replace('JOB ','') + ' ($):', current);
+  if (val === null) return;
+  const num = parseFloat(val);
+  if (isNaN(num) || num <= 0) { showToast('Enter a valid number'); return; }
+  if (!S.targets) S.targets = {};
+  if (!S.targets[job]) S.targets[job] = {};
+  S.targets[job].pricePerBoard = num;
+  saveSharedData('targets');
+  renderDashboard();
+  showToast('Target set: $' + num.toFixed(0) + '/board for ' + job.replace('JOB ',''));
+}
+
+
 function renderCharts(rows, jobs) {
   // Spend by job
   const jobSpends = jobs.map(j => rows.filter(r => (r['JOB']||r['Job']||'') === j).reduce((s, r) => s + parseFloat(r['LINE TOTAL']||r['Line Total']||0), 0));
@@ -1681,7 +1835,7 @@ function savePOAssignment(po) {
     model: document.getElementById('pm-model').value.trim(),
   };
   S.assignments[po] = assignment;
-  localStorage.setItem('dw_assignments', JSON.stringify(S.assignments));
+  saveSharedData('assignments');
 
   // Apply to rows in memory
   S.rows.forEach(row => {
@@ -1694,7 +1848,6 @@ function savePOAssignment(po) {
   });
 
   // Write back to Supabase
-  sbSaveAssignment(po, assignment);
 
   closeModal('po-modal');
   renderInbox();
@@ -1778,7 +1931,7 @@ function saveBillMatch(inv, isLabor) {
     unit: isLabor ? document.getElementById('bm-unit')?.value : '',
   };
   S.billAssignments[inv] = match;
-  localStorage.setItem('dw_bill_assignments', JSON.stringify(S.billAssignments));
+  saveSharedData('billAssignments');
   closeModal('po-modal');
   renderInbox();
   updateInboxBadge();
@@ -1850,15 +2003,24 @@ function powBuildSummary() {
 
 function powSave() {
   const po = powData.po;
+  // Double-entry check
+  if (S.assignments[po]) {
+    const ex = S.assignments[po];
+    if (!confirm('⚠️ PO #' + po + ' already assigned to ' + ex.job + '. Override?')) return;
+  }
+  const noLoc = document.getElementById('pow-no-location')?.checked;
   const assignment = {
     job: document.getElementById('pow-job').value,
-    building: document.getElementById('pow-building').value.trim(),
-    floor: document.getElementById('pow-floor').value.trim(),
-    unit: document.getElementById('pow-unit').value.trim(),
-    model: document.getElementById('pow-model').value.trim(),
+    building: noLoc ? '' : document.getElementById('pow-building').value.trim(),
+    floor: noLoc ? '' : document.getElementById('pow-floor').value.trim(),
+    unit: noLoc ? '' : document.getElementById('pow-unit').value.trim(),
+    model: noLoc ? '' : document.getElementById('pow-model').value.trim(),
+    custom: noLoc || false,
+    assignedAt: new Date().toISOString()
   };
+  if (!assignment.job) { showToast('Select a job first'); return; }
   S.assignments[po] = assignment;
-  localStorage.setItem('dw_assignments', JSON.stringify(S.assignments));
+  // Apply to in-memory rows
   S.rows.forEach(row => {
     if (String(row['PO NUMBER']||row['PO #']||'') === po) {
       row['BUILDING'] = assignment.building;
@@ -1867,10 +2029,28 @@ function powSave() {
       row['MODEL'] = assignment.model;
     }
   });
-  sbSaveAssignment(po, assignment);
+  // Flag unknown materials from this PO
+  const poRows = S.rows.filter(r => String(r['PO NUMBER']||'') === po);
+  const newMats = [];
+  poRows.forEach(r => {
+    const mat = (r['MATERIAL']||'').trim();
+    if (!mat) return;
+    const known = MATERIAL_CATALOG.some(m => m.name.toUpperCase() === mat.toUpperCase());
+    if (!known) newMats.push(mat);
+  });
+  if (newMats.length > 0) {
+    if (confirm('📦 New materials found:\n' + newMats.join('\n') + '\n\nAdd to your catalog?')) {
+      newMats.forEach(mat => {
+        MATERIAL_CATALOG.push({name: mat, cat: categorize(mat), uom:'EA', price:0, use:'From PO ' + po});
+      });
+      showToast('Added ' + newMats.length + ' material' + (newMats.length>1?'s':'') + ' to catalog');
+    }
+  }
+  saveSharedData('assignments');
   updateInboxBadge();
-  showToast('✓ PO #' + po + ' saved!');
+  showToast('✓ PO #' + po + ' assigned to ' + assignment.job);
   initPOWizard();
+  renderDashboard();
 }
 
 // ── BILL WIZARD ───────────────────────────────────
@@ -1956,7 +2136,7 @@ function bwizSave() {
     po: document.getElementById('bwiz-po-match').value,
   };
   S.billAssignments[inv] = match;
-  localStorage.setItem('dw_bill_assignments', JSON.stringify(S.billAssignments));
+  saveSharedData('billAssignments');
   updateInboxBadge();
   showToast('✓ Bill #' + inv + ' saved!');
   initBillWizard();
@@ -1976,8 +2156,24 @@ function renderJobMap() {
   if (!job) { container.innerHTML = '<div class="empty"><div class="empty-icon">🗺️</div><div class="empty-title">Select a job above</div></div>'; return; }
 
   const allJobRows = S.rows.filter(function(r) { return (r['JOB']||r['Job']||'') === job; });
+  // Custom jobs (no building) still show in map under "Site Work"
   const assignedRows = allJobRows.filter(function(r) { return r['BUILDING'] && String(r['BUILDING']).trim() !== ''; });
-  const unassignedRows = allJobRows.filter(function(r) { return !r['BUILDING'] || String(r['BUILDING']).trim() === ''; });
+  const customRows = allJobRows.filter(function(r) {
+    const po = String(r['PO NUMBER']||'');
+    const isCustom = S.assignments[po]?.custom === true;
+    return isCustom && (!r['BUILDING'] || String(r['BUILDING']).trim() === '');
+  });
+  const unassignedRows = allJobRows.filter(function(r) {
+    const po = String(r['PO NUMBER']||'');
+    const isCustom = S.assignments[po]?.custom === true;
+    return !isCustom && (!r['BUILDING'] || String(r['BUILDING']).trim() === '');
+  });
+  // Add custom rows as "Site Work" building
+  customRows.forEach(function(r) {
+    r._customBldg = 'Site Work';
+    r._customFl = '1';
+    assignedRows.push(r);
+  });
 
   function isBoard(m) { return /DRYWALL|DENSHIELD|TYPE.?X|MR.?BOARD|SHAFT.?LINER|DENSGLASS|MOLD.?DEFENSE|1\/2.?DW|1\/2.?REG|5\/8.?DW|REGULAR/i.test(m||''); }
   function isStud(m) { return /STUD/i.test(m||'') && !/DRYWALL/i.test(m||''); }
@@ -2249,18 +2445,37 @@ function clearBdFilters() {
 // ── BUDGETS ───────────────────────────────────────
 function loadJobBudget() {
   const job = document.getElementById('bj-sel').value;
-  if (!job || !S.budgets[job]) { document.getElementById('bj-qty').value = ''; document.getElementById('bj-dollars').value = ''; return; }
-  document.getElementById('bj-qty').value = S.budgets[job].qty || '';
-  document.getElementById('bj-dollars').value = S.budgets[job].dollars || '';
+  const b = S.budgets[job] || {};
+  document.getElementById('bj-qty').value = b.qty || '';
+  document.getElementById('bj-dollars').value = b.dollars || '';
+  const matEl = document.getElementById('bj-mat-dollars');
+  const labEl = document.getElementById('bj-labor-dollars');
+  const ppbEl = document.getElementById('bj-ppb');
+  if (matEl) matEl.value = b.materialDollars || '';
+  if (labEl) labEl.value = b.laborDollars || '';
+  if (ppbEl) ppbEl.value = S.targets&&S.targets[job]?.pricePerBoard || '';
 }
 
 function saveJobBudget() {
   const job = document.getElementById('bj-sel').value;
   if (!job) return;
-  S.budgets[job] = { qty: document.getElementById('bj-qty').value, dollars: document.getElementById('bj-dollars').value };
-  localStorage.setItem('dw_budgets', JSON.stringify(S.budgets));
-  sbSaveBudgets();
-  renderBudgets();
+  S.budgets[job] = {
+    qty: document.getElementById('bj-qty').value,
+    dollars: document.getElementById('bj-dollars').value,
+    materialDollars: document.getElementById('bj-mat-dollars')?.value || '',
+    laborDollars: document.getElementById('bj-labor-dollars')?.value || '',
+  };
+  const ppb = parseFloat(document.getElementById('bj-ppb')?.value||0);
+  if (ppb > 0) {
+    if (!S.targets) S.targets = {};
+    if (!S.targets[job]) S.targets[job] = {};
+    S.targets[job].pricePerBoard = ppb;
+    saveSharedData('targets');
+  }
+  saveSharedData('budgets');
+  loadBudgets();
+  renderBudgetVsActual();
+  renderDashboard();
   showToast('Budget saved for ' + job);
 }
 
@@ -2275,6 +2490,18 @@ async function sbSaveBudgets() {
 
 function loadMatBanks() {
   const job = document.getElementById('mb-job-sel').value;
+  // Auto-init job material bank with catalog items if empty
+  if (job && (!S.matBanks[job] || S.matBanks[job].length === 0)) {
+    S.matBanks[job] = [];
+    // Pre-populate with catalog items that appear in this job's POs
+    const jobMats = [...new Set(S.rows.filter(r=>(r['JOB']||'')===job).map(r=>r['MATERIAL']||'').filter(Boolean))];
+    jobMats.forEach(mat => {
+      const cat = MATERIAL_CATALOG.find(m => m.name.toUpperCase() === mat.toUpperCase());
+      if (!S.matBanks[job].some(b => b.keyword.toUpperCase() === mat.toUpperCase())) {
+        S.matBanks[job].push({keyword: mat, qty:'', dollars:'', scope:'job', label:'Job Total', fromCatalog: !!cat});
+      }
+    });
+  }
   const banks = S.matBanks[job] || [];
   if (banks.length === 0) {
     document.getElementById('mat-banks-list').innerHTML = '<div class="no-data">No material banks yet. Add one below.</div>';
@@ -2326,7 +2553,7 @@ function addMatBank() {
     bank.label = 'Job Total';
   }
   S.matBanks[job].push(bank);
-  localStorage.setItem('dw_matbanks', JSON.stringify(S.matBanks));
+  saveSharedData('matBanks');
   document.getElementById('mb-kw').value = '';
   document.getElementById('mb-qty').value = '';
   document.getElementById('mb-dollars').value = '';
@@ -2337,7 +2564,7 @@ function addMatBank() {
 
 function removeMatBank(job, idx) {
   S.matBanks[job].splice(idx, 1);
-  localStorage.setItem('dw_matbanks', JSON.stringify(S.matBanks));
+  saveSharedData('matBanks');
   loadMatBanks();
 }
 
@@ -2746,9 +2973,9 @@ function confirmBillMatch(inv, isLabor) {
   };
   if (!S.actuals) S.actuals = {};
   S.actuals[inv] = actual;
-  localStorage.setItem('dw_actuals', JSON.stringify(S.actuals));
+  saveSharedData('actuals');
   S.billAssignments[inv] = {job, isLabor, po:matchedPO, building:actual.building, floor:actual.floor, unit:actual.unit, matched:true};
-  localStorage.setItem('dw_bill_assignments', JSON.stringify(S.billAssignments));
+  saveSharedData('billAssignments');
   closeModal('po-modal');
   updateInboxBadge();
   renderInbox();
@@ -2771,13 +2998,21 @@ function renderActuals() {
   const laborAct = filtered.filter(a=>a.isLabor).reduce((s,a)=>s+parseFloat(a.total||0),0);
   const matAct = filtered.filter(a=>!a.isLabor).reduce((s,a)=>s+parseFloat(a.total||0),0);
   const variance = totalBudget - totalActual;
+  // Simple actuals: Material Budget / Material PO / Material Actual / Labor Actual
+  const matBudget = filterJob
+    ? parseFloat(S.budgets[filterJob]?.materialDollars||S.budgets[filterJob]?.dollars||0)
+    : Object.values(S.budgets).reduce((s,b)=>s+parseFloat(b.materialDollars||b.dollars||0),0);
+  const laborBudget = filterJob
+    ? parseFloat(S.budgets[filterJob]?.laborDollars||0)
+    : Object.values(S.budgets).reduce((s,b)=>s+parseFloat(b.laborDollars||0),0);
+
   document.getElementById('act-stats').innerHTML =
-    mkStat('Budget',fmt(totalBudget),'var(--ink)','Set in Budget Bank') +
-    mkStat('PO Committed',fmt(totalPO),'var(--blue)','Purchase orders') +
-    mkStat('Actual Billed',fmt(totalActual),'var(--accent)',filtered.length+' bills') +
-    mkStat('Variance',fmt(Math.abs(variance)),variance>=0?'var(--green)':'var(--red)',variance>=0?'Under budget':'Over budget') +
-    mkStat('Labor',fmt(laborAct),'var(--purple)','Subs') +
-    mkStat('Material',fmt(matAct),'#10B981','Suppliers');
+    mkStat('Material Budget', matBudget?fmt(matBudget):'Not set', 'var(--ink)', 'Set in Budget Bank') +
+    mkStat('Material PO', fmt(totalPO), 'var(--blue)', 'From purchase orders') +
+    mkStat('Material Actual', fmt(matAct), '#10B981', filtered.filter(a=>!a.isLabor).length + ' bills confirmed') +
+    mkStat('Labor Budget', laborBudget?fmt(laborBudget):'Not set', 'var(--ink)', 'Set in Budget Bank') +
+    mkStat('Labor Actual', fmt(laborAct), 'var(--purple)', filtered.filter(a=>a.isLabor).length + ' sub bills') +
+    mkStat('Total Actual', fmt(totalActual), 'var(--accent)', 'All confirmed bills');
   const jobs = filterJob?[filterJob]:getJobs();
   const bData = jobs.map(j=>parseFloat(S.budgets[j]?.dollars||0));
   const pData = jobs.map(j=>S.rows.filter(r=>r['JOB']===j).reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0));
@@ -2959,8 +3194,9 @@ function handleLogoUpload(event) {
   reader.onload = e => {
     const data = e.target.result;
     localStorage.setItem('dw_logo', data);
+    // Also save to Supabase so all users see it
+    sbSet('logo', data).then(() => showToast('✓ Logo uploaded & synced'));
     loadLogo();
-    showToast('✓ Logo uploaded');
   };
   reader.readAsDataURL(file);
 }
@@ -3062,6 +3298,13 @@ document.addEventListener('click', e => {
   }
 });
 
+
+
+function togglePOLocation() {
+  const noLoc = document.getElementById('pow-no-location')?.checked;
+  const fields = document.getElementById('pow-location-fields');
+  if (fields) fields.style.display = noLoc ? 'none' : 'block';
+}
 
 // ── HELPERS ───────────────────────────────────────
 function fmt(n) {
