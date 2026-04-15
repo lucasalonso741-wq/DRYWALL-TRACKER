@@ -1344,9 +1344,14 @@ async function loadSharedData() {
 }
 
 async function saveSharedData(key) {
-  // Save specific key to Supabase
   const val = S[key];
-  await sbSet(key, val);
+  try {
+    await sbSet(key, val);
+    console.log('Saved to Supabase:', key, '(' + JSON.stringify(val).length + ' bytes)');
+  } catch(e) {
+    console.error('Failed to save', key, ':', e);
+    showToast('⚠ Save failed - check connection', true);
+  }
 }
 
 
@@ -1383,15 +1388,18 @@ window.onload = async () => {
     document.getElementById('last-sync-label').textContent = 'Last sync: ' + new Date(S.lastSync).toLocaleTimeString();
   }
 
-  // Only load data if user is already authenticated
+  // Always load shared data and sync in background (data is not secret)
+  // Auth just gates the UI, not the data loading
+  loadSharedData().then(() => {
+    syncAll().catch(e => console.warn('Sync error:', e));
+  }).catch(e => console.warn('Load error:', e));
+
+  // Check auth and show appropriate screen
   const isAuthed = checkAuth();
   if (isAuthed) {
-    showToast('Syncing...');
-    await loadSharedData();
-    await syncAll();
     nav('home');
   }
-  // If not authed, login screen is showing - data loads after login
+  // If not authed, login screen shows - data is already loading in background
 };
 
 // ── NAVIGATION ────────────────────────────────────
@@ -2001,7 +2009,7 @@ function powBuildSummary() {
     <div style="text-align:right;margin-top:8px;font-weight:700;">Total: ${fmt(total)}</div>`;
 }
 
-function powSave() {
+async function powSave() {
   const po = powData.po;
   // Double-entry check
   if (S.assignments[po]) {
@@ -2046,9 +2054,9 @@ function powSave() {
       showToast('Added ' + newMats.length + ' material' + (newMats.length>1?'s':'') + ' to catalog');
     }
   }
-  saveSharedData('assignments');
+  await saveSharedData('assignments');
   updateInboxBadge();
-  showToast('✓ PO #' + po + ' assigned to ' + assignment.job);
+  showToast('✓ PO #' + po + ' synced for all users');
   initPOWizard();
   renderDashboard();
 }
@@ -3174,13 +3182,13 @@ async function tryLogin() {
   if (pw === PASSCODE) {
     document.getElementById('login-screen').style.display = 'none';
     localStorage.setItem('dw_auth', '1');
+    sessionStorage.setItem('dw_auth', '1');
     loadLogo();
-    // First time login - load all data
-    if (S.rows.length === 0) {
-      showToast('Loading data...');
-      await loadSharedData();
-      await syncAll();
-    }
+    showToast('Welcome! Syncing data...');
+    // Always reload to get latest state
+    await loadSharedData();
+    if (S.rows.length === 0) await syncAll();
+    else renderDashboard();
     nav('home');
   } else {
     document.getElementById('login-err').style.display = 'block';
@@ -3191,7 +3199,7 @@ async function tryLogin() {
 }
 
 function checkAuth() {
-  const authed = localStorage.getItem('dw_auth') === '1';
+  const authed = localStorage.getItem('dw_auth') === '1' || sessionStorage.getItem('dw_auth') === '1';
   if (authed) {
     document.getElementById('login-screen').style.display = 'none';
     loadLogo();
