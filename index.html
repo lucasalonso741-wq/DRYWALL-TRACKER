@@ -1352,9 +1352,6 @@ async function saveSharedData(key) {
 
 // ── INIT ──────────────────────────────────────────
 window.onload = async () => {
-  // Check auth first
-  checkAuth();
-
   // Init Supabase
   try {
     sb = supabase.createClient(SB_URL, SB_KEY);
@@ -1386,12 +1383,15 @@ window.onload = async () => {
     document.getElementById('last-sync-label').textContent = 'Last sync: ' + new Date(S.lastSync).toLocaleTimeString();
   }
 
-  // Load ALL shared data from Supabase first (so all users see same state)
-  showToast('Loading shared data...');
-  await loadSharedData();
-
-  // Always sync sheet - it's hardcoded
-  await syncAll();
+  // Only load data if user is already authenticated
+  const isAuthed = checkAuth();
+  if (isAuthed) {
+    showToast('Syncing...');
+    await loadSharedData();
+    await syncAll();
+    nav('home');
+  }
+  // If not authed, login screen is showing - data loads after login
 };
 
 // ── NAVIGATION ────────────────────────────────────
@@ -2575,16 +2575,25 @@ function renderBudgets() {
   // Job budget list
   document.getElementById('job-budget-list').innerHTML = jobs.map(j => {
     const b = S.budgets[j] || {};
-    const spent = S.rows.filter(r => (r['JOB']||r['Job']||'') === j).reduce((s, r) => s + parseFloat(r['LINE TOTAL']||r['Line Total']||0), 0);
-    const pct = b.dollars > 0 ? Math.min((spent/b.dollars)*100,100) : 0;
-    const color = pct > 90 ? 'red' : pct > 70 ? 'yellow' : 'green';
-    return `<div style="margin-bottom:14px;">
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-        <span style="font-weight:600;font-size:13px;">${j}</span>
-        <span style="font-size:12px;color:var(--ink3);">${fmt(spent)} / ${b.dollars ? fmt(b.dollars) : 'No budget'}</span>
-      </div>
-      <div class="prog-wrap"><div class="prog-bar ${color}" style="width:${pct}%"></div></div>
-    </div>`;
+    const est = S.matBanks && S.matBanks[j + '_estimate'];
+    const hasEst = est && Object.keys(est).length > 0;
+    const estTotal = hasEst ? Object.keys(est).reduce(function(s,k){
+      var item = ESTIMATE_TEMPLATE.find(function(t){return t.name===k;})||{};
+      var d = est[k]; return s + (d.qty||0)*(d.price!==undefined?d.price:(item.price||0));
+    }, 0) : 0;
+    const spend = S.rows.filter(r=>(r['JOB']||r['Job']||'')===j).reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0);
+    const budget = parseFloat(b.dollars||0);
+    const pct = budget>0?Math.min((spend/budget)*100,100):0;
+    const barColor = pct>90?'red':pct>70?'yellow':'green';
+    return '<div style="padding:14px 0;border-bottom:1px solid var(--border);">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
+      '<div style="font-weight:700;font-size:14px;">' + j.replace('JOB ','') + '</div>' +
+      '<div style="display:flex;gap:8px;">' +
+      '<button class="btn btn-primary btn-sm" onclick="openEstimator(' + JSON.stringify(j) + ')">📋 ' + (hasEst?'Edit':'New') + ' Estimate</button>' +
+      '</div></div>' +
+      (budget>0?'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink3);margin-bottom:4px;"><span>Spent '+fmt(spend)+' of '+fmt(budget)+'</span><span>'+pct.toFixed(0)+'%</span></div><div class="prog-wrap"><div class="prog-bar '+barColor+'" style="width:'+pct+'%"></div></div>':'') +
+      (hasEst?'<div style="font-size:12px;color:var(--ink3);margin-top:6px;">📋 Estimate: $'+estTotal.toFixed(2)+'</div>':'<div style="font-size:12px;color:var(--ink3);margin-top:6px;">No estimate yet — click above to create</div>') +
+      '</div>';
   }).join('');
 
   loadJobBudget();
@@ -3160,12 +3169,18 @@ function getMaterialSuggestions(query) {
 // ── LOGIN ─────────────────────────────────────────────────────
 const PASSCODE = 'gypsum';
 
-function tryLogin() {
+async function tryLogin() {
   const pw = document.getElementById('login-pw').value.trim().toLowerCase();
   if (pw === PASSCODE) {
     document.getElementById('login-screen').style.display = 'none';
     localStorage.setItem('dw_auth', '1');
     loadLogo();
+    // First time login - load all data
+    if (S.rows.length === 0) {
+      showToast('Loading data...');
+      await loadSharedData();
+      await syncAll();
+    }
     nav('home');
   } else {
     document.getElementById('login-err').style.display = 'block';
@@ -3180,9 +3195,11 @@ function checkAuth() {
   if (authed) {
     document.getElementById('login-screen').style.display = 'none';
     loadLogo();
+    return true;
   } else {
     document.getElementById('login-screen').style.display = 'flex';
     setTimeout(() => document.getElementById('login-pw')?.focus(), 100);
+    return false;
   }
 }
 
@@ -3306,6 +3323,219 @@ function togglePOLocation() {
   if (fields) fields.style.display = noLoc ? 'none' : 'block';
 }
 
+
+// ══════════════════════════════════════════════════════════════
+// MATERIAL ESTIMATOR — Full spreadsheet per job
+// ══════════════════════════════════════════════════════════════
+
+const ESTIMATE_TEMPLATE = [
+  {cat:'Metal 20GA',  name:'6" TRAC 20GA',          use:'Fire walls & bathrooms',         hint:'LN ft x2 /10',      uom:'EA', price:6.90,  qty:0},
+  {cat:'Metal 20GA',  name:'6" STUD 20GA',           use:'Fire walls & bathrooms',         hint:'LN ft',             uom:'EA', price:6.53,  qty:0},
+  {cat:'Metal 20GA',  name:'3 5/8 STUD 20GA',        use:'Bathrooms / as per plan',        hint:'LN ft',             uom:'EA', price:4.14,  qty:0},
+  {cat:'Metal 20GA',  name:'3 5/8 TRAC 20GA',        use:'Bathrooms / as per plan',        hint:'LN ft x2 /10',      uom:'EA', price:4.35,  qty:0},
+  {cat:'Metal 20GA',  name:'2x2 ANGLES 20GA',        use:'Soffits',                        hint:'20 per unit',       uom:'EA', price:5.25,  qty:0},
+  {cat:'Metal 20GA',  name:'FLAT METAL',             use:'Backing; bath & kitchen',        hint:'',                  uom:'EA', price:8.90,  qty:0},
+  {cat:'Metal 25GA',  name:'RC1 CHANNELS',           use:'Firewalls',                      hint:'LF fwalls x rows /10', uom:'EA', price:5.81, qty:0},
+  {cat:'Metal 25GA',  name:'3 5/8 TRAC 25GA',        use:'Interior partitions',            hint:'LN ft x2 /10',      uom:'EA', price:3.90,  qty:0},
+  {cat:'Metal 25GA',  name:'3 5/8 STUD 25GA',        use:'Interior partitions',            hint:'LN ft',             uom:'EA', price:3.65,  qty:0},
+  {cat:'Metal 25GA',  name:'1 5/8 TRAC',             use:'Chase walls / Soffits',          hint:'LF x0.25 /10',      uom:'EA', price:2.70,  qty:0},
+  {cat:'Metal 25GA',  name:'1 5/8 STUD',             use:'Chase walls / Soffits',          hint:'LF x0.40',          uom:'EA', price:2.75,  qty:0},
+  {cat:'Metal 25GA',  name:'1 1/2 HI HAT',           use:'Furring',                        hint:'LN ft',             uom:'EA', price:4.68,  qty:0},
+  {cat:'Metal 25GA',  name:'7/8 HI HAT',             use:'Furring or ceiling',             hint:'',                  uom:'EA', price:5.36,  qty:0},
+  {cat:'Wood',        name:'2x8x10 PT',              use:'Backing',                        hint:'',                  uom:'EA', price:8.91,  qty:0},
+  {cat:'Wood',        name:'2x6x10 PT',              use:'Corridor entry doors',           hint:'doors x 2.5',       uom:'EA', price:7.55,  qty:0},
+  {cat:'Wood',        name:'2x4x10 SPRUCE',          use:'Doors pre-hung',                 hint:'doors x 2.5',       uom:'EA', price:5.20,  qty:0},
+  {cat:'Wood',        name:'1x4x10 PT',              use:'Window bucks',                   hint:'windows x 2.5',     uom:'EA', price:3.55,  qty:0},
+  {cat:'Wood',        name:'1x6x10 PT',              use:'Slider bucks',                   hint:'sliders x 3',       uom:'EA', price:5.40,  qty:0},
+  {cat:'Wood',        name:'1x2x8 PT',               use:'Furring strips',                 hint:'LF block wall',     uom:'EA', price:1.65,  qty:0},
+  {cat:'Drywall',     name:'1/2 DENSHIELD',          use:'Showers and tubs',               hint:'SF /32',            uom:'BD', price:35.20, qty:0},
+  {cat:'Drywall',     name:'5/8 DENSHIELD',          use:'Showers/tubs vs fire walls',     hint:'SF /32',            uom:'BD', price:38.40, qty:0},
+  {cat:'Drywall',     name:'1/2 REGULAR',            use:'Walls and ceilings',             hint:'SF /48',            uom:'BD', price:18.96, qty:0},
+  {cat:'Drywall',     name:'5/8 MOLD DEFENSE',       use:'Soffits & bathroom ceiling',     hint:'LF firewall x4 /48',uom:'BD', price:27.12, qty:0},
+  {cat:'Drywall',     name:'5/8 DENSGLASS',          use:'Exterior framing',               hint:'SF ext /32',        uom:'BD', price:31.20, qty:0},
+  {cat:'Drywall',     name:'1" SHAFT LINER',         use:'2-hour chases',                  hint:'LF 2hr x H /16',   uom:'BD', price:49.60, qty:0},
+  {cat:'Drywall',     name:'5/8 TYPE X',             use:'Fire/demising/2hr walls',        hint:'SF /48',            uom:'BD', price:20.40, qty:0},
+  {cat:'Finish',      name:'JOINT COMPOUND 5 GAL',   use:'Finish',                         hint:'boards/7 + 3/unit', uom:'BKT',price:18.75, qty:0},
+  {cat:'Finish',      name:'TAPE 500FT ROLL',        use:'Finish',                         hint:'boards /25',        uom:'ROLL',price:6.00, qty:0},
+  {cat:'Finish',      name:'8FT CORNER BEAD',        use:'Finish',                         hint:'boards /100',       uom:'BX', price:110.00,qty:0},
+  {cat:'Finish',      name:'FIRECAULK',              use:'Firewall',                       hint:'LF fwall x5 /20',   uom:'TUBE',price:16.25,qty:0},
+  {cat:'Finish',      name:'DURABOND',               use:'Misc everything',                hint:'4 per unit',        uom:'BAG', price:10.25,qty:0},
+  {cat:'Fasteners',   name:'SCREWS 1-1/4 DRYWALL',   use:'Drywall screws',                hint:'boards /100',       uom:'BX', price:65.00, qty:0},
+  {cat:'Fasteners',   name:'SCREWS 1-5/8',           use:'All over',                       hint:'boards /100',       uom:'BX', price:75.00, qty:0},
+  {cat:'Fasteners',   name:'SCREWS 1-5/8 ZINC',      use:'Bathroom denshield',             hint:'boards /100',       uom:'BX', price:85.60, qty:0},
+  {cat:'Fasteners',   name:'FASTRAC',                use:'Trac metal fastener',            hint:'trac x10x12 /1000', uom:'BX', price:72.00, qty:0},
+  {cat:'Fasteners',   name:'FRAMERS 7/16',           use:'Framing screws',                 hint:'studs x5 /12000',   uom:'BX', price:135.00,qty:0},
+  {cat:'Fasteners',   name:'COIL NAILS',             use:'Furring bucks',                  hint:'mat x10x12 /8 /300',uom:'ROLL',price:3.00, qty:0},
+  {cat:'Fasteners',   name:'LANCO CAULK',            use:'Bucks/doors/windows',            hint:'ext windows x2',    uom:'TUBE',price:2.75, qty:0},
+];
+
+let currentEstimateJob = null;
+let currentEstimateData = {};
+
+function openEstimator(job) {
+  currentEstimateJob = job;
+  document.getElementById('est-modal-title').textContent = 'Material Estimator — ' + job.replace('JOB ','');
+  const saved = (S.matBanks && S.matBanks[job + '_estimate']) || {};
+  currentEstimateData = JSON.parse(JSON.stringify(saved));
+  renderEstimator();
+  document.getElementById('estimator-modal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeEstimator() {
+  document.getElementById('estimator-modal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function renderEstimator() {
+  var cats = {};
+  ESTIMATE_TEMPLATE.forEach(function(item) {
+    if (!cats[item.cat]) cats[item.cat] = [];
+    cats[item.cat].push(item);
+  });
+  var catColors = ['#DBEAFE','#FEF3C7','#D1FAE5','#EDE9FE','#FEE2E2','#F3F4F6'];
+  var html = '<div style="overflow-x:auto;">';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  html += '<thead><tr style="background:var(--surface2);"><th style="padding:8px 10px;text-align:left;">Material</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--ink3);">Use</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--ink3);">Formula</th><th style="padding:8px 6px;text-align:center;font-size:11px;color:var(--ink3);">UOM</th><th style="padding:8px 8px;text-align:right;font-size:11px;color:var(--ink3);">Unit $</th><th style="padding:8px 8px;text-align:center;font-size:11px;color:var(--ink3);">Qty</th><th style="padding:8px 8px;text-align:right;font-size:11px;color:var(--ink3);">Total</th></tr></thead><tbody>';
+  var grandTotal = 0;
+  var ci = 0;
+  Object.keys(cats).forEach(function(cat) {
+    var color = catColors[ci++ % catColors.length];
+    html += '<tr><td colspan="7" style="padding:7px 10px;background:' + color + ';font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">' + cat + '</td></tr>';
+    cats[cat].forEach(function(item, i) {
+      var d = currentEstimateData[item.name] || {};
+      var qty = d.qty !== undefined ? d.qty : 0;
+      var price = d.price !== undefined ? d.price : item.price;
+      var cost = parseFloat(qty||0) * parseFloat(price||0);
+      grandTotal += cost;
+      var bg = i%2===0 ? 'var(--surface)' : 'var(--surface2)';
+      var safeKey = item.name.replace(/['"\\]/g,'').replace(/\s/g,'_');
+      html += '<tr style="background:' + bg + ';border-bottom:1px solid var(--border);">';
+      html += '<td style="padding:7px 10px;font-weight:500;">' + item.name + '</td>';
+      html += '<td style="padding:7px 10px;color:var(--ink3);font-size:11px;">' + item.use + '</td>';
+      html += '<td style="padding:7px 10px;color:var(--ink3);font-size:11px;font-style:italic;">' + item.hint + '</td>';
+      html += '<td style="padding:7px 6px;text-align:center;color:var(--ink3);font-size:12px;">' + item.uom + '</td>';
+      html += '<td style="padding:4px 8px;text-align:right;"><input type="number" value="' + price.toFixed(2) + '" step="0.01" data-key="' + safeKey + '" data-field="price" onchange="estChange(this)" style="width:75px;text-align:right;border:1px solid var(--border);border-radius:4px;padding:3px 5px;font-size:12px;"></td>';
+      html += '<td style="padding:4px 8px;text-align:center;"><input type="number" value="' + (qty||'') + '" min="0" data-key="' + safeKey + '" data-field="qty" onchange="estChange(this)" oninput="this.style.background=parseFloat(this.value)>0?\'#F0FDF4\':\'var(--surface)\'" style="width:65px;text-align:center;border:1px solid var(--border);border-radius:4px;padding:3px 5px;font-size:13px;font-weight:600;background:' + (qty>0?'#F0FDF4':'var(--surface)') + ';"></td>';
+      html += '<td style="padding:7px 10px;text-align:right;font-weight:600;color:' + (cost>0?'var(--accent)':'var(--ink3)') + ';" id="ec_' + safeKey + '">' + (cost>0?'$'+cost.toFixed(2):'—') + '</td>';
+      html += '</tr>';
+    });
+  });
+  // Custom items
+  Object.keys(currentEstimateData).forEach(function(k) {
+    if (!ESTIMATE_TEMPLATE.find(function(t){return t.name===k;})) {
+      var d = currentEstimateData[k];
+      var cost = (d.qty||0)*(d.price||0);
+      grandTotal += cost;
+      var safeKey = k.replace(/['"\\]/g,'').replace(/\s/g,'_');
+      html += '<tr style="background:#FFF7ED;border-bottom:1px solid var(--border);">';
+      html += '<td style="padding:7px 10px;font-weight:500;">' + k + ' <span style="font-size:10px;color:var(--accent);">custom</span></td>';
+      html += '<td colspan="2" style="padding:7px 10px;color:var(--ink3);font-size:11px;">Custom item</td>';
+      html += '<td style="padding:7px 6px;text-align:center;font-size:12px;">' + (d.uom||'EA') + '</td>';
+      html += '<td style="padding:4px 8px;text-align:right;"><input type="number" value="' + (d.price||0) + '" step="0.01" data-key="' + safeKey + '" data-field="price" onchange="estChange(this)" style="width:75px;text-align:right;border:1px solid var(--border);border-radius:4px;padding:3px 5px;font-size:12px;"></td>';
+      html += '<td style="padding:4px 8px;text-align:center;"><input type="number" value="' + (d.qty||'') + '" min="0" data-key="' + safeKey + '" data-field="qty" onchange="estChange(this)" style="width:65px;text-align:center;border:1px solid var(--border);border-radius:4px;padding:3px 5px;font-size:13px;font-weight:600;background:' + ((d.qty||0)>0?'#F0FDF4':'var(--surface)') + ';"></td>';
+      html += '<td style="padding:7px 10px;text-align:right;font-weight:600;color:' + (cost>0?'var(--accent)':'var(--ink3)') + ';" id="ec_' + safeKey + '">' + (cost>0?'$'+cost.toFixed(2):'—') + '</td>';
+      html += '</tr>';
+    }
+  });
+  html += '</tbody>';
+  html += '<tfoot><tr style="background:var(--ink);color:#fff;"><td colspan="5" style="padding:12px 16px;font-weight:700;">TOTAL ESTIMATE</td><td></td><td style="padding:12px 16px;text-align:right;font-weight:800;font-size:15px;" id="est-grand">$' + grandTotal.toFixed(2) + '</td></tr></tfoot>';
+  html += '</table>';
+  // Custom add row
+  html += '<div style="margin-top:14px;padding:12px 14px;background:var(--surface2);border-radius:10px;"><div style="font-weight:700;font-size:13px;margin-bottom:8px;">+ Add Custom Item</div>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">';
+  html += '<div><label style="font-size:11px;">Name</label><input type="text" id="ec-name" placeholder="Material name" style="display:block;"/></div>';
+  html += '<div><label style="font-size:11px;">Unit $</label><input type="number" id="ec-price" placeholder="0.00" style="display:block;width:80px;"/></div>';
+  html += '<div><label style="font-size:11px;">Qty</label><input type="number" id="ec-qty" placeholder="0" style="display:block;width:65px;"/></div>';
+  html += '<div><label style="font-size:11px;">UOM</label><select id="ec-uom" style="display:block;"><option>EA</option><option>BD</option><option>BX</option><option>BKT</option><option>ROLL</option><option>BAG</option><option>TUBE</option></select></div>';
+  html += '<button class="btn btn-primary btn-sm" onclick="addEstCustom()" style="margin-bottom:2px;">+ Add</button></div></div></div>';
+  document.getElementById('est-modal-body').innerHTML = html;
+}
+
+// Map safeKey back to original name
+function estKeyToName(safeKey) {
+  var found = ESTIMATE_TEMPLATE.find(function(t){ return t.name.replace(/['"\\]/g,'').replace(/\s/g,'_') === safeKey; });
+  if (found) return found.name;
+  // Check custom
+  var customs = Object.keys(currentEstimateData).filter(function(k){ return !ESTIMATE_TEMPLATE.find(function(t){return t.name===k;}); });
+  return customs.find(function(k){ return k.replace(/['"\\]/g,'').replace(/\s/g,'_') === safeKey; }) || safeKey;
+}
+
+function estChange(input) {
+  var safeKey = input.dataset.key;
+  var field = input.dataset.field;
+  var val = parseFloat(input.value) || 0;
+  var name = estKeyToName(safeKey);
+  if (!currentEstimateData[name]) currentEstimateData[name] = {};
+  currentEstimateData[name][field] = val;
+  // Update row total
+  var d = currentEstimateData[name];
+  var item = ESTIMATE_TEMPLATE.find(function(t){return t.name===name;}) || {};
+  var qty = d.qty !== undefined ? d.qty : 0;
+  var price = d.price !== undefined ? d.price : (item.price||0);
+  var cost = qty * price;
+  var costEl = document.getElementById('ec_' + safeKey);
+  if (costEl) { costEl.textContent = cost>0?'$'+cost.toFixed(2):'—'; costEl.style.color = cost>0?'var(--accent)':'var(--ink3)'; }
+  // Grand total
+  var grand = 0;
+  ESTIMATE_TEMPLATE.forEach(function(t) {
+    var td = currentEstimateData[t.name]||{}; 
+    grand += ((td.qty||0)) * (td.price!==undefined?td.price:t.price);
+  });
+  Object.keys(currentEstimateData).forEach(function(k) {
+    if (!ESTIMATE_TEMPLATE.find(function(t){return t.name===k;})) { var td=currentEstimateData[k]; grand+=(td.qty||0)*(td.price||0); }
+  });
+  var ge = document.getElementById('est-grand');
+  if (ge) ge.textContent = '$' + grand.toFixed(2);
+}
+
+function addEstCustom() {
+  var name = (document.getElementById('ec-name').value||'').trim();
+  var price = parseFloat(document.getElementById('ec-price').value||0);
+  var qty = parseFloat(document.getElementById('ec-qty').value||0);
+  var uom = document.getElementById('ec-uom').value;
+  if (!name) { showToast('Enter a name'); return; }
+  if (!MATERIAL_CATALOG.find(function(m){return m.name.toUpperCase()===name.toUpperCase();})) {
+    MATERIAL_CATALOG.push({name:name, cat:categorize(name), uom:uom, price:price, use:'Custom'});
+  }
+  currentEstimateData[name] = {qty:qty, price:price, uom:uom, custom:true};
+  document.getElementById('ec-name').value='';
+  document.getElementById('ec-price').value='';
+  document.getElementById('ec-qty').value='';
+  renderEstimator();
+  showToast('Added: ' + name);
+}
+
+function saveEstimate() {
+  if (!currentEstimateJob) return;
+  if (!S.matBanks) S.matBanks = {};
+  S.matBanks[currentEstimateJob + '_estimate'] = currentEstimateData;
+  // Calculate totals
+  var total = 0, boards = 0;
+  ESTIMATE_TEMPLATE.forEach(function(t) {
+    var d = currentEstimateData[t.name]||{};
+    var q = d.qty||0; var p = d.price!==undefined?d.price:t.price;
+    total += q*p;
+    if (t.uom==='BD') boards += q;
+  });
+  Object.keys(currentEstimateData).forEach(function(k) {
+    if (!ESTIMATE_TEMPLATE.find(function(t){return t.name===k;})) { var d=currentEstimateData[k]; total+=(d.qty||0)*(d.price||0); }
+  });
+  if (total > 0) {
+    if (!S.budgets[currentEstimateJob]) S.budgets[currentEstimateJob] = {};
+    S.budgets[currentEstimateJob].estimateTotal = total.toFixed(2);
+    S.budgets[currentEstimateJob].estimateBoards = boards;
+    if (!S.budgets[currentEstimateJob].dollars) S.budgets[currentEstimateJob].dollars = total.toFixed(2);
+    if (!S.budgets[currentEstimateJob].qty) S.budgets[currentEstimateJob].qty = boards;
+    saveSharedData('budgets');
+  }
+  saveSharedData('matBanks');
+  closeEstimator();
+  renderBudgets();
+  showToast('Estimate saved — $' + total.toFixed(2) + ' · ' + boards + ' boards');
+}
+
+
 // ── HELPERS ───────────────────────────────────────
 function fmt(n) {
   if (isNaN(n) || n === 0) return '$0';
@@ -3345,5 +3575,23 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
   el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
 });
 </script>
+
+  <!-- ── MATERIAL ESTIMATOR MODAL ──────────────────── -->
+  <div id="estimator-modal" class="modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.5);overflow-y:auto;">
+    <div style="background:var(--surface);border-radius:16px;max-width:900px;margin:40px auto;padding:0;box-shadow:0 24px 80px rgba(0,0,0,.3);">
+      <div style="padding:20px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;" id="est-modal-title">Material Estimator</div>
+          <div style="font-size:13px;color:var(--ink3);">Fill in quantities — formulas auto-calculate</div>
+        </div>
+        <button onclick="closeEstimator()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--ink3);">✕</button>
+      </div>
+      <div style="padding:20px 28px;" id="est-modal-body">Loading...</div>
+      <div style="padding:16px 28px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="closeEstimator()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEstimate()">💾 Save Estimate</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
