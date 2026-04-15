@@ -564,6 +564,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
     <div class="nav-item" onclick="nav('jobmap')" data-page="jobmap">
       <span class="nav-icon">🗺️</span> Job Map
     </div>
+    <div class="nav-item" onclick="nav('tracker')" data-page="tracker">
+      <span class="nav-icon">📊</span> Material Tracker
+    </div>
     <div class="nav-item" onclick="nav('breakdown')" data-page="breakdown">
       <span class="nav-icon">📋</span> Breakdown
     </div>
@@ -1124,6 +1127,50 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
     <div id="act-job-breakdown"></div>
   </div>
 
+  <!-- ── MATERIAL TRACKER ─────────────────────── -->
+  <div class="page" id="page-tracker">
+    <div class="filter-bar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px;">
+      <select id="tr-job" onchange="renderTracker()" style="flex:1;min-width:200px;">
+        <option value="">All Jobs</option>
+      </select>
+      <select id="tr-bldg" onchange="renderTracker()" style="min-width:120px;">
+        <option value="">All Buildings</option>
+      </select>
+      <select id="tr-floor" onchange="renderTracker()" style="min-width:100px;">
+        <option value="">All Floors</option>
+      </select>
+      <select id="tr-cat" onchange="renderTracker()" style="min-width:140px;">
+        <option value="">All Categories</option>
+        <option value="boards">Boards</option>
+        <option value="metal">Metal</option>
+        <option value="finish">Finish</option>
+        <option value="supplies">Supplies</option>
+        <option value="tax">Tax</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+
+    <!-- Summary stat row -->
+    <div id="tr-stats" class="stats-row" style="margin-bottom:20px;"></div>
+
+    <!-- Duplicate PO alerts -->
+    <div id="tr-dupes" style="margin-bottom:16px;"></div>
+
+    <!-- Main tracker table -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Material Ordered vs Budgeted</span>
+        <span id="tr-subtitle" style="font-size:12px;color:var(--ink3);"></span>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div id="tr-table" style="overflow-x:auto;"></div>
+      </div>
+    </div>
+
+    <!-- Floor breakdown accordion -->
+    <div id="tr-floors" style="margin-top:20px;"></div>
+  </div>
+
   <!-- ── RAW DATA ───────────────────────────── -->
   <div class="page" id="page-raw">
     <div class="filter-bar">
@@ -1449,6 +1496,7 @@ const PAGE_TITLES = {
   'po-wizard': ['PO Wizard', 'Assign a PO to a job location'],
   'bill-wizard': ['Bill Wizard', 'Match bills from your sheet'],
   jobmap: ['Job Map', 'Visual floor & unit breakdown'],
+  tracker: ['Material Tracker', 'Budget vs ordered — by job & floor'],
   breakdown: ['Breakdown', 'Detailed line-item view'],
   budgets: ['Budget Bank', 'Set and track budgets'],
   'bills-tracker': ['Bills Tracker', 'All bills from BILL DATA sheet'],
@@ -1466,11 +1514,12 @@ function nav(page) {
   document.getElementById('page-meta').textContent = meta;
 
   // Render pages on nav
-  if (page === 'home') renderHome();
-  if (page === 'dashboard') renderDashboard();
+  if (page === 'home') { try { renderHome(); } catch(e){} }
+  if (page === 'dashboard') { try { renderDashboard(); } catch(e){} }
   if (page === 'inbox') renderInbox();
   if (page === 'breakdown') renderBreakdown();
   if (page === 'jobmap') renderJobMapPage();
+  if (page === 'tracker') renderTracker();
   if (page === 'budgets') renderBudgets();
   if (page === 'bills-tracker') renderBillsTracker();
   if (page === 'actuals') renderActuals();
@@ -1490,6 +1539,27 @@ async function syncAll() {
   try {
     await Promise.all([fetchRawData(), fetchBillData()]);
     S.lastSync = new Date().toISOString();
+  
+  // Detect duplicate POs (same PO# appearing twice with same total)
+  const poGroups = {};
+  S.rows.forEach(r => {
+    const po = String(r['PO NUMBER']||'').trim();
+    if (!po) return;
+    if (!poGroups[po]) poGroups[po] = {rows:[], total:0};
+    poGroups[po].rows.push(r);
+    poGroups[po].total += parseFloat(r['LINE TOTAL']||0);
+  });
+  S.duplicatePOs = [];
+  Object.entries(poGroups).forEach(([po, d]) => {
+    // Count unique dates
+    const dates = [...new Set(d.rows.map(r => String(r['DATE']||'')).filter(Boolean))];
+    // If total appears duplicated (rows count oddly high vs unique materials)
+    const mats = d.rows.map(r => (r['MATERIAL']||'').trim());
+    const uniqueMats = [...new Set(mats)];
+    if (mats.length > uniqueMats.length * 1.5 && d.rows.length > 4) {
+      S.duplicatePOs.push({po, rowCount: d.rows.length, uniqueMats: uniqueMats.length, total: d.total});
+    }
+  });
     localStorage.setItem('dw_last_sync', S.lastSync);
     document.getElementById('last-sync-label').textContent = 'Last sync: ' + new Date().toLocaleTimeString();
     document.getElementById('sheet-status-mini').textContent = '✓ Connected · ' + S.rows.length + ' PO rows';
@@ -1511,12 +1581,16 @@ async function syncAll() {
 
   btn.disabled = false;
   btn.innerHTML = '⟳ Sync Now';
-  // Always re-render after sync so data shows up
+  // Re-render the currently active page after sync
   if (S.rows.length > 0) {
-    try { renderDashboard(); } catch(e) {}
-    try { renderHome(); } catch(e) {}
-    try { updateInboxBadge(); } catch(e) {}
     try { populateJobSelects(); } catch(e) {}
+    try { updateInboxBadge(); } catch(e) {}
+    // Re-render whichever page is currently showing
+    const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
+    if (activePage === 'dashboard') { try { renderDashboard(); } catch(e) {} }
+    else if (activePage === 'home') { try { renderHome(); } catch(e) {} }
+    else if (activePage === 'tracker') { try { renderTracker(); } catch(e) {} }
+    else { try { renderDashboard(); } catch(e) {} try { renderHome(); } catch(e) {} }
   }
 }
 
@@ -1562,7 +1636,7 @@ async function fetchBillData() {
 
 // ── FUZZY CATEGORIZE ─────────────────────────────
 function categorize(desc) {
-  if (!desc) return 'other';
+  if (!desc || String(desc).trim() === '') return 'tax'; // Blank = Tax line
   const d = String(desc).toUpperCase();
   // BOARDS — all drywall panel types
   if (/DRYWALL|DENSHIELD|SHAFT.?LINER|DUROCK|FIRECODE|ULTRALIGHT|MR.?BOARD|TYPE.?X|GREENBOARD|HARDIBOARD|REGULAR.?BOARD/.test(d) || /^[0-9\/]+\s*(DW|REG|REGULAR)\b/.test(d) || /\b(1\/2|5\/8|5\/4|1\/4)\s*(DW|REGULAR|MOLD|TYPE|DENIAL|BOARD)\b/.test(d)) return 'boards';
@@ -1575,7 +1649,7 @@ function categorize(desc) {
   // LABOR — labor line items
   if (/LABOR|INSTALL|FRAMING|HANGING|PUNCHOUT|PUNCH.?OUT|FINISH.?WORK|LAYOUT|SUPERVISION|SUB.?CONTRACT/.test(d)) return 'labor';
   // TAX
-  if (/^TAX$|SALES.?TAX/.test(d)) return 'tax';
+  if (/^TAX$|SALES.?TAX/.test(d) || d.trim() === '') return 'tax';
   return 'other';
 }
 
@@ -3687,6 +3761,228 @@ function saveEstimate() {
   closeEstimator();
   renderBudgets();
   showToast('Estimate saved — $' + total.toFixed(2) + ' · ' + boards + ' boards');
+}
+
+
+
+// ══════════════════════════════════════════════════════════════
+// MATERIAL TRACKER — Budget vs Ordered, by Job/Floor/Category
+// ══════════════════════════════════════════════════════════════
+
+function renderTracker() {
+  populateTrackerFilters();
+  const job = document.getElementById('tr-job')?.value || '';
+  const bldg = document.getElementById('tr-bldg')?.value || '';
+  const floor = document.getElementById('tr-floor')?.value || '';
+  const cat = document.getElementById('tr-cat')?.value || '';
+
+  // Filter rows
+  let rows = S.rows.filter(r => {
+    if (job && (r['JOB']||r['Job']||'') !== job) return false;
+    if (bldg && String(r['BUILDING']||'').trim() !== bldg) return false;
+    if (floor && String(r['FLOOR']||'').trim() !== floor) return false;
+    if (cat && categorize(r['MATERIAL']||'') !== cat) return false;
+    return true;
+  });
+
+  const subtitle = document.getElementById('tr-subtitle');
+  if (subtitle) subtitle.textContent = rows.length + ' line items';
+
+  // ── STAT CARDS ──────────────────────────────────────────────
+  const totalSpend = rows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+  const totalBoards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+  const totalMetal = rows.filter(r => categorize(r['MATERIAL']||'') === 'metal').reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+  const totalTax = rows.filter(r => categorize(r['MATERIAL']||'') === 'tax').reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+  const uniqPOs = [...new Set(rows.map(r => String(r['PO NUMBER']||'')).filter(Boolean))];
+
+  // Get estimate totals for comparison
+  const estKey = job ? job + '_estimate' : null;
+  const est = estKey && S.matBanks ? (S.matBanks[estKey] || {}) : {};
+  const estBoardQty = parseFloat(S.budgets[job]?.qty || 0);
+  const estTotal = parseFloat(S.budgets[job]?.estimateTotal || S.budgets[job]?.dollars || 0);
+
+  const statsEl = document.getElementById('tr-stats');
+  if (statsEl) {
+    const boardDiff = estBoardQty > 0 ? totalBoards - estBoardQty : null;
+    const boardColor = boardDiff === null ? 'var(--ink)' : boardDiff > 0 ? 'var(--red)' : 'var(--green)';
+    statsEl.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Total Spend</div>
+        <div class="stat-val" style="color:var(--accent);">${fmt(totalSpend)}</div>
+        <div class="stat-sub">${uniqPOs.length} POs · ${rows.length} lines</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Boards Ordered</div>
+        <div class="stat-val" style="color:${boardColor};">${Math.round(totalBoards)}</div>
+        <div class="stat-sub">${estBoardQty > 0 ? 'Est: ' + estBoardQty + (boardDiff !== null ? ' · ' + (boardDiff > 0 ? '+' : '') + Math.round(boardDiff) + ' vs est' : '') : 'No estimate set'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Metal Pieces</div>
+        <div class="stat-val" style="color:var(--blue);">${Math.round(totalMetal)}</div>
+        <div class="stat-sub">Studs, track, angles</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Budget</div>
+        <div class="stat-val" style="color:${estTotal > 0 && totalSpend > estTotal ? 'var(--red)' : 'var(--green)'};">${estTotal > 0 ? fmt(estTotal) : '—'}</div>
+        <div class="stat-sub">${estTotal > 0 ? (totalSpend <= estTotal ? '✓ Under budget' : '⚠ Over by ' + fmt(totalSpend - estTotal)) : 'Set in Budget Bank'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Tax</div>
+        <div class="stat-val" style="color:var(--ink3);">${fmt(totalTax)}</div>
+        <div class="stat-sub">From blank material lines</div>
+      </div>
+    `;
+  }
+
+  // ── DUPLICATE PO ALERTS ─────────────────────────────────────
+  const dupesEl = document.getElementById('tr-dupes');
+  if (dupesEl) {
+    const dupes = (S.duplicatePOs || []).filter(d => !job || rows.some(r => String(r['PO NUMBER']||'') === d.po));
+    if (dupes.length > 0) {
+      dupesEl.innerHTML = dupes.map(d =>
+        `<div class="alert alert-yellow" style="margin-bottom:8px;">
+          ⚠️ <strong>PO #${d.po}</strong> may be duplicated — ${d.rowCount} rows but only ${d.uniqueMats} unique materials. 
+          Total: ${fmt(d.total)}. Review the raw sheet.
+        </div>`
+      ).join('');
+    } else {
+      dupesEl.innerHTML = '';
+    }
+  }
+
+  // ── MATERIAL TABLE — grouped by material, qty + cost ─────────
+  const matMap = {};
+  rows.forEach(r => {
+    const mat = (r['MATERIAL']||'').trim() || '[TAX]';
+    const category = categorize(r['MATERIAL']||'');
+    if (!matMap[mat]) matMap[mat] = {mat, cat: category, qty: 0, cost: 0, po: new Set(), floors: new Set()};
+    matMap[mat].qty += parseFloat(r['QTY']||0);
+    matMap[mat].cost += parseFloat(r['LINE TOTAL']||0);
+    matMap[mat].po.add(String(r['PO NUMBER']||''));
+    const fl = String(r['FLOOR']||'').trim();
+    if (fl) matMap[mat].floors.add((r['BUILDING']||'?') + ' FL' + fl);
+  });
+
+  const catOrder = ['boards','metal','finish','supplies','tax','other'];
+  const catColors = {boards:'#DBEAFE',metal:'#FEF3C7',finish:'#D1FAE5',supplies:'#F3F4F6',tax:'#FEE2E2',other:'#F3F4F6'};
+  const catTextColors = {boards:'#1E40AF',metal:'#92400E',finish:'#065F46',supplies:'#374151',tax:'#991B1B',other:'#374151'};
+
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  html += '<thead><tr style="background:var(--surface2);"><th style="padding:10px 12px;text-align:left;">Material</th><th style="padding:10px 8px;text-align:left;font-size:11px;color:var(--ink3);">Cat</th><th style="padding:10px 8px;text-align:right;font-size:11px;">Qty Ordered</th><th style="padding:10px 8px;text-align:right;font-size:11px;">Est Qty</th><th style="padding:10px 8px;text-align:right;font-size:11px;">Difference</th><th style="padding:10px 12px;text-align:right;font-size:11px;">Total $</th><th style="padding:10px 8px;text-align:left;font-size:11px;color:var(--ink3);">Floors</th></tr></thead><tbody>';
+
+  let grandTotal = 0;
+  catOrder.forEach(catKey => {
+    const items = Object.values(matMap).filter(m => m.cat === catKey).sort((a,b) => b.cost - a.cost);
+    if (!items.length) return;
+    const catTotal = items.reduce((s,m) => s + m.cost, 0);
+    grandTotal += catTotal;
+    html += `<tr style="background:${catColors[catKey]};"><td colspan="7" style="padding:7px 12px;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:${catTextColors[catKey]};">${catKey.toUpperCase()} — ${fmt(catTotal)}</td></tr>`;
+    items.forEach((m, i) => {
+      // Get estimate qty from matBanks if exists
+      const estItem = Object.values(est).find ? Object.values(est).find(e => e && e.qty) : null;
+      const matchedEst = ESTIMATE_TEMPLATE.find(t => t.name.toUpperCase().includes(m.mat.substring(0,8).toUpperCase()));
+      const estQtyRaw = matchedEst && est[matchedEst.name] ? est[matchedEst.name].qty : null;
+      const estQty = estQtyRaw ? parseFloat(estQtyRaw) : null;
+      const diff = estQty !== null ? m.qty - estQty : null;
+      const diffColor = diff === null ? '' : diff > 0 ? 'color:var(--red);font-weight:700;' : 'color:var(--green);font-weight:700;';
+      const bg = i%2===0 ? 'var(--surface)' : 'var(--surface2)';
+      html += `<tr style="background:${bg};border-bottom:1px solid var(--border);">
+        <td style="padding:8px 12px;font-weight:500;">${m.mat}</td>
+        <td style="padding:8px 8px;"><span style="background:${catColors[catKey]};color:${catTextColors[catKey]};padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">${catKey}</span></td>
+        <td style="padding:8px;text-align:right;font-weight:700;">${m.qty > 0 ? Math.round(m.qty) : '—'}</td>
+        <td style="padding:8px;text-align:right;color:var(--ink3);">${estQty !== null ? Math.round(estQty) : '—'}</td>
+        <td style="padding:8px;text-align:right;${diffColor}">${diff !== null ? (diff > 0 ? '+' : '') + Math.round(diff) : '—'}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:700;">${fmt(m.cost)}</td>
+        <td style="padding:8px;font-size:11px;color:var(--ink3);">${[...m.floors].slice(0,3).join(', ')}</td>
+      </tr>`;
+    });
+  });
+
+  html += `<tfoot><tr style="background:var(--ink);color:#fff;"><td colspan="5" style="padding:12px 16px;font-weight:700;">GRAND TOTAL</td><td style="padding:12px 16px;text-align:right;font-weight:800;font-size:15px;">${fmt(grandTotal)}</td><td></td></tr></tfoot>`;
+  html += '</tbody></table>';
+
+  const tableEl = document.getElementById('tr-table');
+  if (tableEl) tableEl.innerHTML = html;
+
+  // ── FLOOR BREAKDOWN ─────────────────────────────────────────
+  const floorsEl = document.getElementById('tr-floors');
+  if (!floorsEl || !job) { if(floorsEl) floorsEl.innerHTML = ''; return; }
+
+  const floorMap = {};
+  rows.forEach(r => {
+    const b = String(r['BUILDING']||'').trim() || 'Unassigned';
+    const fl = String(r['FLOOR']||'').trim() || '—';
+    const key = b + '||' + fl;
+    if (!floorMap[key]) floorMap[key] = {bldg:b, floor:fl, total:0, boards:0, metal:0, rows:[]};
+    floorMap[key].total += parseFloat(r['LINE TOTAL']||0);
+    floorMap[key].rows.push(r);
+    if (isBoard(r['MATERIAL']||'')) floorMap[key].boards += parseFloat(r['QTY']||0);
+    if (categorize(r['MATERIAL']||'') === 'metal') floorMap[key].metal += parseFloat(r['QTY']||0);
+  });
+
+  let flHtml = '<div style="font-family:Syne,sans-serif;font-size:16px;font-weight:800;margin-bottom:14px;">Floor Breakdown — ' + job.replace('JOB ','') + '</div>';
+  Object.values(floorMap).sort((a,b) => a.bldg.localeCompare(b.bldg) || +a.floor - +b.floor).forEach(fl => {
+    const flId = 'tr-fl-' + fl.bldg.replace(/\W/g,'') + fl.floor;
+    flHtml += `<div style="border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;cursor:pointer;background:var(--surface);" onclick="toggleFloor('${flId}')">
+        <div style="font-weight:700;font-size:14px;min-width:160px;">Bldg ${fl.bldg} · Floor ${fl.floor}</div>
+        ${fl.boards > 0 ? `<span style="background:#DBEAFE;color:#1E40AF;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;">🟦 ${Math.round(fl.boards)} boards</span>` : ''}
+        ${fl.metal > 0 ? `<span style="background:#FEF3C7;color:#92400E;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;">📐 ${Math.round(fl.metal)} metal</span>` : ''}
+        <div style="margin-left:auto;font-weight:700;font-size:15px;">${fmt(fl.total)}</div>
+        <div id="${flId}-arr" style="color:var(--ink3);font-size:20px;">›</div>
+      </div>
+      <div id="${flId}" style="display:none;background:var(--surface2);border-top:1px solid var(--border);padding:16px 18px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="background:var(--surface);"><th style="padding:6px 8px;text-align:left;">Material</th><th style="padding:6px 8px;text-align:right;">Qty</th><th style="padding:6px 8px;text-align:left;">UOM</th><th style="padding:6px 8px;text-align:right;">Total</th><th style="padding:6px 8px;text-align:left;">Unit</th></tr></thead><tbody>
+          ${fl.rows.map((r,i) => {
+            const mat = (r['MATERIAL']||'').trim() || '[TAX]';
+            const bg = i%2===0?'var(--surface)':'var(--surface2)';
+            return `<tr style="background:${bg};border-bottom:1px solid var(--border);">
+              <td style="padding:6px 8px;font-weight:500;">${mat}</td>
+              <td style="padding:6px 8px;text-align:right;">${r['QTY']||'—'}</td>
+              <td style="padding:6px 8px;color:var(--ink3);">${r['UOM']||''}</td>
+              <td style="padding:6px 8px;text-align:right;font-weight:600;">${fmt(parseFloat(r['LINE TOTAL']||0))}</td>
+              <td style="padding:6px 8px;color:var(--ink3);">${r['UNIT']||''}</td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+
+  floorsEl.innerHTML = flHtml;
+}
+
+function populateTrackerFilters() {
+  const jobSel = document.getElementById('tr-job');
+  const bldgSel = document.getElementById('tr-bldg');
+  const floorSel = document.getElementById('tr-floor');
+  if (!jobSel) return;
+
+  const jobs = getJobs();
+  const curJob = jobSel.value;
+  if (!jobSel.options.length || jobSel.options.length === 1) {
+    jobSel.innerHTML = '<option value="">All Jobs</option>' + jobs.map(j => `<option value="${j}">${j.replace('JOB ','')}</option>`).join('');
+    if (curJob) jobSel.value = curJob;
+  }
+
+  // Populate buildings/floors based on selected job
+  const job = jobSel.value;
+  const filteredRows = job ? S.rows.filter(r => (r['JOB']||r['Job']||'') === job) : S.rows;
+  const bldgs = [...new Set(filteredRows.map(r => String(r['BUILDING']||'').trim()).filter(Boolean))].sort();
+  const floors = [...new Set(filteredRows.map(r => String(r['FLOOR']||'').trim()).filter(Boolean))].sort((a,b) => +a - +b);
+
+  const curBldg = bldgSel?.value;
+  if (bldgSel) {
+    bldgSel.innerHTML = '<option value="">All Buildings</option>' + bldgs.map(b => `<option value="${b}">${b}</option>`).join('');
+    if (curBldg && bldgs.includes(curBldg)) bldgSel.value = curBldg;
+  }
+  const curFloor = floorSel?.value;
+  if (floorSel) {
+    floorSel.innerHTML = '<option value="">All Floors</option>' + floors.map(f => `<option value="${f}">Floor ${f}</option>`).join('');
+    if (curFloor && floors.includes(curFloor)) floorSel.value = curFloor;
+  }
 }
 
 
