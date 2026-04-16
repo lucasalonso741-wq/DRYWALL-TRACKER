@@ -251,6 +251,42 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 .inbox-sub{font-size:12px;color:var(--ink3);margin-top:2px;}
 .inbox-amt{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;color:var(--ink);}
 
+/* ── JOB TABS ─────────────────────────────────── */
+.job-tab {
+  padding: 10px 20px; border: none; background: none;
+  font-size: 14px; font-weight: 600; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; color: var(--ink3); border-bottom: 3px solid transparent;
+  margin-bottom: -2px; transition: all .15s; border-radius: 0;
+}
+.job-tab:hover { color: var(--ink); }
+.job-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.job-tab-panel { display: block; }
+
+/* ── ESTIMATE TABLE ───────────────────────────── */
+.est-cat-row td { background: var(--surface2); font-weight: 700; font-size: 11px;
+  text-transform: uppercase; letter-spacing: .06em; color: var(--ink2); padding: 7px 12px; }
+.est-input { width: 100%; border: 1.5px solid var(--border); border-radius: 6px;
+  padding: 6px 8px; font-size: 13px; background: var(--surface);
+  color: var(--ink); font-family: 'DM Sans', sans-serif; }
+.est-input:focus { outline: none; border-color: var(--accent); }
+.est-total-cell { font-weight: 700; color: var(--ink); }
+.est-remove-btn { width: 26px; height: 26px; border-radius: 6px; border: none;
+  background: none; cursor: pointer; color: var(--ink3); font-size: 16px; line-height: 1; }
+.est-remove-btn:hover { background: #fee2e2; color: var(--red); }
+
+/* ── FLOOR BUDGET ROW ─────────────────────────── */
+.floor-budget-row { display: grid; grid-template-columns: 100px 1fr 1fr 1fr 1fr auto;
+  gap: 8px; align-items: center; padding: 10px 12px;
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; }
+.floor-stat-ok { color: var(--green); font-weight: 700; }
+.floor-stat-warn { color: var(--red); font-weight: 700; }
+
+/* ── ALERT BANNER ─────────────────────────────── */
+.alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; }
+.alert-yellow { background: #FEF3C7; color: #92400E; border: 1px solid #F59E0B; }
+.alert-red { background: #FEE2E2; color: #991B1B; border: 1px solid #EF4444; }
+.alert-green { background: #D1FAE5; color: #065F46; border: 1px solid #10B981; }
+
 /* ── MODAL ────────────────────────────────────── */
 .modal-overlay{
   position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;
@@ -542,42 +578,17 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
     <div class="nav-item" onclick="nav('home')" data-page="home">
       <span class="nav-icon">🏠</span> Home
     </div>
-    <div class="nav-item active" onclick="nav('dashboard')" data-page="dashboard">
-      <span class="nav-icon">📊</span> Dashboard
-    </div>
-
-    <div class="nav-section">Work Queue</div>
     <div class="nav-item" onclick="nav('inbox')" data-page="inbox">
       <span class="nav-icon">📥</span> Inbox
       <span class="nav-badge" id="inbox-badge" style="display:none">0</span>
     </div>
 
-    <div class="nav-section">Entry</div>
-    <div class="nav-item" onclick="nav('po-wizard')" data-page="po-wizard">
-      <span class="nav-icon">📦</span> PO Wizard
-    </div>
-    <div class="nav-item" onclick="nav('bill-wizard')" data-page="bill-wizard">
-      <span class="nav-icon">🧾</span> Bill Wizard
-    </div>
-
-    <div class="nav-section">Analytics</div>
-    <div class="nav-item" onclick="nav('jobmap')" data-page="jobmap">
-      <span class="nav-icon">🗺️</span> Job Map
+    <div class="nav-section">Jobs</div>
+    <div class="nav-item" onclick="nav('jobs')" data-page="jobs">
+      <span class="nav-icon">🏗️</span> Job Costing
     </div>
     <div class="nav-item" onclick="nav('tracker')" data-page="tracker">
       <span class="nav-icon">📊</span> Material Tracker
-    </div>
-    <div class="nav-item" onclick="nav('breakdown')" data-page="breakdown">
-      <span class="nav-icon">📋</span> Breakdown
-    </div>
-    <div class="nav-item" onclick="nav('budgets')" data-page="budgets">
-      <span class="nav-icon">💰</span> Budget Bank
-    </div>
-    <div class="nav-item" onclick="nav('bills-tracker')" data-page="bills-tracker">
-      <span class="nav-icon">📑</span> Bills Tracker
-    </div>
-    <div class="nav-item" onclick="nav('actuals')" data-page="actuals">
-      <span class="nav-icon">✅</span> Actuals
     </div>
 
     <div class="nav-section">Data</div>
@@ -1127,6 +1138,127 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
     <div id="act-job-breakdown"></div>
   </div>
 
+  <!-- ── JOBS PAGE ─────────────────────────────────── -->
+  <div class="page" id="page-jobs">
+
+    <!-- Job selector header -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap;">
+      <select id="jobs-job-sel" onchange="renderJobsPage()" style="font-size:16px;font-weight:700;font-family:'Syne',sans-serif;padding:10px 16px;border:2px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);flex:1;min-width:200px;max-width:400px;">
+        <option value="">— Select a Job —</option>
+      </select>
+      <button onclick="renderJobsPage()" style="padding:10px 18px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;">Load</button>
+    </div>
+
+    <!-- Tab bar -->
+    <div id="jobs-tabs" style="display:none;">
+      <div style="display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:24px;">
+        <button class="job-tab active" data-tab="estimate" onclick="switchJobTab('estimate')">📋 Estimate</button>
+        <button class="job-tab" data-tab="tracker" onclick="switchJobTab('tracker')">📦 PO Tracker</button>
+        <button class="job-tab" data-tab="bills" onclick="switchJobTab('bills')">🧾 Bills</button>
+        <button class="job-tab" data-tab="summary" onclick="switchJobTab('summary')">💰 Summary</button>
+      </div>
+
+      <!-- ── ESTIMATE TAB ──────────────────────────────── -->
+      <div id="jobs-tab-estimate" class="job-tab-panel">
+
+        <!-- Estimate header + save -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;" id="est-job-title">Estimate</div>
+            <div style="font-size:13px;color:var(--ink3);">Set quantities and prices — saved as your material budget</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="addEstimateLine()" style="padding:8px 14px;border:1.5px solid var(--border);background:var(--surface);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">+ Add Item</button>
+            <button onclick="saveJobEstimate()" style="padding:8px 18px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">Save Estimate</button>
+          </div>
+        </div>
+
+        <!-- Estimate table -->
+        <div style="overflow-x:auto;border-radius:12px;border:1.5px solid var(--border);margin-bottom:24px;">
+          <table id="est-table" style="width:100%;border-collapse:collapse;min-width:700px;">
+            <thead>
+              <tr style="background:var(--surface2);">
+                <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);">Material</th>
+                <th style="padding:10px 8px;text-align:left;font-size:11px;color:var(--ink3);">Category</th>
+                <th style="padding:10px 8px;text-align:right;font-size:11px;color:var(--ink3);">Qty</th>
+                <th style="padding:10px 8px;text-align:left;font-size:11px;color:var(--ink3);">UOM</th>
+                <th style="padding:10px 8px;text-align:right;font-size:11px;color:var(--ink3);">Unit Price</th>
+                <th style="padding:10px 8px;text-align:right;font-size:11px;color:var(--ink3);">Total</th>
+                <th style="padding:10px 8px;text-align:center;font-size:11px;color:var(--ink3);">✕</th>
+              </tr>
+            </thead>
+            <tbody id="est-tbody"></tbody>
+            <tfoot>
+              <tr style="background:var(--ink);color:#fff;">
+                <td colspan="5" style="padding:12px 16px;font-weight:700;font-family:'Syne',sans-serif;">MATERIAL TOTAL</td>
+                <td style="padding:12px 16px;text-align:right;font-weight:800;font-size:16px;" id="est-mat-total">$0</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <!-- Labor section -->
+        <div style="border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;">
+          <div style="background:var(--surface2);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-weight:700;font-size:15px;font-family:'Syne',sans-serif;">🔨 Labor Budget</div>
+            <div style="font-size:13px;color:var(--ink3);">Enter total budget per category</div>
+          </div>
+          <div style="padding:16px 18px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;" id="labor-budget-grid">
+              <!-- populated by JS -->
+            </div>
+            <div style="margin-top:16px;padding-top:16px;border-top:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+              <div style="font-weight:700;">Total Labor Budget: <span id="est-labor-total" style="color:var(--accent);">$0</span></div>
+              <div style="font-weight:800;font-size:16px;font-family:'Syne',sans-serif;">Grand Total: <span id="est-grand-total" style="color:var(--accent);">$0</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end estimate tab -->
+
+      <!-- ── PO TRACKER TAB ────────────────────────────── -->
+      <div id="jobs-tab-tracker" class="job-tab-panel" style="display:none;">
+
+        <!-- Floor budget setup -->
+        <div style="border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">
+          <div style="background:var(--surface2);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-weight:700;font-size:15px;font-family:'Syne',sans-serif;">🏢 Floor Board Budgets</div>
+            <button onclick="addFloorBudget()" style="padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">+ Add Floor</button>
+          </div>
+          <div style="padding:16px 18px;">
+            <div id="floor-budget-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
+            <div style="font-size:12px;color:var(--ink3);">Set board qty and target $/board per floor. Live PO data fills in automatically.</div>
+          </div>
+        </div>
+
+        <!-- Live PO material breakdown -->
+        <div style="font-weight:800;font-size:16px;font-family:'Syne',sans-serif;margin-bottom:14px;">📦 Materials Ordered (from POs)</div>
+        <div id="po-tracker-stats" class="stats-row" style="margin-bottom:20px;"></div>
+        <div id="po-tracker-floors" style="display:flex;flex-direction:column;gap:10px;"></div>
+
+      </div><!-- end tracker tab -->
+
+      <!-- ── BILLS TAB ─────────────────────────────────── -->
+      <div id="jobs-tab-bills" class="job-tab-panel" style="display:none;">
+        <div id="jobs-bills-list"></div>
+      </div>
+
+      <!-- ── SUMMARY TAB ────────────────────────────────── -->
+      <div id="jobs-tab-summary" class="job-tab-panel" style="display:none;">
+        <div id="jobs-summary-content"></div>
+      </div>
+
+    </div><!-- end jobs-tabs -->
+
+    <div id="jobs-empty" style="text-align:center;padding:60px 20px;color:var(--ink3);">
+      <div style="font-size:48px;margin-bottom:16px;">🏗️</div>
+      <div style="font-size:18px;font-weight:700;font-family:'Syne',sans-serif;margin-bottom:8px;">Select a Job</div>
+      <div style="font-size:14px;">Choose a job from the dropdown above to view its estimate, PO tracker, bills, and cost summary.</div>
+    </div>
+
+  </div><!-- end page-jobs -->
+
   <!-- ── MATERIAL TRACKER ─────────────────────── -->
   <div class="page" id="page-tracker">
     <div class="filter-bar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px;">
@@ -1344,6 +1476,7 @@ let S = {
   assignments: {},   // PO assignments, loaded from Supabase
   billAssignments: {},// bill matches, loaded from Supabase
   actuals: {},       // confirmed bills, loaded from Supabase
+  floorBudgets: {},  // per-job per-floor board budgets, loaded from Supabase
   rows: [],
   bills: [],
   lastSync: null,
@@ -1395,7 +1528,7 @@ async function sbSet(key, value) {
 
 async function loadSharedData() {
   // Load all shared data from Supabase in parallel
-  const [budgets, targets, matBanks, assignments, billAssignments, actuals, logo, jobs] = await Promise.all([
+  const [budgets, targets, matBanks, assignments, billAssignments, actuals, logo, jobs, floorBudgets] = await Promise.all([
     sbGet('budgets'),
     sbGet('targets'),
     sbGet('matBanks'),
@@ -1404,6 +1537,7 @@ async function loadSharedData() {
     sbGet('actuals'),
     sbGet('logo'),
     sbGet('jobs'),
+    sbGet('floorBudgets'),
   ]);
   if (budgets) S.budgets = budgets;
   if (targets) S.targets = targets;
@@ -1412,6 +1546,7 @@ async function loadSharedData() {
   if (billAssignments) S.billAssignments = billAssignments;
   if (actuals) S.actuals = actuals;
   if (jobs && Array.isArray(jobs)) S.jobs = jobs;
+  if (floorBudgets) S.floorBudgets = floorBudgets;
   // Logo: prefer Supabase (shared) over localStorage (local)
   if (logo) {
     localStorage.setItem('dw_logo', logo);
@@ -1433,6 +1568,115 @@ async function saveSharedData(key) {
 
 
 // ── INIT ──────────────────────────────────────────
+
+// ── PDF UPLOAD & EXTRACTION ───────────────────────────────────
+
+function handlePDFDrop(e) {
+  e.preventDefault();
+  document.getElementById('pdf-drop-zone').style.borderColor = 'var(--border)';
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') handlePDFFile(file);
+  else showToast('Please drop a PDF file');
+}
+
+async function handlePDFFile(file) {
+  if (!file) return;
+  const resultEl = document.getElementById('pdf-result');
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink3);">⏳ Reading PDF and extracting data...</div>';
+
+  // Read PDF as base64
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const base64 = e.target.result.split(',')[1];
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: [
+              {type: 'document', source: {type: 'base64', media_type: 'application/pdf', data: base64}},
+              {type: 'text', text: `Extract this Purchase Order data as JSON only, no markdown, no explanation. Format:
+{"po_number":"","vendor":"","job_name":"","ship_to":"","building":"","floor":"","unit":"","model":"","date":"","lines":[{"sku":"","description":"","qty":0,"rate":0,"amount":0}],"total":0}
+If a field is not present, use empty string or 0. Extract ALL line items.`}
+            ]
+          }]
+        })
+      });
+      const data = await res.json();
+      const text = data.content?.[0]?.text || '';
+      let po;
+      try {
+        po = JSON.parse(text.replace(/```json|```/g,'').trim());
+      } catch(err) {
+        resultEl.innerHTML = '<div class="alert alert-red">Could not parse PDF data. Make sure it is a QuickBooks PO PDF.</div>';
+        return;
+      }
+      renderPDFResult(po);
+    } catch(err) {
+      resultEl.innerHTML = '<div class="alert alert-red">Error reading PDF: ' + err.message + '</div>';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderPDFResult(po) {
+  const resultEl = document.getElementById('pdf-result');
+  const jobs = getJobs();
+  const matchedJob = jobs.find(j => j.toUpperCase().includes((po.job_name||'').toUpperCase().split(' ')[0])) || '';
+
+  resultEl.innerHTML = `
+    <div style="background:var(--surface);border:1.5px solid var(--green);border-radius:12px;padding:18px 20px;">
+      <div style="font-weight:800;font-size:15px;margin-bottom:14px;color:var(--green);">✓ PO Extracted — Review & Confirm</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:16px;">
+        <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">PO NUMBER</label><input class="est-input" id="pdf-po" value="${po.po_number||''}"/></div>
+        <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">VENDOR</label><input class="est-input" id="pdf-vendor" value="${po.vendor||''}"/></div>
+        <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">JOB</label>
+          <select class="est-input" id="pdf-job">
+            <option value="">— select —</option>
+            ${jobs.map(j=>`<option value="${j}" ${j===matchedJob?'selected':''}>${j.replace('JOB ','')}</option>`).join('')}
+          </select>
+        </div>
+        <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">BUILDING</label><input class="est-input" id="pdf-bldg" value="${po.building||''}"/></div>
+        <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">FLOOR</label><input class="est-input" id="pdf-floor" value="${po.floor||''}"/></div>
+        <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">UNIT</label><input class="est-input" id="pdf-unit" value="${po.unit||''}"/></div>
+      </div>
+      <div style="overflow-x:auto;margin-bottom:14px;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr style="background:var(--surface2);"><th style="padding:7px 10px;text-align:left;">Description</th><th style="padding:7px 8px;text-align:right;">Qty</th><th style="padding:7px 8px;text-align:right;">Rate</th><th style="padding:7px 8px;text-align:right;">Amount</th></tr></thead>
+          <tbody>${(po.lines||[]).map((l,i)=>`<tr style="background:${i%2?'var(--surface2)':'var(--surface)'};border-bottom:1px solid var(--border);"><td style="padding:7px 10px;">${l.description||l.sku||''}</td><td style="padding:7px 8px;text-align:right;">${l.qty||''}</td><td style="padding:7px 8px;text-align:right;">${l.rate?'$'+parseFloat(l.rate).toFixed(2):''}</td><td style="padding:7px 8px;text-align:right;font-weight:700;">${l.amount?'$'+parseFloat(l.amount).toFixed(2):''}</td></tr>`).join('')}</tbody>
+          <tfoot><tr style="background:var(--ink);color:#fff;"><td colspan="3" style="padding:10px 12px;font-weight:700;">TOTAL</td><td style="padding:10px 12px;text-align:right;font-weight:800;">$${parseFloat(po.total||0).toFixed(2)}</td></tr></tfoot>
+        </table>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="document.getElementById('pdf-result').style.display='none'" style="padding:8px 16px;border:1.5px solid var(--border);background:var(--surface);border-radius:8px;cursor:pointer;font-weight:600;">Cancel</button>
+        <button onclick="confirmPDFPO(${JSON.stringify(po).replace(/"/g,'&quot;')})" style="padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">✓ Add to Tracker</button>
+      </div>
+    </div>`;
+}
+
+function confirmPDFPO(po) {
+  const job = document.getElementById('pdf-job')?.value;
+  const bldg = document.getElementById('pdf-bldg')?.value || po.building || '';
+  const floor = document.getElementById('pdf-floor')?.value || po.floor || '';
+  const unit = document.getElementById('pdf-unit')?.value || po.unit || '';
+  const poNum = document.getElementById('pdf-po')?.value || po.po_number || '';
+  if (!job) { showToast('Please select a job'); return; }
+
+  // Store in S.assignments as a manual PO
+  if (!S.assignments) S.assignments = {};
+  S.assignments[poNum] = {job, bldg, floor, unit, manual: true, lines: po.lines, total: po.total, vendor: po.vendor, date: new Date().toISOString().split('T')[0]};
+  saveSharedData('assignments').then ? saveSharedData('assignments').then(() => {
+    showToast('✓ PO #' + poNum + ' added to ' + job.replace('JOB ',''));
+    document.getElementById('pdf-result').style.display = 'none';
+  }) : saveSharedData('assignments');
+}
+
+
 window.onload = async () => {
   // Init Supabase
   try {
@@ -1520,6 +1764,7 @@ function nav(page) {
   if (page === 'breakdown') renderBreakdown();
   if (page === 'jobmap') renderJobMapPage();
   if (page === 'tracker') renderTracker();
+  if (page === 'jobs') renderJobsPage();
   if (page === 'budgets') renderBudgets();
   if (page === 'bills-tracker') renderBillsTracker();
   if (page === 'actuals') renderActuals();
@@ -1682,6 +1927,13 @@ function getJobs() {
 
 function populateJobSelects() {
   const jobs = getJobs();
+  // Also populate the Jobs page selector
+  const jobsPageSel = document.getElementById('jobs-job-sel');
+  if (jobsPageSel) {
+    const cur = jobsPageSel.value;
+    jobsPageSel.innerHTML = '<option value="">— Select a Job —</option>' + jobs.map(j => `<option value="${j}" ${j===cur?'selected':''}>${j.replace('JOB ','')}</option>`).join('');
+    if (cur && jobs.includes(cur)) jobsPageSel.value = cur;
+  }
   const selects = ['pow-job','bwiz-job','bwiz-labor-job','bj-sel','mb-job-sel','bd-job','jmap-job-sel','bva-job','bt-job','raw-job'];
   selects.forEach(id => {
     const el = document.getElementById(id);
@@ -2751,9 +3003,11 @@ function addMatBank() {
 }
 
 function removeMatBank(job, idx) {
+  if (!S.matBanks[job]) return;
   S.matBanks[job].splice(idx, 1);
-  saveSharedData('matBanks');
-  loadMatBanks();
+  saveSharedData('matBanks').then ? 
+    saveSharedData('matBanks').then(() => { showToast('Removed'); renderJobsPage(); }) :
+    (saveSharedData('matBanks'), showToast('Removed'), renderJobsPage());
 }
 
 function renderBudgets() {
@@ -3763,6 +4017,527 @@ function saveEstimate() {
   showToast('Estimate saved — $' + total.toFixed(2) + ' · ' + boards + ' boards');
 }
 
+
+
+
+// ══════════════════════════════════════════════════════════════
+// JOBS PAGE — Estimate / PO Tracker / Bills / Summary
+// ══════════════════════════════════════════════════════════════
+
+function renderJobsPage() {
+  // Populate job selector
+  const sel = document.getElementById('jobs-job-sel');
+  if (!sel) return;
+  const jobs = getJobs();
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Select a Job —</option>' + 
+    jobs.map(j => `<option value="${j}" ${j===cur?'selected':''}>${j.replace('JOB ','')}</option>`).join('');
+  if (cur && jobs.includes(cur)) sel.value = cur;
+
+  const job = sel.value;
+  document.getElementById('jobs-tabs').style.display = job ? 'block' : 'none';
+  document.getElementById('jobs-empty').style.display = job ? 'none' : 'block';
+  if (!job) return;
+
+  // Render active tab
+  const activeTab = document.querySelector('.job-tab.active')?.dataset?.tab || 'estimate';
+  switchJobTab(activeTab);
+}
+
+function switchJobTab(tab) {
+  document.querySelectorAll('.job-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.job-tab-panel').forEach(p => p.style.display = 'none');
+  const panel = document.getElementById('jobs-tab-' + tab);
+  if (panel) panel.style.display = 'block';
+  const job = document.getElementById('jobs-job-sel')?.value;
+  if (!job) return;
+  if (tab === 'estimate') renderEstimateTab(job);
+  else if (tab === 'tracker') renderPOTrackerTab(job);
+  else if (tab === 'bills') renderJobBillsTab(job);
+  else if (tab === 'summary') renderJobSummaryTab(job);
+}
+
+// ── ESTIMATE TAB ──────────────────────────────────────────────
+
+function getJobEstimate(job) {
+  if (!S.matBanks) S.matBanks = {};
+  const key = job + '_est2';
+  if (!S.matBanks[key]) {
+    // Initialize from template with qty=0
+    S.matBanks[key] = ESTIMATE_TEMPLATE.map(t => ({
+      cat: t.cat, name: t.name, uom: t.uom,
+      qty: 0, price: t.price || 0
+    }));
+  }
+  return S.matBanks[key];
+}
+
+function getJobLabor(job) {
+  if (!S.matBanks) S.matBanks = {};
+  const key = job + '_labor';
+  if (!S.matBanks[key]) {
+    S.matBanks[key] = {Framing:0, Hanging:0, Finish:0, Punchout:0, Layout:0, Supervision:0, Other:0};
+  }
+  return S.matBanks[key];
+}
+
+function renderEstimateTab(job) {
+  const el = document.getElementById('est-job-title');
+  if (el) el.textContent = job.replace('JOB ','') + ' — Estimate';
+
+  const items = getJobEstimate(job);
+  const tbody = document.getElementById('est-tbody');
+  if (!tbody) return;
+
+  const CAT_COLORS = {
+    'Metal 20GA':'#DBEAFE','Metal 25GA':'#FEF3C7','Wood':'#D1FAE5',
+    'Drywall':'#EDE9FE','Finish':'#FCE7F3','Fasteners':'#F3F4F6'
+  };
+  const CAT_TEXT = {
+    'Metal 20GA':'#1E40AF','Metal 25GA':'#92400E','Wood':'#065F46',
+    'Drywall':'#5B21B6','Finish':'#831843','Fasteners':'#374151'
+  };
+
+  let html = '';
+  let lastCat = '';
+  let matTotal = 0;
+
+  items.forEach((item, i) => {
+    if (item.cat !== lastCat) {
+      const bg = CAT_COLORS[item.cat] || '#F3F4F6';
+      const tc = CAT_TEXT[item.cat] || '#374151';
+      html += `<tr class="est-cat-row"><td colspan="7" style="background:${bg};color:${tc};">${item.cat}</td></tr>`;
+      lastCat = item.cat;
+    }
+    const total = (parseFloat(item.qty)||0) * (parseFloat(item.price)||0);
+    matTotal += total;
+    const bg = i%2===0 ? 'var(--surface)' : 'var(--surface2)';
+    html += `<tr style="background:${bg};border-bottom:1px solid var(--border);">
+      <td style="padding:7px 12px;font-weight:500;font-size:13px;">${item.name}</td>
+      <td style="padding:7px 8px;"><span style="background:${CAT_COLORS[item.cat]||'#eee'};color:${CAT_TEXT[item.cat]||'#333'};padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;">${item.cat}</span></td>
+      <td style="padding:7px 8px;text-align:right;">
+        <input type="number" class="est-input" style="width:80px;text-align:right;" 
+          value="${item.qty||''}" placeholder="0"
+          oninput="updateEstItem(${i},'qty',this.value)" min="0"/>
+      </td>
+      <td style="padding:7px 8px;font-size:13px;color:var(--ink3);">${item.uom||'EA'}</td>
+      <td style="padding:7px 8px;text-align:right;">
+        <input type="number" class="est-input" style="width:90px;text-align:right;" 
+          value="${item.price||''}" placeholder="0.00" step="0.01"
+          oninput="updateEstItem(${i},'price',this.value)" min="0"/>
+      </td>
+      <td style="padding:7px 12px;text-align:right;font-weight:700;" id="est-row-total-${i}">${total>0?fmt(total):'—'}</td>
+      <td style="padding:7px 8px;text-align:center;">
+        <button class="est-remove-btn" onclick="removeEstItem(${i})" title="Remove">✕</button>
+      </td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = html;
+  const matTotalEl = document.getElementById('est-mat-total');
+  if (matTotalEl) matTotalEl.textContent = fmt(matTotal);
+  renderLaborSection(job);
+}
+
+function updateEstItem(idx, field, val) {
+  const job = document.getElementById('jobs-job-sel')?.value;
+  if (!job) return;
+  const items = getJobEstimate(job);
+  if (!items[idx]) return;
+  items[idx][field] = parseFloat(val) || 0;
+  // Update row total live
+  const qty = parseFloat(items[idx].qty)||0;
+  const price = parseFloat(items[idx].price)||0;
+  const total = qty * price;
+  const cell = document.getElementById('est-row-total-' + idx);
+  if (cell) cell.textContent = total > 0 ? fmt(total) : '—';
+  // Update footer total
+  const allItems = getJobEstimate(job);
+  const matTotal = allItems.reduce((s,it) => s + (parseFloat(it.qty)||0)*(parseFloat(it.price)||0), 0);
+  const el = document.getElementById('est-mat-total');
+  if (el) el.textContent = fmt(matTotal);
+  updateGrandTotal(job);
+}
+
+function removeEstItem(idx) {
+  const job = document.getElementById('jobs-job-sel')?.value;
+  if (!job) return;
+  const items = getJobEstimate(job);
+  items.splice(idx, 1);
+  renderEstimateTab(job);
+}
+
+function addEstimateLine() {
+  const job = document.getElementById('jobs-job-sel')?.value;
+  if (!job) return;
+  const items = getJobEstimate(job);
+  // Add to end, user can set category
+  const cats = [...new Set(ESTIMATE_TEMPLATE.map(t => t.cat))];
+  const cat = prompt('Category? (' + cats.join(', ') + ')', cats[0]);
+  if (!cat) return;
+  const name = prompt('Material name?', '');
+  if (!name) return;
+  const uom = prompt('Unit of measure?', 'EA');
+  items.push({cat: cat.trim(), name: name.trim(), uom: uom||'EA', qty: 0, price: 0});
+  // Sort to keep categories together
+  items.sort((a,b) => cats.indexOf(a.cat) - cats.indexOf(b.cat) || a.name.localeCompare(b.name));
+  renderEstimateTab(job);
+}
+
+function renderLaborSection(job) {
+  const labor = getJobLabor(job);
+  const laborCats = ['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
+  const grid = document.getElementById('labor-budget-grid');
+  if (!grid) return;
+  grid.innerHTML = laborCats.map(cat => {
+    const val = parseFloat(labor[cat]||0);
+    return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;">${cat}</div>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <span style="color:var(--ink3);font-size:13px;">$</span>
+        <input type="number" class="est-input" value="${val||''}" placeholder="0"
+          style="flex:1;min-width:0;" min="0" step="1000"
+          oninput="updateLaborBudget('${cat}',this.value)"/>
+      </div>
+    </div>`;
+  }).join('');
+  updateGrandTotal(job);
+}
+
+function updateLaborBudget(cat, val) {
+  const job = document.getElementById('jobs-job-sel')?.value;
+  if (!job) return;
+  const labor = getJobLabor(job);
+  labor[cat] = parseFloat(val) || 0;
+  updateGrandTotal(job);
+}
+
+function updateGrandTotal(job) {
+  const items = getJobEstimate(job);
+  const matTotal = items.reduce((s,it) => s+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0), 0);
+  const labor = getJobLabor(job);
+  const laborCats = ['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
+  const laborTotal = laborCats.reduce((s,c) => s+(parseFloat(labor[c]||0)), 0);
+  const el = document.getElementById('est-labor-total');
+  if (el) el.textContent = fmt(laborTotal);
+  const el2 = document.getElementById('est-grand-total');
+  if (el2) el2.textContent = fmt(matTotal + laborTotal);
+}
+
+function saveJobEstimate() {
+  const job = document.getElementById('jobs-job-sel')?.value;
+  if (!job) { showToast('Select a job first'); return; }
+  // Save both estimate and labor
+  Promise.all([
+    saveSharedData('matBanks'),
+  ]).then(() => showToast('✓ Estimate saved for ' + job.replace('JOB ','')));
+}
+
+// ── PO TRACKER TAB ────────────────────────────────────────────
+
+function renderPOTrackerTab(job) {
+  renderFloorBudgets(job);
+  renderLivePOData(job);
+}
+
+function renderFloorBudgets(job) {
+  if (!S.floorBudgets) S.floorBudgets = {};
+  if (!S.floorBudgets[job]) S.floorBudgets[job] = [];
+  const floors = S.floorBudgets[job];
+  const el = document.getElementById('floor-budget-list');
+  if (!el) return;
+
+  if (!floors.length) {
+    el.innerHTML = '<div style="color:var(--ink3);font-size:13px;padding:8px 0;">No floors set yet. Click + Add Floor to begin.</div>';
+    return;
+  }
+
+  // Get live PO data per floor
+  const jobRows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+
+  el.innerHTML = floors.map((fl, i) => {
+    const flRows = jobRows.filter(r => String(r['FLOOR']||'').trim() === String(fl.floor));
+    const orderedBoards = flRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0),0);
+    const orderedTotal = flRows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0),0);
+    const budgetedBoards = parseFloat(fl.budgetQty||0);
+    const targetPPB = parseFloat(fl.targetPPB||0);
+    const remaining = budgetedBoards - orderedBoards;
+    const currentPPB = orderedBoards > 0 ? orderedTotal / orderedBoards : 0;
+    const remainClass = remaining < 0 ? 'floor-stat-warn' : 'floor-stat-ok';
+    const ppbClass = targetPPB > 0 && currentPPB > targetPPB ? 'floor-stat-warn' : 'floor-stat-ok';
+
+    return `<div class="floor-budget-row">
+      <div style="font-weight:700;font-size:14px;">Floor ${fl.floor}${fl.bldg?' · Bldg '+fl.bldg:''}</div>
+      <div>
+        <div style="font-size:11px;color:var(--ink3);margin-bottom:2px;">Budgeted boards</div>
+        <input type="number" class="est-input" value="${fl.budgetQty||''}" placeholder="0"
+          oninput="updateFloorBudget(${i},'budgetQty',this.value)" style="width:90px;"/>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--ink3);margin-bottom:2px;">Target $/board</div>
+        <input type="number" class="est-input" value="${fl.targetPPB||''}" placeholder="0.00" step="0.5"
+          oninput="updateFloorBudget(${i},'targetPPB',this.value)" style="width:90px;"/>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:11px;color:var(--ink3);">Ordered</div>
+        <div style="font-weight:700;">${Math.round(orderedBoards)} boards</div>
+        <div class="${remainClass}" style="font-size:12px;">${remaining >= 0 ? remaining + ' left' : Math.abs(Math.round(remaining)) + ' OVER'}</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:11px;color:var(--ink3);">Current $/bd</div>
+        <div class="${ppbClass}">${currentPPB > 0 ? fmt(currentPPB) : '—'}</div>
+        <div style="font-size:11px;color:var(--ink3);">${targetPPB > 0 ? 'Target: '+fmt(targetPPB) : ''}</div>
+      </div>
+      <button onclick="removeFloorBudget(${i})" class="est-remove-btn">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function addFloorBudget() {
+  const job = document.getElementById('jobs-job-sel')?.value;
+  if (!job) return;
+  if (!S.floorBudgets) S.floorBudgets = {};
+  if (!S.floorBudgets[job]) S.floorBudgets[job] = [];
+  const floor = prompt('Floor number?', '');
+  if (!floor) return;
+  const bldg = prompt('Building? (optional)', '');
+  S.floorBudgets[job].push({floor: floor.trim(), bldg: bldg.trim(), budgetQty: 0, targetPPB: 0});
+  S.floorBudgets[job].sort((a,b) => parseInt(a.floor)-parseInt(b.floor));
+  saveSharedData('floorBudgets');
+  renderFloorBudgets(job);
+}
+
+function updateFloorBudget(idx, field, val) {
+  const job = document.getElementById('jobs-job-sel')?.value;
+  if (!job || !S.floorBudgets[job]) return;
+  S.floorBudgets[job][idx][field] = parseFloat(val)||0;
+  saveSharedData('floorBudgets');
+  renderFloorBudgets(job);
+}
+
+function removeFloorBudget(idx) {
+  const job = document.getElementById('jobs-job-sel')?.value;
+  if (!job || !S.floorBudgets[job]) return;
+  S.floorBudgets[job].splice(idx,1);
+  saveSharedData('floorBudgets');
+  renderFloorBudgets(job);
+}
+
+function renderLivePOData(job) {
+  const jobRows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const totalBoards = jobRows.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0);
+  const totalSpend = jobRows.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0);
+  const uniqPOs = [...new Set(jobRows.map(r=>String(r['PO NUMBER']||'')).filter(Boolean))];
+  const totalTax = jobRows.filter(r=>categorize(r['MATERIAL']||'') === 'tax').reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0);
+
+  const statsEl = document.getElementById('po-tracker-stats');
+  if (statsEl) statsEl.innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total Spend</div><div class="stat-val" style="color:var(--accent);">${fmt(totalSpend)}</div><div class="stat-sub">${uniqPOs.length} POs · ${jobRows.length} lines</div></div>
+    <div class="stat-card"><div class="stat-label">Boards Ordered</div><div class="stat-val">${Math.round(totalBoards)}</div></div>
+    <div class="stat-card"><div class="stat-label">Tax</div><div class="stat-val" style="color:var(--ink3);">${fmt(totalTax)}</div><div class="stat-sub">Blank material lines</div></div>
+  `;
+
+  // Group by floor
+  const floorMap = {};
+  jobRows.forEach(r => {
+    const fl = String(r['FLOOR']||'').trim() || '—';
+    const bldg = String(r['BUILDING']||'').trim() || '';
+    const key = bldg + '||' + fl;
+    if (!floorMap[key]) floorMap[key] = {fl, bldg, rows:[], total:0, boards:0, metal:0};
+    floorMap[key].total += parseFloat(r['LINE TOTAL']||0);
+    floorMap[key].rows.push(r);
+    if (isBoard(r['MATERIAL']||'')) floorMap[key].boards += parseFloat(r['QTY']||0);
+    if (categorize(r['MATERIAL']||'') === 'metal') floorMap[key].metal += parseFloat(r['QTY']||0);
+  });
+
+  const floorsEl = document.getElementById('po-tracker-floors');
+  if (!floorsEl) return;
+  if (!Object.keys(floorMap).length) {
+    floorsEl.innerHTML = '<div class="alert alert-yellow">No PO data found for this job. Sync the sheet to load data.</div>';
+    return;
+  }
+
+  floorsEl.innerHTML = Object.values(floorMap)
+    .sort((a,b) => parseInt(a.fl)-parseInt(b.fl) || a.bldg.localeCompare(b.bldg))
+    .map(fl => {
+      const id = 'pofl-' + fl.bldg.replace(/\W/g,'') + fl.fl;
+      const matGroups = {};
+      fl.rows.forEach(r => {
+        const mat = (r['MATERIAL']||'').trim() || '[TAX]';
+        if (!matGroups[mat]) matGroups[mat] = {qty:0, total:0, cat:categorize(r['MATERIAL']||'')};
+        matGroups[mat].qty += parseFloat(r['QTY']||0);
+        matGroups[mat].total += parseFloat(r['LINE TOTAL']||0);
+      });
+      return `<div style="border:1.5px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:12px;padding:13px 18px;cursor:pointer;background:var(--surface);" onclick="document.getElementById('${id}').style.display=document.getElementById('${id}').style.display==='none'?'block':'none'">
+          <div style="font-weight:700;min-width:120px;">Floor ${fl.fl}${fl.bldg?' · Bldg '+fl.bldg:''}</div>
+          ${fl.boards>0?`<span style="background:#DBEAFE;color:#1E40AF;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;">🟦 ${Math.round(fl.boards)} boards</span>`:''}
+          ${fl.metal>0?`<span style="background:#FEF3C7;color:#92400E;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;">📐 ${Math.round(fl.metal)} metal</span>`:''}
+          <div style="margin-left:auto;font-weight:700;">${fmt(fl.total)}</div>
+          <span style="color:var(--ink3);">›</span>
+        </div>
+        <div id="${id}" style="display:none;padding:16px 18px;background:var(--surface2);border-top:1px solid var(--border);">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="background:var(--surface);"><th style="padding:7px 10px;text-align:left;">Material</th><th style="padding:7px 8px;text-align:left;font-size:11px;">Category</th><th style="padding:7px 8px;text-align:right;">Qty</th><th style="padding:7px 10px;text-align:right;">Total</th></tr></thead>
+            <tbody>${Object.entries(matGroups).map(([mat,d],i)=>`<tr style="background:${i%2===0?'var(--surface)':'var(--surface2)'};border-bottom:1px solid var(--border);"><td style="padding:7px 10px;font-weight:500;">${mat}</td><td style="padding:7px 8px;font-size:11px;color:var(--ink3);">${d.cat}</td><td style="padding:7px 8px;text-align:right;">${d.qty>0?Math.round(d.qty):'—'}</td><td style="padding:7px 10px;text-align:right;font-weight:700;">${fmt(d.total)}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+// ── BILLS TAB ─────────────────────────────────────────────────
+
+function renderJobBillsTab(job) {
+  const el = document.getElementById('jobs-bills-list');
+  if (!el) return;
+  const bills = S.bills.filter(b => {
+    const inv = String(b['INVOICE NUMBER']||b['Invoice Number']||'').trim();
+    const ba = S.billAssignments[inv];
+    return ba && ba.job === job;
+  });
+  if (!bills.length) {
+    el.innerHTML = '<div class="alert alert-yellow" style="margin-top:8px;">No bills assigned to this job yet. Assign bills in the Inbox.</div>';
+    return;
+  }
+  const LABOR_CATS = ['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
+  const totalBilled = bills.reduce((s,b) => {
+    const inv = String(b['INVOICE NUMBER']||b['Invoice Number']||'').trim();
+    const ba = S.billAssignments[inv] || {};
+    return s + parseFloat(ba.total || b['LINE TOTAL'] || 0);
+  }, 0);
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-weight:700;font-size:15px;">${bills.length} bills · Total: <span style="color:var(--accent);">${fmt(totalBilled)}</span></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+    ${bills.map(b => {
+      const inv = String(b['INVOICE NUMBER']||b['Invoice Number']||'').trim();
+      const ba = S.billAssignments[inv] || {};
+      const vendor = b['VENDOR'] || b['Vendor'] || '';
+      const total = parseFloat(ba.total || b['LINE TOTAL'] || 0);
+      const cat = ba.category || '—';
+      const isLabor = LABOR_CATS.some(lc => cat.includes(lc));
+      return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;">
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:14px;">${vendor}</div>
+          <div style="font-size:12px;color:var(--ink3);">Inv #${inv} · ${ba.date||''}</div>
+        </div>
+        <span style="padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:${isLabor?'#D1FAE5':'#DBEAFE'};color:${isLabor?'#065F46':'#1E40AF'};">${cat}</span>
+        <div style="font-weight:700;font-size:15px;">${fmt(total)}</div>
+        <button onclick="removeBillMatch('${inv}')" style="padding:4px 10px;border:1px solid var(--red);color:var(--red);background:none;border-radius:6px;cursor:pointer;font-size:12px;">↩ Undo</button>
+      </div>`;
+    }).join('')}
+    </div>`;
+}
+
+// ── SUMMARY TAB ───────────────────────────────────────────────
+
+function renderJobSummaryTab(job) {
+  const el = document.getElementById('jobs-summary-content');
+  if (!el) return;
+  const LABOR_CATS = ['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
+
+  // Material spend from POs
+  const jobRows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const matOrdered = jobRows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0),0);
+
+  // Labor billed
+  const bills = S.bills.filter(b => {
+    const inv = String(b['INVOICE NUMBER']||b['Invoice Number']||'').trim();
+    return S.billAssignments[inv]?.job === job;
+  });
+  const laborBilled = bills.reduce((s,b) => {
+    const inv = String(b['INVOICE NUMBER']||b['Invoice Number']||'').trim();
+    const ba = S.billAssignments[inv]||{};
+    if (LABOR_CATS.some(lc => (ba.category||'').includes(lc))) return s+parseFloat(ba.total||0);
+    return s;
+  }, 0);
+  const matBilled = bills.reduce((s,b) => {
+    const inv = String(b['INVOICE NUMBER']||b['Invoice Number']||'').trim();
+    const ba = S.billAssignments[inv]||{};
+    if (!LABOR_CATS.some(lc => (ba.category||'').includes(lc))) return s+parseFloat(ba.total||0);
+    return s;
+  }, 0);
+
+  // Estimate totals
+  const items = getJobEstimate(job);
+  const matBudget = items.reduce((s,it) => s+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0),0);
+  const labor = getJobLabor(job);
+  const laborBudget = LABOR_CATS.reduce((s,c) => s+(parseFloat(labor[c]||0)),0);
+  const totalBudget = matBudget + laborBudget;
+  const totalActual = laborBilled + matBilled;
+  const pct = totalBudget > 0 ? Math.min((totalActual/totalBudget)*100,100) : 0;
+  const overUnder = totalBudget - totalActual;
+
+  el.innerHTML = `
+    <!-- Grand total bar -->
+    <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:20px 24px;margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px;">
+        <div>
+          <div style="font-size:13px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Total Budget</div>
+          <div style="font-size:28px;font-weight:800;font-family:'Syne',sans-serif;">${fmt(totalBudget)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:13px;color:var(--ink3);">Actual Paid</div>
+          <div style="font-size:24px;font-weight:700;color:${totalActual>totalBudget?'var(--red)':'var(--green)'};">${fmt(totalActual)}</div>
+        </div>
+      </div>
+      <div style="height:10px;background:var(--border);border-radius:10px;overflow:hidden;">
+        <div style="height:100%;width:${pct.toFixed(1)}%;background:${pct>90?'var(--red)':pct>70?'var(--yellow)':'var(--green)'};border-radius:10px;transition:width .4s;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--ink3);">
+        <span>${pct.toFixed(0)}% used</span>
+        <span style="color:${overUnder<0?'var(--red)':'var(--green)'};font-weight:700;">${overUnder>=0?fmt(overUnder)+' remaining':fmt(Math.abs(overUnder))+' OVER BUDGET'}</span>
+      </div>
+    </div>
+
+    <!-- Material vs Labor split -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:18px 20px;">
+        <div style="font-size:12px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">📦 Material</div>
+        <div style="font-size:20px;font-weight:800;">Budget: ${fmt(matBudget)}</div>
+        <div style="font-size:15px;color:var(--ink2);margin-top:4px;">Ordered: ${fmt(matOrdered)}</div>
+        <div style="font-size:15px;color:var(--ink2);">Billed: ${fmt(matBilled)}</div>
+        <div style="margin-top:8px;font-size:13px;font-weight:700;color:${matOrdered>matBudget?'var(--red)':'var(--green)'};">
+          ${matOrdered>matBudget?'⚠ '+fmt(matOrdered-matBudget)+' over budget on orders':'✓ '+fmt(matBudget-matOrdered)+' remaining'}
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:18px 20px;">
+        <div style="font-size:12px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">🔨 Labor</div>
+        <div style="font-size:20px;font-weight:800;">Budget: ${fmt(laborBudget)}</div>
+        <div style="font-size:15px;color:var(--ink2);margin-top:4px;">Billed: ${fmt(laborBilled)}</div>
+        <div style="margin-top:8px;font-size:13px;font-weight:700;color:${laborBilled>laborBudget?'var(--red)':'var(--green)'};">
+          ${laborBilled>laborBudget?'⚠ '+fmt(laborBilled-laborBudget)+' over':'✓ '+fmt(laborBudget-laborBilled)+' remaining'}
+        </div>
+      </div>
+    </div>
+
+    <!-- Labor breakdown by category -->
+    ${laborBudget > 0 ? `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:18px 20px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:14px;font-family:'Syne',sans-serif;">Labor by Category</div>
+      ${LABOR_CATS.map(cat => {
+        const bud = parseFloat(labor[cat]||0);
+        const billed = bills.reduce((s,b) => {
+          const inv = String(b['INVOICE NUMBER']||b['Invoice Number']||'').trim();
+          const ba = S.billAssignments[inv]||{};
+          return (ba.category||'').includes(cat) ? s+parseFloat(ba.total||0) : s;
+        },0);
+        if (!bud && !billed) return '';
+        const pct2 = bud > 0 ? Math.min((billed/bud)*100,100) : 0;
+        return `<div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
+            <span style="font-weight:600;">${cat}</span>
+            <span>${fmt(billed)} <span style="color:var(--ink3);">/ ${fmt(bud)}</span></span>
+          </div>
+          <div style="height:6px;background:var(--border);border-radius:6px;">
+            <div style="height:100%;width:${pct2.toFixed(1)}%;background:${pct2>90?'var(--red)':'var(--blue)'};border-radius:6px;"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : '<div class="alert alert-yellow">Set labor budgets in the Estimate tab to see breakdown here.</div>'}
+  `;
+}
 
 
 // ══════════════════════════════════════════════════════════════
