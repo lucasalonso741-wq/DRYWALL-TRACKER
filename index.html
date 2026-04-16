@@ -2365,7 +2365,7 @@ function renderJobMap() {
   parts.push('<div class="stat-card" style="padding:14px;"><div class="stat-label">Budget</div><div style="font-size:20px;font-weight:700;color:' + (budget?'var(--green)':'var(--ink3)') + ';">' + (budget?fmt(budget):'Not set') + '</div></div>');
   if (unassignedRows.length) {
     var uPos = Object.keys(unassignedRows.reduce(function(a,r){a[String(r['PO NUMBER']||'')]=1;return a;},{}));
-    parts.push('<div class="stat-card" style="padding:14px;border-color:var(--yellow);"><div class="stat-label">⚠ Unassigned</div><div style="font-size:14px;font-weight:700;color:var(--yellow);">' + uPos.length + ' POs</div><div style="font-size:11px;color:var(--ink3);margin-top:4px;" onclick="nav(\'inbox\')" style="cursor:pointer;">Go to Inbox →</div></div>');
+    parts.push('<div class="stat-card" style="padding:14px;border-color:var(--yellow);"><div class="stat-label">⚠ Unassigned</div><div style="font-size:14px;font-weight:700;color:var(--yellow);">' + uPos.length + ' POs</div><div style="font-size:11px;color:var(--ink3);margin-top:4px;cursor:pointer;" onclick="nav(\'inbox\')">Go to Inbox →</div></div>');
   }
   parts.push('</div>');
 
@@ -3042,7 +3042,7 @@ async function sendAI() {
             'anthropic-version': '2023-06-01',
             'anthropic-dangerous-direct-browser-access': 'true'
           },
-          body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: context, messages: [{ role: 'user', content: q }] })
+          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 500, system: context, messages: [{ role: 'user', content: q }] })
         });
         const d2 = await res2.json();
         removeLastAIMsg();
@@ -4036,7 +4036,7 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
         </div>
         <button onclick="closeEstimator()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--ink3);">✕</button>
       </div>
-      <div style="padding:20px 28px;" id="est-modal-body" style="overflow-x:auto;padding:20px;">Loading...</div>
+      <div style="overflow-x:auto;padding:20px 28px;" id="est-modal-body">Loading...</div>
       <div style="padding:16px 28px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">
         <button class="btn btn-ghost" onclick="closeEstimator()">Cancel</button>
         <button class="btn btn-primary" onclick="saveEstimate()">💾 Save Estimate</button>
