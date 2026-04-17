@@ -317,7 +317,7 @@ a{color:var(--accent);}
 <!-- ── SIDEBAR ─────────────────────────────── -->
 <div id="sidebar">
   <div class="nav-logo" id="sb-logo" onclick="nav('home')">
-    <img id="sb-logo-img" src="" alt=""/>
+    <img id="sb-logo-img" src="data:," alt="" style="display:none;width:36px;height:36px;border-radius:10px;object-fit:cover;"/>
     <span id="sb-logo-icon">🏗️</span>
   </div>
   <div class="nav-divider"></div>
@@ -425,6 +425,7 @@ a{color:var(--accent);}
         <option value="">— Select a Job —</option>
       </select>
       <button onclick="showJobSetup()" class="btn btn-ghost btn-sm">⚙ Floors & Units</button>
+      <button onclick="renderMaterialStats(_currentJob)" class="btn btn-blue btn-sm">📊 Quick Stats</button>
     </div>
 
     <!-- Board PPB cards -->
@@ -587,6 +588,7 @@ const JOB_ALIASES = {
   'LOFTS': 'JOB PIONEER LOFTS',
   'MARGATE': 'LEGACY AT MARGATE',
   'LEGACY': 'LEGACY AT MARGATE',
+  'LEGACY AT MARGATE': 'LEGACY AT MARGATE',
   // LUDLAM is its own job — not Villages
   'LUDLAM': 'LUDLAM',
 };
@@ -847,7 +849,7 @@ async function syncAll() {
     document.getElementById('sheet-connected-label').textContent = '✓ Sheet connected';
     document.getElementById('sheet-connected-label').className = 'sheet-status ok';
     populateJobSelects();
-    renderDashboard();
+    // renderDashboard removed - no dashboard page
     updateInboxBadge();
     showToast('✓ Synced — ' + S.rows.length + ' PO rows, ' + S.bills.length + ' bill rows');
   } catch(e) {
@@ -867,10 +869,9 @@ async function syncAll() {
     try { updateInboxBadge(); } catch(e) {}
     // Re-render whichever page is currently showing
     const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
-    if (activePage === 'dashboard') { try { renderDashboard(); } catch(e) {} }
-    else if (activePage === 'home') { try { renderHome(); renderActivityFeed(); } catch(e) {} }
-    else if (activePage === 'tracker') { try { renderTracker(); } catch(e) {} }
-    else { try { renderDashboard(); } catch(e) {} try { renderHome(); } catch(e) {} }
+    if (activePage === 'home') { try { renderHome(); } catch(e) {} }
+    else if (activePage === 'jobs') { try { renderJobsPage(); } catch(e) {} }
+    else { try { renderHome(); } catch(e) {} }
   }
 }
 
@@ -887,7 +888,7 @@ async function tryLogin() {
     // Always reload to get latest state
     await loadSharedData();
     if (S.rows.length === 0) await syncAll();
-    else renderDashboard();
+    else // renderDashboard removed - no dashboard page
     nav('home');
   } else {
     document.getElementById('login-err').style.display = 'block';
@@ -1002,7 +1003,7 @@ function populateJobSelects() {
     jobsPageSel.innerHTML = '<option value="">— Select a Job —</option>' + jobs.map(j => `<option value="${j}" ${j===cur?'selected':''}>${j.replace('JOB ','')}</option>`).join('');
     if (cur && jobs.includes(cur)) jobsPageSel.value = cur;
   }
-  const selects = ['pow-job','bwiz-job','bwiz-labor-job','bj-sel','mb-job-sel','bd-job','jmap-job-sel','bva-job','bt-job','raw-job'];
+  const selects = ['pow-job','bwiz-job','bwiz-labor-job','bj-sel','mb-job-sel','bd-job','jmap-job-sel','bva-job','bt-job','raw-job','jobs-sel'];
   selects.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -1015,26 +1016,20 @@ function populateJobSelects() {
 
 function loadLogo() {
   const logo = localStorage.getItem('dw_logo');
-  // Login screen
   const loginImg = document.getElementById('login-logo-img');
   const loginIcon = document.getElementById('login-logo-icon');
-  // Home page
-  const homeImg = document.getElementById('home-logo-img');
-  const homeIcon = document.getElementById('home-logo-icon');
-  // Settings preview
-  const previewDiv = document.getElementById('logo-preview-img');
-  if (logo) {
-    if (loginImg) { loginImg.src = logo; loginImg.style.display='block'; }
+  const sbImg = document.getElementById('sb-logo-img');
+  const sbIcon = document.getElementById('sb-logo-icon');
+  if (logo && logo.startsWith('data:image')) {
+    if (loginImg) { loginImg.src = logo; loginImg.style.display = 'block'; }
     if (loginIcon) loginIcon.style.display = 'none';
-    if (homeImg) { homeImg.src = logo; homeImg.style.display='block'; }
-    if (homeIcon) homeIcon.style.display = 'none';
-    if (previewDiv) previewDiv.innerHTML = '<img src="'+logo+'" style="width:64px;height:64px;border-radius:12px;object-fit:cover;"/>';
+    if (sbImg) { sbImg.src = logo; sbImg.style.display = 'block'; }
+    if (sbIcon) sbIcon.style.display = 'none';
   } else {
     if (loginImg) loginImg.style.display = 'none';
-    if (loginIcon) loginIcon && (loginIcon.style.display='block');
-    if (homeImg) homeImg.style.display = 'none';
-    if (homeIcon) homeIcon && (homeIcon.style.display='block');
-    if (previewDiv) previewDiv.innerHTML = '🏗️';
+    if (loginIcon) loginIcon.style.display = 'block';
+    if (sbImg) { sbImg.src = 'data:,'; sbImg.style.display = 'none'; }
+    if (sbIcon) sbIcon.style.display = 'block';
   }
 }
 
@@ -1158,6 +1153,25 @@ async function confirmPDFPO(po, savedId) {
   }) : saveSharedData('assignments');
 }
 
+
+async function deletePORecord(id, poNumber) {
+  if (!confirm('Delete extraction for PO #' + poNumber + '? This only removes it from the PDF queue — not from your sheet.')) return;
+  const res = await fetch('https://svvjsumhkbezbyskxxej.supabase.co/rest/v1/po_pdfs?id=eq.' + id, {
+    method: 'DELETE',
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer ' + SB_KEY,
+      'Content-Type': 'application/json'
+    }
+  });
+  if (res.ok) {
+    showToast('✓ PO #' + poNumber + ' removed from queue');
+    loadPendingPOs();
+  } else {
+    showToast('Error deleting: ' + res.status);
+  }
+}
+
 async function loadPendingPOs() {
   const el = document.getElementById('pending-pos-list');
   if (!el) return;
@@ -1183,7 +1197,10 @@ async function loadPendingPOs() {
           <div style="font-size:12px;color:var(--ink3);">${p.job_name||'No job assigned'} ${p.building?'· Bldg '+p.building:''} ${p.floor?'· Fl '+p.floor:''} · $${parseFloat(p.total||0).toFixed(2)} · ${src} · ${date}</div>
         </div>
         <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:${statusColors[p.status]||'#F3F4F6'};white-space:nowrap;">${statusLabel[p.status]||p.status}</span>
-        ${p.status !== 'confirmed' ? `<button onclick="reviewPO('${p.id}')" style="padding:5px 14px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Review →</button>` : ''}
+        <div style="display:flex;gap:6px;align-items:center;">' +
+          (p.status !== 'confirmed' ? '<button onclick="reviewPO(\'' + p.id + '\')" style="padding:5px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Review →</button>' : '') +
+          '<button onclick="deletePORecord(\'' + p.id + '\',\'' + (p.po_number||'') + '\')" style="padding:5px 10px;background:none;border:1px solid var(--red);color:var(--red);border-radius:6px;font-size:12px;cursor:pointer;" title="Delete from queue">🗑</button>' +
+          '</div>
       </div>`;
     }).join('');
   } catch(err) {
@@ -1365,7 +1382,7 @@ function renameJob(oldName) {
   ]).then(() => {
     renderSettings();
     populateJobSelects();
-    renderDashboard();
+    // renderDashboard removed - no dashboard page
     showToast('✓ Renamed to "' + n + '" — updated ' + count + ' PO assignments');
   });
 }
@@ -1985,6 +2002,73 @@ function switchJobTab(tab) {
 }
 
 // ── PPB SUMMARY CARDS ─────────────────────────────────────────
+
+function renderMaterialStats(job) {
+  // Quick material summary - shows on job select
+  const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  if (!rows.length) return;
+
+  // Group by material, compute qty ordered
+  const matMap = {};
+  rows.forEach(r => {
+    const mat = (r['MATERIAL']||'').trim(); if (!mat) return;
+    const cat = categorize(mat);
+    if (!matMap[mat]) matMap[mat] = {mat, cat, qty:0, spend:0};
+    matMap[mat].qty += parseFloat(r['QTY']||0);
+    matMap[mat].spend += parseFloat(r['LINE TOTAL']||0);
+  });
+
+  const items = Object.values(matMap).sort((a,b) => b.spend-a.spend);
+  const totalBoards = items.filter(m=>m.cat==='boards').reduce((s,m)=>s+m.qty,0);
+  const totalMetal = items.filter(m=>m.cat==='metal').reduce((s,m)=>s+m.qty,0);
+  const totalSpend = items.reduce((s,m)=>s+m.spend,0);
+
+  // Get estimate for comparison
+  const estItems = getJobEstimate(job);
+  const estBoards = estItems.filter(i=>i.cat==='Drywall').reduce((s,i)=>s+(parseFloat(i.qty)||0),0);
+
+  // Build modal content
+  const modal = document.getElementById('po-modal');
+  document.getElementById('po-modal-title').textContent = '📊 ' + job.replace('JOB ','') + ' — Material Overview';
+  document.getElementById('po-modal-footer').innerHTML = '<button class="btn btn-ghost" onclick="closeModal(\'po-modal\')">Close</button>';
+
+  const CAT_ORDER = ['boards','metal','finish','supplies','tax','other'];
+  const CAT_LABEL = {boards:'🟦 Boards',metal:'📐 Metal',finish:'🪣 Finish',supplies:'🔩 Supplies',tax:'Tax',other:'Other'};
+
+  let html = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+    <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Total Boards</div><div style="font-size:22px;font-weight:800;color:var(--blue);">${Math.round(totalBoards)}</div>${estBoards>0?`<div style="font-size:10px;color:var(--ink3);">Est: ${Math.round(estBoards)} · ${totalBoards>0?((totalBoards/estBoards)*100).toFixed(0)+'%':'—'} ordered</div>`:''}</div>
+    <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Metal Pieces</div><div style="font-size:22px;font-weight:800;color:var(--yellow);">${Math.round(totalMetal)}</div></div>
+    <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Total Spend</div><div style="font-size:20px;font-weight:800;color:var(--accent);">${fmt(totalSpend)}</div></div>
+  </div>`;
+
+  CAT_ORDER.forEach(catKey => {
+    const catItems = items.filter(m=>m.cat===catKey);
+    if (!catItems.length) return;
+    const catTotal = catItems.reduce((s,m)=>s+m.spend,0);
+    const catQty = catItems.reduce((s,m)=>s+m.qty,0);
+    html += `<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${CAT_LABEL[catKey]||catKey} — ${fmt(catTotal)}</div>`;
+    catItems.slice(0,8).forEach(m => {
+      const estMatch = estItems.find(e=>e.name.toUpperCase().includes(m.mat.substring(0,8).toUpperCase()));
+      const estQty = estMatch ? parseFloat(estMatch.qty)||0 : 0;
+      const pct = estQty > 0 ? Math.min((m.qty/estQty)*100, 150) : 0;
+      const barColor = pct > 110 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : 'var(--green)';
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);">
+        <div style="flex:1;font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.mat}</div>
+        <div style="font-size:12px;font-weight:700;white-space:nowrap;">${Math.round(m.qty)} ${estQty>0?'/ '+Math.round(estQty):''}</div>
+        <div style="width:60px;"><div style="height:4px;background:var(--surface3);border-radius:4px;overflow:hidden;">
+          ${pct>0?`<div style="height:100%;width:${Math.min(pct,100).toFixed(0)}%;background:${barColor};border-radius:4px;"></div>`:''}
+        </div></div>
+        <div style="font-size:11px;color:var(--ink3);white-space:nowrap;">${fmt(m.spend)}</div>
+      </div>`;
+    });
+    if (catItems.length > 8) html += `<div style="font-size:11px;color:var(--ink3);padding:4px 0;">+${catItems.length-8} more items</div>`;
+    html += '</div>';
+  });
+
+  document.getElementById('po-modal-body').innerHTML = html;
+  modal.classList.add('open');
+}
+
 function renderJobPPBCards(job) {
   const el = document.getElementById('jobs-ppb-cards'); if (!el) return;
   const rows = S.rows.filter(r=>(r['JOB']||r['Job']||'')===job);
@@ -2289,7 +2373,19 @@ function showJobSetup() {
 
 function renderJobSetupBody() {
   const el = document.getElementById('job-setup-body'); if (!el) return;
-  let html = `<div style="display:flex;gap:8px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;">
+  let html = `<!-- Batch setup -->
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+    <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">⚡ Quick Batch Setup</div>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">FLOORS (e.g. 1,2,3 or 1-5)</div><input id="js-batch-floors" class="inp inp-sm" style="width:120px;" placeholder="1-5 or 1,2,3"/></div>
+      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">BUILDINGS (e.g. R1,R2)</div><input id="js-batch-bldgs" class="inp inp-sm" style="width:100px;" placeholder="R1 or R1,R2"/></div>
+      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">UNITS PER FLOOR (e.g. 101-116)</div><input id="js-batch-units" class="inp inp-sm" style="width:120px;" placeholder="101-116"/></div>
+      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">BOARD BUDGET/FL</div><input id="js-batch-boards" class="inp inp-sm" style="width:80px;" type="number" placeholder="240"/></div>
+      <button class="btn btn-primary btn-sm" onclick="batchSetupFloors()">⚡ Generate</button>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--ink3);margin-bottom:10px;font-weight:600;">OR add floors one at a time:</div>
+  <div style="display:flex;gap:8px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;">
     <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">FLOOR</div><input id="js-fl" class="inp inp-sm" style="width:65px;" placeholder="3"/></div>
     <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">BLDG</div><input id="js-bldg" class="inp inp-sm" style="width:65px;" placeholder="R1"/></div>
     <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">UNIT START</div><input id="js-us" class="inp inp-sm" style="width:80px;" placeholder="301"/></div>
@@ -2300,11 +2396,12 @@ function renderJobSetupBody() {
 
   (_editStruct.floors||[]).forEach((fl,fi)=>{
     html += `<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">
-      <div style="background:var(--surface2);padding:10px 14px;display:flex;align-items:center;gap:10px;">
-        <div style="font-weight:700;">Floor ${fl.floor}${fl.bldg?' · '+fl.bldg:''}</div>
+      <div style="background:var(--surface2);padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="font-weight:700;min-width:60px;">Floor ${fl.floor}</div>
+        <input style="width:65px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:12px;" value="${fl.bldg||''}" placeholder="Bldg" oninput="_editStruct.floors[${fi}].bldg=this.value"/>
+        <input type="number" style="width:90px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:12px;" value="${fl.budgetBoards||''}" placeholder="Board budget" oninput="_editStruct.floors[${fi}].budgetBoards=parseFloat(this.value)||0"/>
         <span class="badge badge-blue">${(fl.units||[]).length} units</span>
-        ${fl.budgetBoards?`<span style="font-size:11px;color:var(--ink3);">${fl.budgetBoards} boards budgeted</span>`:''}
-        <button onclick="removeFl(${fi})" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">✕</button>
+        <button onclick="removeFl(${fi})" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;" title="Delete floor">✕</button>
       </div>
       <div style="padding:10px 14px;display:flex;flex-wrap:wrap;gap:6px;">
         ${(fl.units||[]).map((u,ui)=>`<div style="display:flex;align-items:center;gap:3px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:12px;font-weight:600;">${u.unit}<button onclick="removeUnit(${fi},${ui})" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:11px;padding:0 1px;">✕</button></div>`).join('')}
@@ -2314,6 +2411,52 @@ function renderJobSetupBody() {
   });
   if (!(_editStruct.floors||[]).length) html += '<div class="no-data">No floors added yet.</div>';
   el.innerHTML = html;
+}
+
+
+function batchSetupFloors() {
+  const floorsInput = document.getElementById('js-batch-floors')?.value.trim();
+  const bldgsInput = document.getElementById('js-batch-bldgs')?.value.trim() || '';
+  const unitsInput = document.getElementById('js-batch-units')?.value.trim() || '';
+  const budBoards = parseFloat(document.getElementById('js-batch-boards')?.value||0)||0;
+
+  if (!floorsInput) { showToast('Enter floor range'); return; }
+
+  // Parse floors
+  const floors = [];
+  if (floorsInput.includes('-')) {
+    const [s,e] = floorsInput.split('-').map(Number);
+    for (let i=s;i<=e;i++) floors.push(String(i));
+  } else {
+    floorsInput.split(',').forEach(f => floors.push(f.trim()));
+  }
+
+  // Parse buildings
+  const bldgs = bldgsInput ? bldgsInput.split(',').map(b=>b.trim()) : [''];
+
+  // Parse units
+  let unitRange = [];
+  if (unitsInput && unitsInput.includes('-')) {
+    const [s,e] = unitsInput.split('-').map(Number);
+    for (let u=s;u<=e;u++) unitRange.push(String(u));
+  } else if (unitsInput) {
+    unitRange = unitsInput.split(',').map(u=>u.trim());
+  }
+
+  // Generate floors
+  if (!_editStruct.floors) _editStruct.floors = [];
+  floors.forEach(floor => {
+    bldgs.forEach(bldg => {
+      // Skip if already exists
+      const exists = _editStruct.floors.find(f => String(f.floor)===floor && (f.bldg||'') === bldg);
+      if (exists) return;
+      const units = unitRange.map(u => ({unit: u, budgetBoards: 0}));
+      _editStruct.floors.push({floor, bldg, budgetBoards: budBoards, units});
+    });
+  });
+  _editStruct.floors.sort((a,b) => parseInt(a.floor)-parseInt(b.floor));
+  renderJobSetupBody();
+  showToast('✓ Generated ' + floors.length + ' floor' + (floors.length>1?'s':'') + ' with ' + unitRange.length + ' units each');
 }
 
 function addFloorToStruct() {
