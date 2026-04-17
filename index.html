@@ -1583,48 +1583,33 @@ async function handlePDFFile(file) {
   if (!file) return;
   const resultEl = document.getElementById('pdf-result');
   resultEl.style.display = 'block';
-  resultEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink3);">⏳ Reading PDF and extracting data...</div>';
+  resultEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink3);">⏳ Reading PDF — extracting PO data...</div>';
 
-  // Read PDF as base64
   const reader = new FileReader();
   reader.onload = async function(e) {
     const base64 = e.target.result.split(',')[1];
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('https://svvjsumhkbezbyskxxej.supabase.co/functions/v1/extract-po', {
         method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{
-            role: 'user',
-            content: [
-              {type: 'document', source: {type: 'base64', media_type: 'application/pdf', data: base64}},
-              {type: 'text', text: `Extract this Purchase Order data as JSON only, no markdown, no explanation. Format:
-{"po_number":"","vendor":"","job_name":"","ship_to":"","building":"","floor":"","unit":"","model":"","date":"","lines":[{"sku":"","description":"","qty":0,"rate":0,"amount":0}],"total":0}
-If a field is not present, use empty string or 0. Extract ALL line items.`}
-            ]
-          }]
-        })
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ pdf_base64: base64, source: 'upload' })
       });
       const data = await res.json();
-      const text = data.content?.[0]?.text || '';
-      let po;
-      try {
-        po = JSON.parse(text.replace(/```json|```/g,'').trim());
-      } catch(err) {
-        resultEl.innerHTML = '<div class="alert alert-red">Could not parse PDF data. Make sure it is a QuickBooks PO PDF.</div>';
+      if (data.error) {
+        resultEl.innerHTML = '<div class="alert alert-red">❌ ' + data.error + '</div>';
         return;
       }
-      renderPDFResult(po);
+      if (data.duplicate) showToast('⚠️ Duplicate PO #' + (data.po?.po_number||'') + ' — flagged for review');
+      renderPDFResult(data.po, data.id);
     } catch(err) {
-      resultEl.innerHTML = '<div class="alert alert-red">Error reading PDF: ' + err.message + '</div>';
+      resultEl.innerHTML = '<div class="alert alert-red">❌ Error: ' + err.message + '</div>';
     }
   };
   reader.readAsDataURL(file);
 }
 
-function renderPDFResult(po) {
+
+function renderPDFResult(po, savedId) {
   const resultEl = document.getElementById('pdf-result');
   const jobs = getJobs();
   const matchedJob = jobs.find(j => j.toUpperCase().includes((po.job_name||'').toUpperCase().split(' ')[0])) || '';
@@ -1654,12 +1639,12 @@ function renderPDFResult(po) {
       </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
         <button onclick="document.getElementById('pdf-result').style.display='none'" style="padding:8px 16px;border:1.5px solid var(--border);background:var(--surface);border-radius:8px;cursor:pointer;font-weight:600;">Cancel</button>
-        <button onclick="confirmPDFPO(${JSON.stringify(po).replace(/"/g,'&quot;')})" style="padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">✓ Add to Tracker</button>
+        <button onclick="confirmPDFPO(${JSON.stringify(po).replace(/"/g,'&quot;')}, '${savedId||''}')" style="padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">✓ Add to Tracker</button>
       </div>
     </div>`;
 }
 
-function confirmPDFPO(po) {
+function confirmPDFPO(po, savedId) {
   const job = document.getElementById('pdf-job')?.value;
   const bldg = document.getElementById('pdf-bldg')?.value || po.building || '';
   const floor = document.getElementById('pdf-floor')?.value || po.floor || '';
@@ -1670,7 +1655,18 @@ function confirmPDFPO(po) {
   // Store in S.assignments as a manual PO
   if (!S.assignments) S.assignments = {};
   S.assignments[poNum] = {job, bldg, floor, unit, manual: true, lines: po.lines, total: po.total, vendor: po.vendor, date: new Date().toISOString().split('T')[0]};
-  saveSharedData('assignments').then ? saveSharedData('assignments').then(() => {
+  saveSharedData('assignments').then ? saveSharedData('assignments').then(async () => {
+    // Mark as confirmed in po_pdfs table
+    if (savedId) {
+      await fetch('https://svvjsumhkbezbyskxxej.supabase.co/rest/v1/po_pdfs?id=eq.' + savedId, {
+        method: 'PATCH',
+        headers: {
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2dmpzdW1oa2JlemJ5c2t4eGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMjYxNzMsImV4cCI6MjA5MTcwMjE3M30.91A6_m36yMsOr2vofpH7wTVVnCtpuM2hssy1K-vStRQ',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: 'confirmed', job_name: job })
+      });
+    }
     showToast('✓ PO #' + poNum + ' added to ' + job.replace('JOB ',''));
     document.getElementById('pdf-result').style.display = 'none';
   }) : saveSharedData('assignments');
@@ -3733,6 +3729,7 @@ function loadLogo() {
 
 // ── HOME PAGE ─────────────────────────────────────────────────
 function renderHome() {
+  loadPendingPOs();
   // Date line
   const now = new Date();
   const el = document.getElementById('home-date-line');
