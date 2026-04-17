@@ -4,8 +4,9 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>AA Drywall Tracker</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 
 :root {
@@ -29,8 +30,8 @@
   --r: 12px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;letter-spacing:.01em;}
-h1,h2,h3,h4{font-family:'Syne',sans-serif;font-weight:700;line-height:1.2;}
+html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif;font-weight:700;line-height:1.2;}
 input,select,button,textarea{font-family:'DM Sans',sans-serif;}
 a{color:var(--accent);}
 
@@ -87,7 +88,7 @@ a{color:var(--accent);}
   display:flex;align-items:center;justify-content:space-between;
   position:sticky;top:0;z-index:50;
 }
-.topbar-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;letter-spacing:-.01em;}
+.topbar-title{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--ink);}
 .topbar-right{display:flex;align-items:center;gap:10px;}
 .sync-label{font-size:11px;color:var(--ink3);}
 
@@ -98,14 +99,14 @@ a{color:var(--accent);}
 /* ── CARDS ───────────────── */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);}
 .card-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-.card-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;}
+.card-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;letter-spacing:-.01em;}
 .card-body{padding:16px;}
 
 /* ── STAT CARDS ──────────── */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;}
 .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;}
 .stat-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);font-weight:600;margin-bottom:5px;}
-.stat-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;line-height:1;}
+.stat-val{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;line-height:1;}
 .stat-sub{font-size:10px;color:var(--ink3);margin-top:3px;}
 
 /* ── BUTTONS ──────────────── */
@@ -154,7 +155,7 @@ a{color:var(--accent);}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.6);animation:modalIn .2s ease;}
 @keyframes modalIn{from{opacity:0;transform:scale(.95);}to{opacity:1;transform:scale(1);}}
 .modal-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-.modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;}
+.modal-title{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;}
 .modal-close{width:30px;height:30px;border-radius:6px;border:none;background:var(--surface2);cursor:pointer;font-size:16px;color:var(--ink2);display:flex;align-items:center;justify-content:center;}
 .modal-body{padding:20px;}
 .modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
@@ -183,7 +184,7 @@ a{color:var(--accent);}
 .unit-card.over-budget{border-color:var(--red);background:rgba(248,113,113,.06);}
 .unit-card.near-budget{border-color:var(--yellow);background:rgba(251,191,36,.06);}
 .unit-card.no-data{opacity:.5;}
-.unit-num{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;margin-bottom:4px;}
+.unit-num{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;margin-bottom:4px;}
 .unit-boards{font-size:12px;color:var(--blue);font-weight:700;}
 .unit-spend{font-size:11px;color:var(--ink3);margin-top:2px;}
 
@@ -195,7 +196,7 @@ a{color:var(--accent);}
   cursor:pointer;
 }
 .floor-hdr:hover{background:var(--surface3);}
-.floor-num{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;}
+.floor-num{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;}
 .floor-body{padding:0 16px 16px;background:var(--surface);}
 
 /* ── ACTIVITY FEED ────────── */
@@ -233,7 +234,7 @@ a{color:var(--accent);}
 /* ── BOARD PPB CARDS ──────── */
 .ppb-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;text-align:center;}
 .ppb-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);font-weight:600;margin-bottom:6px;}
-.ppb-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;line-height:1;}
+.ppb-val{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;line-height:1;}
 .ppb-sub{font-size:11px;color:var(--ink3);margin-top:4px;}
 
 /* ── AI CHAT ──────────────── */
@@ -286,9 +287,31 @@ a{color:var(--accent);}
 
 /* ── MISC ─────────────────── */
 .divider{height:1px;background:var(--border);margin:16px 0;}
-.section-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;margin-bottom:12px;}
+.section-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;margin-bottom:12px;letter-spacing:-.01em;}
 .no-data{color:var(--ink3);font-size:12px;font-style:italic;padding:16px 0;}
 
+
+/* ── DASHBOARD ────────────────────────────────── */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;}
+.dash-job-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;transition:border-color .15s;}
+.dash-job-card:hover{border-color:var(--accent);}
+.dash-job-name{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;margin-bottom:10px;color:var(--ink);}
+.dash-ppb{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;color:var(--accent);}
+.dash-ppb-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:4px;}
+.dash-prog-wrap{height:5px;background:var(--surface3);border-radius:5px;overflow:hidden;margin:8px 0 4px;}
+.dash-prog-fill{height:100%;border-radius:5px;transition:width .5s ease;}
+.dash-chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.dash-chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;}
+.dash-chart-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--ink);margin-bottom:14px;}
+.dash-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.dash-table th{padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);border-bottom:1px solid var(--border);background:var(--surface2);font-weight:600;}
+.dash-table td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--ink);}
+.dash-table tr:last-child td{border-bottom:none;}
+.dash-table tr:hover td{background:var(--surface2);}
+.dash-on-track{color:var(--green);font-weight:700;}
+.dash-over{color:var(--red);font-weight:700;}
+.dash-warn{color:var(--yellow);font-weight:700;}
+.dash-neutral{color:var(--ink3);}
 </style>
 </head>
 <body>
@@ -300,12 +323,12 @@ a{color:var(--accent);}
       <img id="login-logo-img" src="" alt=""/>
       <span id="login-logo-icon">🏗️</span>
     </div>
-    <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;">AA Drywall</div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;margin-bottom:4px;">AA Drywall</div>
     <div style="font-size:12px;color:var(--ink3);margin-bottom:28px;">Job Tracking Platform</div>
     <input id="login-pw" type="password" placeholder="passcode" autocomplete="off"
       style="width:100%;padding:12px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--ink);font-size:15px;text-align:center;letter-spacing:3px;margin-bottom:12px;outline:none;"
       onkeydown="if(event.key==='Enter')tryLogin()"/>
-    <button onclick="tryLogin()" style="width:100%;padding:12px;border-radius:8px;border:none;cursor:pointer;background:var(--accent);color:#fff;font-size:14px;font-weight:700;font-family:'Syne',sans-serif;">Enter</button>
+    <button onclick="tryLogin()" style="width:100%;padding:12px;border-radius:8px;border:none;cursor:pointer;background:var(--accent);color:#fff;font-size:14px;font-weight:700;font-family:'Space Grotesk',sans-serif;">Enter</button>
     <div id="login-err" style="color:var(--red);font-size:12px;margin-top:8px;display:none;">Incorrect passcode</div>
   </div>
 </div>
@@ -325,8 +348,12 @@ a{color:var(--accent);}
   <button class="nav-icon-btn active" data-page="home" onclick="nav('home')" title="Home">
     <span>⚡</span><span class="label">Feed</span>
   </button>
+  <button class="nav-icon-btn" data-page="dashboard" onclick="nav('dashboard')" title="Dashboard">
+    <span>📊</span><span class="label">Dash</span>
+  </button>
   <button class="nav-icon-btn" data-page="inbox" onclick="nav('inbox')" title="Inbox" style="position:relative;">
     <span>📥</span><span class="label">Inbox</span>
+    <span id="inbox-badge" style="display:none;position:absolute;top:4px;right:4px;background:var(--yellow);color:#000;font-size:9px;font-weight:700;border-radius:10px;padding:1px 5px;min-width:16px;text-align:center;line-height:14px;">0</span>
     <div class="nav-badge-dot" id="inbox-dot" style="display:none;"></div>
   </button>
   <button class="nav-icon-btn" data-page="jobs" onclick="nav('jobs')" title="Jobs">
@@ -403,6 +430,64 @@ a{color:var(--accent);}
             <div class="no-data">Loading...</div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══ DASHBOARD ════════════════════════════════ -->
+  <div class="page" id="page-dashboard">
+    <!-- Top summary stats -->
+    <div id="dash-top-stats" class="dash-grid" style="margin-bottom:20px;"></div>
+
+    <!-- Charts row -->
+    <div class="dash-chart-grid" style="margin-bottom:20px;">
+      <div class="dash-chart-card">
+        <div class="dash-chart-title">Spend by Job</div>
+        <div style="position:relative;height:200px;"><canvas id="dash-chart-jobs"></canvas></div>
+      </div>
+      <div class="dash-chart-card">
+        <div class="dash-chart-title">Material Categories</div>
+        <div style="position:relative;height:200px;"><canvas id="dash-chart-cats"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Job breakdown cards with PPB -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-hdr">
+        <span class="card-title">Job Cost Summary — Price Per Board</span>
+        <span style="font-size:11px;color:var(--ink3);">Material + Labor ÷ Boards ordered</span>
+      </div>
+      <div class="card-body" style="padding:0;overflow-x:auto;">
+        <table class="dash-table" id="dash-ppb-table">
+          <thead><tr>
+            <th>Job</th>
+            <th style="text-align:right;">Boards</th>
+            <th style="text-align:right;">Mat Spend</th>
+            <th style="text-align:right;">Labor Billed</th>
+            <th style="text-align:right;">Total $/Board</th>
+            <th style="text-align:right;">Mat $/Board</th>
+            <th style="text-align:right;">Labor $/Board</th>
+            <th style="text-align:right;">Target</th>
+            <th style="text-align:center;">Status</th>
+            <th style="text-align:right;">Budget Used</th>
+          </tr></thead>
+          <tbody id="dash-ppb-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PO activity table -->
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-title">Recent Activity</span>
+        <span style="font-size:11px;color:var(--ink3);" id="dash-activity-count"></span>
+      </div>
+      <div style="overflow-x:auto;max-height:320px;overflow-y:auto;">
+        <table class="dash-table">
+          <thead><tr><th>PO #</th><th>Job</th><th>Materials</th><th>Bldg</th><th>Floor</th><th style="text-align:right;">Amount</th><th>Status</th></tr></thead>
+          <tbody id="dash-activity-tbody"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -559,6 +644,7 @@ a{color:var(--accent);}
 
 <script>
 let sb = null;
+let chartJobs = null, chartCats = null;
 
 const SB_URL = 'https://svvjsumhkbezbyskxxej.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2dmpzdW1oa2JlemJ5c2t4eGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMjYxNzMsImV4cCI6MjA5MTcwMjE3M30.91A6_m36yMsOr2vofpH7wTVVnCtpuM2hssy1K-vStRQ';
@@ -843,11 +929,10 @@ async function syncAll() {
     }
   });
     localStorage.setItem('dw_last_sync', S.lastSync);
-    document.getElementById('last-sync-label').textContent = 'Last sync: ' + new Date().toLocaleTimeString();
-    document.getElementById('sheet-status-mini').textContent = '✓ Connected · ' + S.rows.length + ' PO rows';
-    document.getElementById('sheet-status-mini').className = 'sheet-status ok';
-    document.getElementById('sheet-connected-label').textContent = '✓ Sheet connected';
-    document.getElementById('sheet-connected-label').className = 'sheet-status ok';
+    const lsl = document.getElementById('last-sync-label'); if(lsl) lsl.textContent = 'Last sync: ' + new Date().toLocaleTimeString();
+    const smi = document.getElementById('sheet-status-mini'); if(smi){smi.textContent='✓ Connected · '+S.rows.length+' PO rows';smi.className='sheet-status ok';}
+    const scl = document.getElementById('sheet-connected-label'); if(scl){scl.textContent='✓ Sheet connected';scl.className='sheet-status ok';}
+    const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--green)';
     populateJobSelects();
     // renderDashboard removed - no dashboard page
     updateInboxBadge();
@@ -856,9 +941,8 @@ async function syncAll() {
     showToast('⚠️ Sync failed: ' + e.message, true);
     console.warn('Sync error:', e.message);
     // Only show error if we have no data at all
-    if (S.rows.length === 0) {
-      document.getElementById('sheet-status-mini').textContent = '⚠ Sync error';
-    }
+    const smie = document.getElementById('sheet-status-mini'); if(smie&&S.rows.length===0) smie.textContent='⚠ Sync error';
+    const doterr = document.getElementById('sync-dot'); if(doterr) doterr.style.background='var(--red)';
   }
 
   btn.disabled = false;
@@ -986,17 +1070,12 @@ function showToast(msg, isErr) {
 
 function updateInboxBadge() {
   const unassigned = getUnassignedPOs();
-  const unmatchedBills = getUnmatchedBills();
-  const total = unassigned.length + unmatchedBills.length;
+  const unmatched = getUnmatchedBills();
+  const total = unassigned.length + unmatched.length;
   const badge = document.getElementById('inbox-badge');
-  if (total > 0) {
-    badge.textContent = total;
-    badge.style.display = '';
-  } else {
-    badge.style.display = 'none';
-  }
-  document.getElementById('inbox-po-count').textContent = unassigned.length;
-  document.getElementById('inbox-bill-count').textContent = unmatchedBills.length;
+  const dot = document.getElementById('inbox-dot');
+  if (badge) { badge.textContent = total; badge.style.display = total > 0 ? '' : 'none'; }
+  if (dot) dot.style.display = total > 0 ? '' : 'none';
 }
 
 function populateJobSelects() {
@@ -1581,6 +1660,7 @@ function editTargetPPB(job) {
 // ── PAGE TITLES ──────────────────────────────────────────────
 const PAGE_TITLES = {
   home: ['Feed', 'Live activity & PO queue'],
+  dashboard: ['Dashboard', 'Job analytics, boards & budgets'],
   inbox: ['Inbox', 'Items needing attention'],
   jobs: ['Job Costing', 'Map · Estimate · Bills · Summary'],
   raw: ['Raw Data', 'All imported rows'],
@@ -1601,6 +1681,7 @@ function nav(page) {
   if (el1) el1.textContent = t[0];
   if (el2) el2.textContent = t[1];
   if (page === 'home') renderHome();
+  else if (page === 'dashboard') renderDashboard();
   else if (page === 'inbox') renderInbox();
   else if (page === 'jobs') renderJobsPage();
   else if (page === 'raw') renderRaw();
@@ -2409,109 +2490,180 @@ function showJobSetup() {
 
 function renderJobSetupBody() {
   const el = document.getElementById('job-setup-body'); if (!el) return;
-  let html = `<!-- Batch setup -->
-  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;">
-    <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">⚡ Quick Batch Setup</div>
-    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">FLOORS (e.g. 1,2,3 or 1-5)</div><input id="js-batch-floors" class="inp inp-sm" style="width:120px;" placeholder="1-5 or 1,2,3"/></div>
-      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">BUILDINGS (e.g. R1,R2)</div><input id="js-batch-bldgs" class="inp inp-sm" style="width:100px;" placeholder="R1 or R1,R2"/></div>
-      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">UNITS PER FLOOR (e.g. 101-116)</div><input id="js-batch-units" class="inp inp-sm" style="width:120px;" placeholder="101-116"/></div>
-      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">BOARD BUDGET/FL</div><input id="js-batch-boards" class="inp inp-sm" style="width:80px;" type="number" placeholder="240"/></div>
-      <button class="btn btn-primary btn-sm" onclick="batchSetupFloors()">⚡ Generate</button>
+  const struct = _editStruct;
+
+  let html = `
+  <!-- ⚡ Smart Batch Generator -->
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+    <div style="font-size:12px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">⚡ Auto-Generate Structure</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:10px;">
+      <div>
+        <div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:3px;">BUILDINGS (e.g. 1-4 or R1,R2)</div>
+        <input id="js-bldgs" class="inp inp-sm" placeholder="1-4 or R1,R2"/>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:3px;">FLOORS PER BUILDING</div>
+        <input id="js-floors-per" class="inp inp-sm" type="number" placeholder="4" min="1"/>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:3px;">UNIT RANGE (e.g. 101-116)</div>
+        <input id="js-unit-range" class="inp inp-sm" placeholder="101-116"/>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:3px;">BOARDS/FLOOR BUDGET</div>
+        <input id="js-bb-auto" class="inp inp-sm" type="number" placeholder="240"/>
+      </div>
     </div>
+    <div style="font-size:11px;color:var(--ink3);margin-bottom:8px;">💡 Floor 1 → units 101-116 · Floor 2 → 201-216 · Floor 3 → 301-316 (auto-increments by floor)</div>
+    <button class="btn btn-primary btn-sm" onclick="smartGenerate()">⚡ Generate All Floors & Units</button>
   </div>
-  <div style="font-size:11px;color:var(--ink3);margin-bottom:10px;font-weight:600;">OR add floors one at a time:</div>
+
+  <div style="font-size:11px;color:var(--ink3);margin-bottom:10px;font-weight:600;">— OR add a single floor manually —</div>
+  
+  <!-- Manual add -->
   <div style="display:flex;gap:8px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;">
-    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">FLOOR</div><input id="js-fl" class="inp inp-sm" style="width:65px;" placeholder="3"/></div>
-    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">BLDG</div><input id="js-bldg" class="inp inp-sm" style="width:65px;" placeholder="R1"/></div>
-    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">UNIT START</div><input id="js-us" class="inp inp-sm" style="width:80px;" placeholder="301"/></div>
-    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">UNIT END</div><input id="js-ue" class="inp inp-sm" style="width:80px;" placeholder="316"/></div>
-    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">BOARD BUDGET</div><input id="js-bb" class="inp inp-sm" style="width:90px;" type="number" placeholder="240"/></div>
-    <button class="btn btn-primary btn-sm" onclick="addFloorToStruct()">+ Add Floor</button>
+    <div><div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:2px;">BUILDING</div><input id="js-bldg" class="inp inp-sm" style="width:70px;" placeholder="1"/></div>
+    <div><div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:2px;">FLOOR</div><input id="js-fl" class="inp inp-sm" style="width:65px;" placeholder="3"/></div>
+    <div><div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:2px;">UNIT RANGE</div><input id="js-us" class="inp inp-sm" style="width:90px;" placeholder="301-316"/></div>
+    <div><div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:2px;">BOARD BUDGET</div><input id="js-bb" class="inp inp-sm" style="width:80px;" type="number" placeholder="240"/></div>
+    <button class="btn btn-ghost btn-sm" onclick="addFloorToStruct()">+ Add Floor</button>
   </div>`;
 
-  (_editStruct.floors||[]).forEach((fl,fi)=>{
-    html += `<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">
-      <div style="background:var(--surface2);padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <div style="font-weight:700;min-width:60px;">Floor ${fl.floor}</div>
-        <input style="width:65px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:12px;" value="${fl.bldg||''}" placeholder="Bldg" oninput="_editStruct.floors[${fi}].bldg=this.value"/>
-        <input type="number" style="width:90px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:12px;" value="${fl.budgetBoards||''}" placeholder="Board budget" oninput="_editStruct.floors[${fi}].budgetBoards=parseFloat(this.value)||0"/>
-        <span class="badge badge-blue">${(fl.units||[]).length} units</span>
-        <button onclick="removeFl(${fi})" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;" title="Delete floor">✕</button>
-      </div>
-      <div style="padding:10px 14px;display:flex;flex-wrap:wrap;gap:6px;">
-        ${(fl.units||[]).map((u,ui)=>`<div style="display:flex;align-items:center;gap:3px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:12px;font-weight:600;">${u.unit}<button onclick="removeUnit(${fi},${ui})" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:11px;padding:0 1px;">✕</button></div>`).join('')}
-        <button onclick="addUnit(${fi})" style="padding:3px 8px;background:var(--surface2);border:1px dashed var(--border);border-radius:5px;font-size:11px;cursor:pointer;color:var(--ink3);">+ Unit</button>
-      </div>
-    </div>`;
+  // Group floors by building for tree view
+  const byBldg = {};
+  (struct.floors||[]).forEach((fl,fi) => {
+    const bKey = fl.bldg||'(no building)';
+    if (!byBldg[bKey]) byBldg[bKey] = [];
+    byBldg[bKey].push({...fl, _fi: fi});
   });
-  if (!(_editStruct.floors||[]).length) html += '<div class="no-data">No floors added yet.</div>';
+
+  if (Object.keys(byBldg).length === 0) {
+    html += '<div class="no-data" style="padding:12px 0;">No structure yet. Use the generator above or add floors manually.</div>';
+  } else {
+    // Render building → floor tree
+    Object.entries(byBldg).sort().forEach(([bldg, floors]) => {
+      const bldgTotal = floors.reduce((s,fl)=>s+(fl.units||[]).length,0);
+      const bldgBoards = floors.reduce((s,fl)=>s+(parseFloat(fl.budgetBoards||0)),0);
+      html += `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;">
+        <div style="background:var(--surface3);padding:10px 14px;display:flex;align-items:center;gap:10px;">
+          <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;">🏢 Building ${bldg}</span>
+          <span class="badge badge-blue" style="font-size:9px;">${floors.length} floors</span>
+          <span class="badge badge-gray" style="font-size:9px;">${bldgTotal} units</span>
+          ${bldgBoards>0?`<span style="font-size:11px;color:var(--ink3);">${Math.round(bldgBoards)} boards budgeted</span>`:''}
+        </div>`;
+
+      floors.sort((a,b)=>parseInt(a.floor)-parseInt(b.floor)).forEach(fl => {
+        const fi = fl._fi;
+        html += `<div style="border-top:1px solid var(--border);padding:10px 14px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+            <span style="font-weight:600;font-size:13px;min-width:60px;">Floor ${fl.floor}</span>
+            <input style="width:65px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:11px;" value="${fl.bldg||''}" placeholder="Bldg" oninput="_editStruct.floors[${fi}].bldg=this.value"/>
+            <input type="number" style="width:90px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:11px;" value="${fl.budgetBoards||''}" placeholder="Board budget" oninput="_editStruct.floors[${fi}].budgetBoards=parseFloat(this.value)||0"/>
+            <span class="badge badge-gray" style="font-size:9px;">${(fl.units||[]).length} units</span>
+            <button onclick="removeFl(${fi})" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;" title="Remove floor">✕</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;">
+            ${(fl.units||[]).map((u,ui)=>`<div style="display:inline-flex;align-items:center;gap:3px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 7px;font-size:11px;font-weight:500;">${u.unit}<button onclick="removeUnit(${fi},${ui})" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:10px;padding:0 0 0 3px;line-height:1;">✕</button></div>`).join('')}
+            <button onclick="addUnit(${fi})" style="padding:3px 8px;background:none;border:1px dashed var(--border);border-radius:5px;font-size:11px;cursor:pointer;color:var(--ink3);">+ Unit</button>
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+    });
+  }
+
   el.innerHTML = html;
 }
 
 
-function batchSetupFloors() {
-  const floorsInput = document.getElementById('js-batch-floors')?.value.trim();
-  const bldgsInput = document.getElementById('js-batch-bldgs')?.value.trim() || '';
-  const unitsInput = document.getElementById('js-batch-units')?.value.trim() || '';
-  const budBoards = parseFloat(document.getElementById('js-batch-boards')?.value||0)||0;
+function batchSetupFloors() { smartGenerate(); }
 
-  if (!floorsInput) { showToast('Enter floor range'); return; }
+function smartGenerate() {
+  const bldgsInput = document.getElementById('js-bldgs')?.value.trim()||'';
+  const floorsPerInput = document.getElementById('js-floors-per')?.value.trim()||'';
+  const unitRange = document.getElementById('js-unit-range')?.value.trim()||'';
+  const budBoards = parseFloat(document.getElementById('js-bb-auto')?.value||0)||0;
 
-  // Parse floors
-  const floors = [];
-  if (floorsInput.includes('-')) {
-    const [s,e] = floorsInput.split('-').map(Number);
-    for (let i=s;i<=e;i++) floors.push(String(i));
-  } else {
-    floorsInput.split(',').forEach(f => floors.push(f.trim()));
+  if (!bldgsInput || !floorsPerInput || !unitRange) {
+    showToast('Fill in buildings, floors, and unit range'); return;
   }
 
   // Parse buildings
-  const bldgs = bldgsInput ? bldgsInput.split(',').map(b=>b.trim()) : [''];
-
-  // Parse units
-  let unitRange = [];
-  if (unitsInput && unitsInput.includes('-')) {
-    const [s,e] = unitsInput.split('-').map(Number);
-    for (let u=s;u<=e;u++) unitRange.push(String(u));
-  } else if (unitsInput) {
-    unitRange = unitsInput.split(',').map(u=>u.trim());
+  const bldgs = [];
+  if (bldgsInput.includes('-') && !isNaN(bldgsInput.split('-')[0])) {
+    const [s,e] = bldgsInput.split('-').map(Number);
+    for (let b=s;b<=e;b++) bldgs.push(String(b));
+  } else {
+    bldgsInput.split(',').forEach(b => bldgs.push(b.trim()));
   }
 
-  // Generate floors
+  // Parse floor count
+  const floorCount = parseInt(floorsPerInput)||1;
+
+  // Parse unit range (first floor: e.g. "101-116")
+  let firstFloorStart = 1, firstFloorEnd = 1, unitsPerFloor = 0;
+  if (unitRange.includes('-')) {
+    const parts = unitRange.split('-').map(s=>s.trim());
+    firstFloorStart = parseInt(parts[0]);
+    firstFloorEnd = parseInt(parts[1]);
+    unitsPerFloor = firstFloorEnd - firstFloorStart + 1;
+  } else {
+    firstFloorStart = parseInt(unitRange); firstFloorEnd = firstFloorStart; unitsPerFloor = 1;
+  }
+
+  // Get the floor number offset (e.g. 101 → floor 1, 201 → floor 2)
+  // Detect: 101 means floor 1 starts at X01, 201 means floor 2 starts at X01
+  const floorDigit = Math.floor(firstFloorStart / 100); // e.g. 101→1, 201→2
+  const unitSuffix = firstFloorStart % 100; // e.g. 101→01, 201→01
+
   if (!_editStruct.floors) _editStruct.floors = [];
-  floors.forEach(floor => {
-    bldgs.forEach(bldg => {
+  let added = 0;
+
+  bldgs.forEach(bldg => {
+    for (let f = 1; f <= floorCount; f++) {
+      const floorNum = f; // actual floor number (1,2,3,4...)
+      // Smart unit numbering: floor 1 → 101-116, floor 2 → 201-216, etc.
+      // Offset floor number to match unit prefix
+      const unitStart = floorNum * 100 + unitSuffix;
+      const unitEnd = unitStart + unitsPerFloor - 1;
+      
+      const units = [];
+      for (let u=unitStart; u<=unitEnd; u++) units.push({unit:String(u),budgetBoards:0});
+
       // Skip if already exists
-      const exists = _editStruct.floors.find(f => String(f.floor)===floor && (f.bldg||'') === bldg);
+      const exists = _editStruct.floors.find(fl=>String(fl.floor)===String(floorNum)&&(fl.bldg||'')===bldg);
       if (exists) return;
-      const units = unitRange.map(u => ({unit: u, budgetBoards: 0}));
-      _editStruct.floors.push({floor, bldg, budgetBoards: budBoards, units});
-    });
+      
+      _editStruct.floors.push({floor:String(floorNum), bldg, budgetBoards:budBoards, units});
+      added++;
+    }
   });
-  _editStruct.floors.sort((a,b) => parseInt(a.floor)-parseInt(b.floor));
+
+  _editStruct.floors.sort((a,b)=>a.bldg.localeCompare(b.bldg)||parseInt(a.floor)-parseInt(b.floor));
   renderJobSetupBody();
-  showToast('✓ Generated ' + floors.length + ' floor' + (floors.length>1?'s':'') + ' with ' + unitRange.length + ' units each');
+  showToast(`✓ Generated ${added} floors across ${bldgs.length} building${bldgs.length>1?'s':''} · ${unitsPerFloor} units each`);
 }
 
 function addFloorToStruct() {
-  const floor = document.getElementById('js-fl')?.value.trim(); if (!floor) { showToast('Enter floor number'); return; }
+  const floor = document.getElementById('js-fl')?.value.trim(); if (!floor) { showToast('Enter a floor number'); return; }
   const bldg = document.getElementById('js-bldg')?.value.trim()||'';
-  const us = document.getElementById('js-us')?.value.trim();
-  const ue = document.getElementById('js-ue')?.value.trim();
+  const unitRangeStr = document.getElementById('js-us')?.value.trim()||'';
   const bb = parseFloat(document.getElementById('js-bb')?.value||0)||0;
   const units = [];
-  if (us) {
-    const sn=parseInt(us), en=ue?parseInt(ue):sn;
-    if (!isNaN(sn)&&!isNaN(en)) for(let u=sn;u<=en;u++) units.push({unit:String(u),budgetBoards:0});
-    else units.push({unit:us,budgetBoards:0});
+  if (unitRangeStr) {
+    if (unitRangeStr.includes('-')) {
+      const [s,e] = unitRangeStr.split('-').map(Number);
+      if (!isNaN(s)&&!isNaN(e)) for(let u=s;u<=e;u++) units.push({unit:String(u),budgetBoards:0});
+      else units.push({unit:unitRangeStr,budgetBoards:0});
+    } else {
+      unitRangeStr.split(',').forEach(u=>units.push({unit:u.trim(),budgetBoards:0}));
+    }
   }
   if (!_editStruct.floors) _editStruct.floors=[];
   _editStruct.floors.push({floor,bldg,budgetBoards:bb,units});
-  _editStruct.floors.sort((a,b)=>parseInt(a.floor)-parseInt(b.floor));
+  _editStruct.floors.sort((a,b)=>a.bldg.localeCompare(b.bldg)||parseInt(a.floor)-parseInt(b.floor));
   renderJobSetupBody();
-  ['js-fl','js-bldg','js-us','js-ue','js-bb'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['js-fl','js-bldg','js-us','js-bb'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
 }
 
 function removeFl(fi) { _editStruct.floors.splice(fi,1); renderJobSetupBody(); }
@@ -2552,7 +2704,7 @@ function renderEstimateTab(job) {
   const LABOR_CATS=['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
   const labor=getJobLabor(job);
   let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-    <div><div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;">${job.replace('JOB ','')} — Estimate</div>
+    <div><div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:800;">${job.replace('JOB ','')} — Estimate</div>
     <div style="font-size:11px;color:var(--ink3);">Set quantities and unit prices</div></div>
     <div style="display:flex;gap:8px;">
       <button onclick="addEstLine('${job.replace(/'/g,"\\'")}');" class="btn btn-ghost btn-sm">+ Add Item</button>
@@ -2564,14 +2716,14 @@ function renderEstimateTab(job) {
     <thead><tr><th>Material</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Unit $</th><th class="tbl-r">Total</th><th></th></tr></thead>
     <tbody id="est-tbody-inner"></tbody>
     <tfoot><tr style="background:var(--surface3);">
-      <td colspan="4" style="padding:10px 14px;font-weight:700;font-family:'Syne',sans-serif;">MATERIAL TOTAL</td>
+      <td colspan="4" style="padding:10px 14px;font-weight:700;font-family:'Space Grotesk',sans-serif;">MATERIAL TOTAL</td>
       <td class="tbl-r" style="padding:10px 14px;font-weight:800;font-size:15px;" id="est-mat-total">$0</td>
       <td></td>
     </tr></tfoot>
   </table></div>`;
 
   html += `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
-    <div style="background:var(--surface2);padding:10px 14px;font-weight:700;font-size:13px;font-family:'Syne',sans-serif;">🔨 Labor Budget</div>
+    <div style="background:var(--surface2);padding:10px 14px;font-weight:700;font-size:13px;font-family:'Space Grotesk',sans-serif;">🔨 Labor Budget</div>
     <div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">
       ${LABOR_CATS.map(cat=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:10px 11px;">
         <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">${cat}</div>
@@ -2581,7 +2733,7 @@ function renderEstimateTab(job) {
     </div>
     <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
       <span style="font-size:13px;font-weight:600;">Labor Total: <span id="est-labor-total" style="color:var(--accent);">$0</span></span>
-      <span style="font-size:15px;font-weight:800;font-family:'Syne',sans-serif;">Grand Total: <span id="est-grand-total" style="color:var(--accent);">$0</span></span>
+      <span style="font-size:15px;font-weight:800;font-family:'Space Grotesk',sans-serif;">Grand Total: <span id="est-grand-total" style="color:var(--accent);">$0</span></span>
     </div>
   </div>`;
 
@@ -2700,7 +2852,7 @@ function renderJobSummaryTab(job) {
     <div class="card" style="margin-bottom:14px;"><div class="card-body">
       <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
         <div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Total Budget</div>
-          <div style="font-size:26px;font-weight:800;font-family:'Syne',sans-serif;">${fmt(totalBudget)}</div></div>
+          <div style="font-size:26px;font-weight:800;font-family:'Space Grotesk',sans-serif;">${fmt(totalBudget)}</div></div>
         <div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);">Actual Paid</div>
           <div style="font-size:22px;font-weight:700;color:${totalActual>totalBudget?'var(--red)':'var(--green)'};">${fmt(totalActual)}</div></div>
       </div>
@@ -2811,7 +2963,183 @@ function renderTracker() {
   nav('jobs');
 }
 
-function renderDashboard() { renderHome(); }
+function renderDashboard() {
+  const jobs = getJobs();
+  const LABOR_CATS = ['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
+
+  // ── Top stat cards ────────────────────────────────────────────
+  const totalSpend = S.rows.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0);
+  const totalBoards = S.rows.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0);
+  const totalBills = Object.values(S.billAssignments||{}).reduce((s,ba)=>s+parseFloat(ba.total||0),0);
+  const uniqPOs = [...new Set(S.rows.map(r=>String(r['PO NUMBER']||'').trim()).filter(Boolean))];
+  const unassigned = uniqPOs.filter(po=>!S.assignments[po]);
+  const totalMatBudget = jobs.reduce((s,j)=>{
+    const est = getJobEstimate(j);
+    return s + est.reduce((es,it)=>es+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0),0);
+  },0);
+  const totalLaborBudget = jobs.reduce((s,j)=>{
+    const lab = getJobLabor(j);
+    return s + ['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'].reduce((ls,c)=>ls+(parseFloat(lab[c]||0)),0);
+  },0);
+  const totalBudget = totalMatBudget + totalLaborBudget;
+
+  const statsEl = document.getElementById('dash-top-stats');
+  if (statsEl) statsEl.innerHTML = [
+    {lbl:'Total Material Spend', val:fmt(totalSpend), sub:uniqPOs.length+' POs', color:'var(--accent)'},
+    {lbl:'Total Boards', val:Math.round(totalBoards).toLocaleString(), sub:'across all jobs', color:'var(--blue)'},
+    {lbl:'Labor Billed', val:fmt(totalBills), sub:Object.keys(S.billAssignments||{}).length+' bills', color:'var(--green)'},
+    {lbl:'Total Budget', val:totalBudget>0?fmt(totalBudget):'Not set', sub:totalBudget>0?((( totalSpend+totalBills)/totalBudget)*100).toFixed(0)+'% used':'Set estimates', color:'var(--ink)'},
+    {lbl:'Needs Review', val:unassigned.length, sub:'unassigned POs', color:unassigned.length>0?'var(--yellow)':'var(--green)'},
+  ].map(s=>`<div class="stat" style="padding:14px;">
+    <div class="stat-lbl">${s.lbl}</div>
+    <div class="stat-val" style="color:${s.color};">${s.val}</div>
+    <div class="stat-sub">${s.sub}</div>
+  </div>`).join('');
+
+  // ── Charts ────────────────────────────────────────────────────
+  // Chart 1: Spend by job (bar)
+  const jobSpends = jobs.map(j=>S.rows.filter(r=>(r['JOB']||r['Job']||'')===j).reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0));
+  const jobLabels = jobs.map(j=>j.replace('JOB ','').split(' ').slice(0,2).join(' '));
+  const c1 = document.getElementById('dash-chart-jobs');
+  if (c1) {
+    if (c1._chart) c1._chart.destroy();
+    c1._chart = new Chart(c1, {
+      type:'bar',
+      data:{
+        labels: jobLabels,
+        datasets:[{
+          data: jobSpends,
+          backgroundColor:['rgba(255,107,53,.85)','rgba(79,142,247,.85)','rgba(52,211,153,.85)','rgba(167,139,250,.85)','rgba(251,191,36,.85)'],
+          borderRadius:6, borderSkipped:false
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{
+          x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#5A6280',font:{size:11,family:"'DM Sans'"}}},
+          y:{grid:{color:'rgba(255,255,255,.06)'},ticks:{color:'#5A6280',font:{size:11},callback:v=>'$'+(v>=1000?(v/1000).toFixed(0)+'k':v)}}
+        }
+      }
+    });
+  }
+
+  // Chart 2: Material categories (doughnut)
+  const cats = {Boards:0,Metal:0,Finish:0,Supplies:0,Tax:0,Other:0};
+  S.rows.forEach(r=>{
+    const cat = categorize(r['MATERIAL']||'');
+    const amt = parseFloat(r['LINE TOTAL']||0);
+    if(cat==='boards') cats.Boards+=amt;
+    else if(cat==='metal') cats.Metal+=amt;
+    else if(cat==='finish') cats.Finish+=amt;
+    else if(cat==='supplies') cats.Supplies+=amt;
+    else if(cat==='tax') cats.Tax+=amt;
+    else cats.Other+=amt;
+  });
+  const c2 = document.getElementById('dash-chart-cats');
+  if (c2) {
+    if (c2._chart) c2._chart.destroy();
+    const catData = Object.entries(cats).filter(([,v])=>v>0);
+    c2._chart = new Chart(c2, {
+      type:'doughnut',
+      data:{
+        labels:catData.map(([k])=>k),
+        datasets:[{
+          data:catData.map(([,v])=>v),
+          backgroundColor:['rgba(79,142,247,.9)','rgba(251,191,36,.9)','rgba(52,211,153,.9)','rgba(167,139,250,.9)','rgba(248,113,113,.9)','rgba(90,98,128,.9)'],
+          borderColor:'#13161F', borderWidth:2
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{position:'right',labels:{color:'#9BA5BE',font:{size:11,family:"'DM Sans'"},padding:10,boxWidth:12}}
+        }
+      }
+    });
+  }
+
+  // ── PPB Table ─────────────────────────────────────────────────
+  const tbody = document.getElementById('dash-ppb-tbody');
+  if (tbody) {
+    tbody.innerHTML = jobs.map(job => {
+      const jRows = S.rows.filter(r=>(r['JOB']||r['Job']||'')===job);
+      const boards = jRows.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0);
+      const matSpend = jRows.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0);
+      const laborBilled = Object.values(S.billAssignments||{}).filter(ba=>ba.job===job&&LABOR_CATS.some(lc=>(ba.category||'').includes(lc))).reduce((s,ba)=>s+parseFloat(ba.total||0),0);
+      const totalAmt = matSpend + laborBilled;
+      const matPPB = boards>0 ? matSpend/boards : 0;
+      const labPPB = boards>0 ? laborBilled/boards : 0;
+      const totPPB = boards>0 ? totalAmt/boards : 0;
+      const target = parseFloat(S.targets?.[job]?.pricePerBoard||0);
+
+      const est = getJobEstimate(job);
+      const matBudget = est.reduce((s,it)=>s+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0),0);
+      const lab = getJobLabor(job);
+      const labBudget = LABOR_CATS.reduce((s,c)=>s+(parseFloat(lab[c]||0)),0);
+      const totalBudget = matBudget + labBudget;
+      const budgetPct = totalBudget > 0 ? (totalAmt/totalBudget)*100 : 0;
+
+      let statusHtml = '<span class="dash-neutral">—</span>';
+      if (target > 0 && totPPB > 0) {
+        const diff = ((totPPB - target)/target)*100;
+        if (diff > 10) statusHtml = `<span class="dash-over">▲ ${diff.toFixed(0)}% over</span>`;
+        else if (diff < -10) statusHtml = `<span class="dash-on-track">▼ ${Math.abs(diff).toFixed(0)}% under</span>`;
+        else statusHtml = `<span class="dash-on-track">✓ On track</span>`;
+      } else if (totalBudget > 0) {
+        if (budgetPct > 100) statusHtml = `<span class="dash-over">Over budget</span>`;
+        else if (budgetPct > 80) statusHtml = `<span class="dash-warn">Watch</span>`;
+        else if (budgetPct > 0) statusHtml = `<span class="dash-on-track">On track</span>`;
+      }
+
+      const budgetBar = totalBudget > 0 ? `<div class="dash-prog-wrap" style="width:80px;display:inline-block;vertical-align:middle;margin-left:6px;"><div class="dash-prog-fill" style="width:${Math.min(budgetPct,100).toFixed(0)}%;background:${budgetPct>100?'var(--red)':budgetPct>80?'var(--yellow)':'var(--green)'};"></div></div><span style="font-size:11px;color:var(--ink3);">${budgetPct.toFixed(0)}%</span>` : '<span class="dash-neutral">No estimate</span>';
+
+      return `<tr>
+        <td><strong style="color:var(--ink);">${job.replace('JOB ','')}</strong></td>
+        <td style="text-align:right;font-weight:600;">${Math.round(boards).toLocaleString()}</td>
+        <td style="text-align:right;">${fmt(matSpend)}</td>
+        <td style="text-align:right;">${laborBilled>0?fmt(laborBilled):'<span class="dash-neutral">—</span>'}</td>
+        <td style="text-align:right;font-weight:700;color:${target>0&&totPPB>target?'var(--red)':'var(--ink)'};">${totPPB>0?'$'+totPPB.toFixed(0):'—'}</td>
+        <td style="text-align:right;color:var(--ink2);">${matPPB>0?'$'+matPPB.toFixed(0):'—'}</td>
+        <td style="text-align:right;color:var(--ink2);">${labPPB>0?'$'+labPPB.toFixed(0):'—'}</td>
+        <td style="text-align:right;color:var(--accent);">${target>0?'$'+target.toFixed(0):'<span class="dash-neutral">—</span>'}</td>
+        <td style="text-align:center;">${statusHtml}</td>
+        <td style="text-align:right;">${budgetBar}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Recent activity table ──────────────────────────────────────
+  const actTbody = document.getElementById('dash-activity-tbody');
+  const actCount = document.getElementById('dash-activity-count');
+  if (actTbody) {
+    const poGroups = {};
+    S.rows.forEach(r=>{
+      const po = String(r['PO NUMBER']||'').trim(); if(!po) return;
+      if(!poGroups[po]) poGroups[po]={po,job:r['JOB']||'',mats:[],total:0,bldg:r['BUILDING']||'',floor:r['FLOOR']||''};
+      poGroups[po].total+=parseFloat(r['LINE TOTAL']||0);
+      const mat=(r['MATERIAL']||'').trim();
+      if(mat&&!poGroups[po].mats.includes(mat)) poGroups[po].mats.push(mat);
+    });
+    const sorted = Object.values(poGroups).sort((a,b)=>parseFloat(b.po)-parseFloat(a.po)).slice(0,30);
+    if(actCount) actCount.textContent = sorted.length + ' most recent POs';
+    actTbody.innerHTML = sorted.map(p=>{
+      const assigned = S.assignments[p.po];
+      const statusHtml = assigned
+        ? `<span style="color:var(--green);font-size:11px;font-weight:600;">✓ Assigned</span>`
+        : `<span style="color:var(--yellow);font-size:11px;font-weight:600;">⚠ Review</span>`;
+      return `<tr onclick="openPOFromFeed('${p.po}')" style="cursor:pointer;">
+        <td><strong style="color:var(--accent);">#${p.po}</strong></td>
+        <td style="color:var(--ink2);">${(assigned?.job||p.job||'').replace('JOB ','') || '—'}</td>
+        <td style="color:var(--ink3);font-size:11px;">${p.mats.slice(0,2).join(', ')}${p.mats.length>2?' +'+( p.mats.length-2)+' more':''}</td>
+        <td>${p.bldg||'<span class="dash-neutral">—</span>'}</td>
+        <td>${p.floor||'<span class="dash-neutral">—</span>'}</td>
+        <td style="text-align:right;font-weight:600;">${fmt(p.total)}</td>
+        <td>${statusHtml}</td>
+      </tr>`;
+    }).join('');
+  }
+}
 
 function renderBudgets() {}
 function renderActuals() {}
@@ -3315,109 +3643,180 @@ function showJobSetup() {
 
 function renderJobSetupBody() {
   const el = document.getElementById('job-setup-body'); if (!el) return;
-  let html = `<!-- Batch setup -->
-  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;">
-    <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">⚡ Quick Batch Setup</div>
-    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">FLOORS (e.g. 1,2,3 or 1-5)</div><input id="js-batch-floors" class="inp inp-sm" style="width:120px;" placeholder="1-5 or 1,2,3"/></div>
-      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">BUILDINGS (e.g. R1,R2)</div><input id="js-batch-bldgs" class="inp inp-sm" style="width:100px;" placeholder="R1 or R1,R2"/></div>
-      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">UNITS PER FLOOR (e.g. 101-116)</div><input id="js-batch-units" class="inp inp-sm" style="width:120px;" placeholder="101-116"/></div>
-      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">BOARD BUDGET/FL</div><input id="js-batch-boards" class="inp inp-sm" style="width:80px;" type="number" placeholder="240"/></div>
-      <button class="btn btn-primary btn-sm" onclick="batchSetupFloors()">⚡ Generate</button>
+  const struct = _editStruct;
+
+  let html = `
+  <!-- ⚡ Smart Batch Generator -->
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+    <div style="font-size:12px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">⚡ Auto-Generate Structure</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:10px;">
+      <div>
+        <div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:3px;">BUILDINGS (e.g. 1-4 or R1,R2)</div>
+        <input id="js-bldgs" class="inp inp-sm" placeholder="1-4 or R1,R2"/>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:3px;">FLOORS PER BUILDING</div>
+        <input id="js-floors-per" class="inp inp-sm" type="number" placeholder="4" min="1"/>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:3px;">UNIT RANGE (e.g. 101-116)</div>
+        <input id="js-unit-range" class="inp inp-sm" placeholder="101-116"/>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:3px;">BOARDS/FLOOR BUDGET</div>
+        <input id="js-bb-auto" class="inp inp-sm" type="number" placeholder="240"/>
+      </div>
     </div>
+    <div style="font-size:11px;color:var(--ink3);margin-bottom:8px;">💡 Floor 1 → units 101-116 · Floor 2 → 201-216 · Floor 3 → 301-316 (auto-increments by floor)</div>
+    <button class="btn btn-primary btn-sm" onclick="smartGenerate()">⚡ Generate All Floors & Units</button>
   </div>
-  <div style="font-size:11px;color:var(--ink3);margin-bottom:10px;font-weight:600;">OR add floors one at a time:</div>
+
+  <div style="font-size:11px;color:var(--ink3);margin-bottom:10px;font-weight:600;">— OR add a single floor manually —</div>
+  
+  <!-- Manual add -->
   <div style="display:flex;gap:8px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;">
-    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">FLOOR</div><input id="js-fl" class="inp inp-sm" style="width:65px;" placeholder="3"/></div>
-    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">BLDG</div><input id="js-bldg" class="inp inp-sm" style="width:65px;" placeholder="R1"/></div>
-    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">UNIT START</div><input id="js-us" class="inp inp-sm" style="width:80px;" placeholder="301"/></div>
-    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">UNIT END</div><input id="js-ue" class="inp inp-sm" style="width:80px;" placeholder="316"/></div>
-    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">BOARD BUDGET</div><input id="js-bb" class="inp inp-sm" style="width:90px;" type="number" placeholder="240"/></div>
-    <button class="btn btn-primary btn-sm" onclick="addFloorToStruct()">+ Add Floor</button>
+    <div><div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:2px;">BUILDING</div><input id="js-bldg" class="inp inp-sm" style="width:70px;" placeholder="1"/></div>
+    <div><div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:2px;">FLOOR</div><input id="js-fl" class="inp inp-sm" style="width:65px;" placeholder="3"/></div>
+    <div><div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:2px;">UNIT RANGE</div><input id="js-us" class="inp inp-sm" style="width:90px;" placeholder="301-316"/></div>
+    <div><div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:2px;">BOARD BUDGET</div><input id="js-bb" class="inp inp-sm" style="width:80px;" type="number" placeholder="240"/></div>
+    <button class="btn btn-ghost btn-sm" onclick="addFloorToStruct()">+ Add Floor</button>
   </div>`;
 
-  (_editStruct.floors||[]).forEach((fl,fi)=>{
-    html += `<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">
-      <div style="background:var(--surface2);padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <div style="font-weight:700;min-width:60px;">Floor ${fl.floor}</div>
-        <input style="width:65px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:12px;" value="${fl.bldg||''}" placeholder="Bldg" oninput="_editStruct.floors[${fi}].bldg=this.value"/>
-        <input type="number" style="width:90px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:12px;" value="${fl.budgetBoards||''}" placeholder="Board budget" oninput="_editStruct.floors[${fi}].budgetBoards=parseFloat(this.value)||0"/>
-        <span class="badge badge-blue">${(fl.units||[]).length} units</span>
-        <button onclick="removeFl(${fi})" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;" title="Delete floor">✕</button>
-      </div>
-      <div style="padding:10px 14px;display:flex;flex-wrap:wrap;gap:6px;">
-        ${(fl.units||[]).map((u,ui)=>`<div style="display:flex;align-items:center;gap:3px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:12px;font-weight:600;">${u.unit}<button onclick="removeUnit(${fi},${ui})" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:11px;padding:0 1px;">✕</button></div>`).join('')}
-        <button onclick="addUnit(${fi})" style="padding:3px 8px;background:var(--surface2);border:1px dashed var(--border);border-radius:5px;font-size:11px;cursor:pointer;color:var(--ink3);">+ Unit</button>
-      </div>
-    </div>`;
+  // Group floors by building for tree view
+  const byBldg = {};
+  (struct.floors||[]).forEach((fl,fi) => {
+    const bKey = fl.bldg||'(no building)';
+    if (!byBldg[bKey]) byBldg[bKey] = [];
+    byBldg[bKey].push({...fl, _fi: fi});
   });
-  if (!(_editStruct.floors||[]).length) html += '<div class="no-data">No floors added yet.</div>';
+
+  if (Object.keys(byBldg).length === 0) {
+    html += '<div class="no-data" style="padding:12px 0;">No structure yet. Use the generator above or add floors manually.</div>';
+  } else {
+    // Render building → floor tree
+    Object.entries(byBldg).sort().forEach(([bldg, floors]) => {
+      const bldgTotal = floors.reduce((s,fl)=>s+(fl.units||[]).length,0);
+      const bldgBoards = floors.reduce((s,fl)=>s+(parseFloat(fl.budgetBoards||0)),0);
+      html += `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;">
+        <div style="background:var(--surface3);padding:10px 14px;display:flex;align-items:center;gap:10px;">
+          <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;">🏢 Building ${bldg}</span>
+          <span class="badge badge-blue" style="font-size:9px;">${floors.length} floors</span>
+          <span class="badge badge-gray" style="font-size:9px;">${bldgTotal} units</span>
+          ${bldgBoards>0?`<span style="font-size:11px;color:var(--ink3);">${Math.round(bldgBoards)} boards budgeted</span>`:''}
+        </div>`;
+
+      floors.sort((a,b)=>parseInt(a.floor)-parseInt(b.floor)).forEach(fl => {
+        const fi = fl._fi;
+        html += `<div style="border-top:1px solid var(--border);padding:10px 14px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+            <span style="font-weight:600;font-size:13px;min-width:60px;">Floor ${fl.floor}</span>
+            <input style="width:65px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:11px;" value="${fl.bldg||''}" placeholder="Bldg" oninput="_editStruct.floors[${fi}].bldg=this.value"/>
+            <input type="number" style="width:90px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:11px;" value="${fl.budgetBoards||''}" placeholder="Board budget" oninput="_editStruct.floors[${fi}].budgetBoards=parseFloat(this.value)||0"/>
+            <span class="badge badge-gray" style="font-size:9px;">${(fl.units||[]).length} units</span>
+            <button onclick="removeFl(${fi})" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;" title="Remove floor">✕</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;">
+            ${(fl.units||[]).map((u,ui)=>`<div style="display:inline-flex;align-items:center;gap:3px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 7px;font-size:11px;font-weight:500;">${u.unit}<button onclick="removeUnit(${fi},${ui})" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:10px;padding:0 0 0 3px;line-height:1;">✕</button></div>`).join('')}
+            <button onclick="addUnit(${fi})" style="padding:3px 8px;background:none;border:1px dashed var(--border);border-radius:5px;font-size:11px;cursor:pointer;color:var(--ink3);">+ Unit</button>
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+    });
+  }
+
   el.innerHTML = html;
 }
 
 
-function batchSetupFloors() {
-  const floorsInput = document.getElementById('js-batch-floors')?.value.trim();
-  const bldgsInput = document.getElementById('js-batch-bldgs')?.value.trim() || '';
-  const unitsInput = document.getElementById('js-batch-units')?.value.trim() || '';
-  const budBoards = parseFloat(document.getElementById('js-batch-boards')?.value||0)||0;
+function batchSetupFloors() { smartGenerate(); }
 
-  if (!floorsInput) { showToast('Enter floor range'); return; }
+function smartGenerate() {
+  const bldgsInput = document.getElementById('js-bldgs')?.value.trim()||'';
+  const floorsPerInput = document.getElementById('js-floors-per')?.value.trim()||'';
+  const unitRange = document.getElementById('js-unit-range')?.value.trim()||'';
+  const budBoards = parseFloat(document.getElementById('js-bb-auto')?.value||0)||0;
 
-  // Parse floors
-  const floors = [];
-  if (floorsInput.includes('-')) {
-    const [s,e] = floorsInput.split('-').map(Number);
-    for (let i=s;i<=e;i++) floors.push(String(i));
-  } else {
-    floorsInput.split(',').forEach(f => floors.push(f.trim()));
+  if (!bldgsInput || !floorsPerInput || !unitRange) {
+    showToast('Fill in buildings, floors, and unit range'); return;
   }
 
   // Parse buildings
-  const bldgs = bldgsInput ? bldgsInput.split(',').map(b=>b.trim()) : [''];
-
-  // Parse units
-  let unitRange = [];
-  if (unitsInput && unitsInput.includes('-')) {
-    const [s,e] = unitsInput.split('-').map(Number);
-    for (let u=s;u<=e;u++) unitRange.push(String(u));
-  } else if (unitsInput) {
-    unitRange = unitsInput.split(',').map(u=>u.trim());
+  const bldgs = [];
+  if (bldgsInput.includes('-') && !isNaN(bldgsInput.split('-')[0])) {
+    const [s,e] = bldgsInput.split('-').map(Number);
+    for (let b=s;b<=e;b++) bldgs.push(String(b));
+  } else {
+    bldgsInput.split(',').forEach(b => bldgs.push(b.trim()));
   }
 
-  // Generate floors
+  // Parse floor count
+  const floorCount = parseInt(floorsPerInput)||1;
+
+  // Parse unit range (first floor: e.g. "101-116")
+  let firstFloorStart = 1, firstFloorEnd = 1, unitsPerFloor = 0;
+  if (unitRange.includes('-')) {
+    const parts = unitRange.split('-').map(s=>s.trim());
+    firstFloorStart = parseInt(parts[0]);
+    firstFloorEnd = parseInt(parts[1]);
+    unitsPerFloor = firstFloorEnd - firstFloorStart + 1;
+  } else {
+    firstFloorStart = parseInt(unitRange); firstFloorEnd = firstFloorStart; unitsPerFloor = 1;
+  }
+
+  // Get the floor number offset (e.g. 101 → floor 1, 201 → floor 2)
+  // Detect: 101 means floor 1 starts at X01, 201 means floor 2 starts at X01
+  const floorDigit = Math.floor(firstFloorStart / 100); // e.g. 101→1, 201→2
+  const unitSuffix = firstFloorStart % 100; // e.g. 101→01, 201→01
+
   if (!_editStruct.floors) _editStruct.floors = [];
-  floors.forEach(floor => {
-    bldgs.forEach(bldg => {
+  let added = 0;
+
+  bldgs.forEach(bldg => {
+    for (let f = 1; f <= floorCount; f++) {
+      const floorNum = f; // actual floor number (1,2,3,4...)
+      // Smart unit numbering: floor 1 → 101-116, floor 2 → 201-216, etc.
+      // Offset floor number to match unit prefix
+      const unitStart = floorNum * 100 + unitSuffix;
+      const unitEnd = unitStart + unitsPerFloor - 1;
+      
+      const units = [];
+      for (let u=unitStart; u<=unitEnd; u++) units.push({unit:String(u),budgetBoards:0});
+
       // Skip if already exists
-      const exists = _editStruct.floors.find(f => String(f.floor)===floor && (f.bldg||'') === bldg);
+      const exists = _editStruct.floors.find(fl=>String(fl.floor)===String(floorNum)&&(fl.bldg||'')===bldg);
       if (exists) return;
-      const units = unitRange.map(u => ({unit: u, budgetBoards: 0}));
-      _editStruct.floors.push({floor, bldg, budgetBoards: budBoards, units});
-    });
+      
+      _editStruct.floors.push({floor:String(floorNum), bldg, budgetBoards:budBoards, units});
+      added++;
+    }
   });
-  _editStruct.floors.sort((a,b) => parseInt(a.floor)-parseInt(b.floor));
+
+  _editStruct.floors.sort((a,b)=>a.bldg.localeCompare(b.bldg)||parseInt(a.floor)-parseInt(b.floor));
   renderJobSetupBody();
-  showToast('✓ Generated ' + floors.length + ' floor' + (floors.length>1?'s':'') + ' with ' + unitRange.length + ' units each');
+  showToast(`✓ Generated ${added} floors across ${bldgs.length} building${bldgs.length>1?'s':''} · ${unitsPerFloor} units each`);
 }
 
 function addFloorToStruct() {
-  const floor = document.getElementById('js-fl')?.value.trim(); if (!floor) { showToast('Enter floor number'); return; }
+  const floor = document.getElementById('js-fl')?.value.trim(); if (!floor) { showToast('Enter a floor number'); return; }
   const bldg = document.getElementById('js-bldg')?.value.trim()||'';
-  const us = document.getElementById('js-us')?.value.trim();
-  const ue = document.getElementById('js-ue')?.value.trim();
+  const unitRangeStr = document.getElementById('js-us')?.value.trim()||'';
   const bb = parseFloat(document.getElementById('js-bb')?.value||0)||0;
   const units = [];
-  if (us) {
-    const sn=parseInt(us), en=ue?parseInt(ue):sn;
-    if (!isNaN(sn)&&!isNaN(en)) for(let u=sn;u<=en;u++) units.push({unit:String(u),budgetBoards:0});
-    else units.push({unit:us,budgetBoards:0});
+  if (unitRangeStr) {
+    if (unitRangeStr.includes('-')) {
+      const [s,e] = unitRangeStr.split('-').map(Number);
+      if (!isNaN(s)&&!isNaN(e)) for(let u=s;u<=e;u++) units.push({unit:String(u),budgetBoards:0});
+      else units.push({unit:unitRangeStr,budgetBoards:0});
+    } else {
+      unitRangeStr.split(',').forEach(u=>units.push({unit:u.trim(),budgetBoards:0}));
+    }
   }
   if (!_editStruct.floors) _editStruct.floors=[];
   _editStruct.floors.push({floor,bldg,budgetBoards:bb,units});
-  _editStruct.floors.sort((a,b)=>parseInt(a.floor)-parseInt(b.floor));
+  _editStruct.floors.sort((a,b)=>a.bldg.localeCompare(b.bldg)||parseInt(a.floor)-parseInt(b.floor));
   renderJobSetupBody();
-  ['js-fl','js-bldg','js-us','js-ue','js-bb'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['js-fl','js-bldg','js-us','js-bb'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
 }
 
 function removeFl(fi) { _editStruct.floors.splice(fi,1); renderJobSetupBody(); }
@@ -3458,7 +3857,7 @@ function renderEstimateTab(job) {
   const LABOR_CATS=['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
   const labor=getJobLabor(job);
   let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-    <div><div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;">${job.replace('JOB ','')} — Estimate</div>
+    <div><div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:800;">${job.replace('JOB ','')} — Estimate</div>
     <div style="font-size:11px;color:var(--ink3);">Set quantities and unit prices</div></div>
     <div style="display:flex;gap:8px;">
       <button onclick="addEstLine('${job.replace(/'/g,"\\'")}');" class="btn btn-ghost btn-sm">+ Add Item</button>
@@ -3470,14 +3869,14 @@ function renderEstimateTab(job) {
     <thead><tr><th>Material</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Unit $</th><th class="tbl-r">Total</th><th></th></tr></thead>
     <tbody id="est-tbody-inner"></tbody>
     <tfoot><tr style="background:var(--surface3);">
-      <td colspan="4" style="padding:10px 14px;font-weight:700;font-family:'Syne',sans-serif;">MATERIAL TOTAL</td>
+      <td colspan="4" style="padding:10px 14px;font-weight:700;font-family:'Space Grotesk',sans-serif;">MATERIAL TOTAL</td>
       <td class="tbl-r" style="padding:10px 14px;font-weight:800;font-size:15px;" id="est-mat-total">$0</td>
       <td></td>
     </tr></tfoot>
   </table></div>`;
 
   html += `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
-    <div style="background:var(--surface2);padding:10px 14px;font-weight:700;font-size:13px;font-family:'Syne',sans-serif;">🔨 Labor Budget</div>
+    <div style="background:var(--surface2);padding:10px 14px;font-weight:700;font-size:13px;font-family:'Space Grotesk',sans-serif;">🔨 Labor Budget</div>
     <div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">
       ${LABOR_CATS.map(cat=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:10px 11px;">
         <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">${cat}</div>
@@ -3487,7 +3886,7 @@ function renderEstimateTab(job) {
     </div>
     <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
       <span style="font-size:13px;font-weight:600;">Labor Total: <span id="est-labor-total" style="color:var(--accent);">$0</span></span>
-      <span style="font-size:15px;font-weight:800;font-family:'Syne',sans-serif;">Grand Total: <span id="est-grand-total" style="color:var(--accent);">$0</span></span>
+      <span style="font-size:15px;font-weight:800;font-family:'Space Grotesk',sans-serif;">Grand Total: <span id="est-grand-total" style="color:var(--accent);">$0</span></span>
     </div>
   </div>`;
 
@@ -3606,7 +4005,7 @@ function renderJobSummaryTab(job) {
     <div class="card" style="margin-bottom:14px;"><div class="card-body">
       <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
         <div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Total Budget</div>
-          <div style="font-size:26px;font-weight:800;font-family:'Syne',sans-serif;">${fmt(totalBudget)}</div></div>
+          <div style="font-size:26px;font-weight:800;font-family:'Space Grotesk',sans-serif;">${fmt(totalBudget)}</div></div>
         <div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);">Actual Paid</div>
           <div style="font-size:22px;font-weight:700;color:${totalActual>totalBudget?'var(--red)':'var(--green)'};">${fmt(totalActual)}</div></div>
       </div>
