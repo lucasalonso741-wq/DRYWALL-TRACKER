@@ -16,8 +16,8 @@
   --border: #2A2E42;
   --border2: #353A52;
   --ink: #E8EAF0;
-  --ink2: #8B91A8;
-  --ink3: #4A5068;
+  --ink2: #9BA5BE;
+  --ink3: #5A6280;
   --accent: #FF6B35;
   --accent2: #FF8C5A;
   --blue: #4F8EF7;
@@ -29,7 +29,7 @@
   --r: 12px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;letter-spacing:.01em;}
 h1,h2,h3,h4{font-family:'Syne',sans-serif;font-weight:700;line-height:1.2;}
 input,select,button,textarea{font-family:'DM Sans',sans-serif;}
 a{color:var(--accent);}
@@ -127,7 +127,7 @@ a{color:var(--accent);}
 /* ── TABLES ───────────────── */
 .tbl{width:100%;border-collapse:collapse;font-size:12px;}
 .tbl th{padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);font-weight:600;border-bottom:1px solid var(--border);background:var(--surface2);white-space:nowrap;}
-.tbl td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--ink);font-size:12.5px;}
 .tbl tr:last-child td{border-bottom:none;}
 .tbl tr:hover td{background:var(--surface2);}
 .tbl-r{text-align:right;font-weight:600;}
@@ -973,10 +973,15 @@ function resolveJobFromPDF(rawJob, shipTo) {
 
 function showToast(msg, isErr) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.background = isErr ? 'var(--red)' : 'var(--ink)';
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3200);
+  if (!t) return;
+  // Remove old toasts
+  t.innerHTML = '';
+  const item = document.createElement('div');
+  item.className = 'toast-item';
+  item.textContent = msg;
+  if (isErr) item.style.borderLeft = '3px solid var(--red)';
+  t.appendChild(item);
+  setTimeout(() => { if(item.parentNode) item.parentNode.removeChild(item); }, 3200);
 }
 
 function updateInboxBadge() {
@@ -1197,11 +1202,10 @@ async function loadPendingPOs() {
           <div style="font-size:12px;color:var(--ink3);">${p.job_name||'No job assigned'} ${p.building?'· Bldg '+p.building:''} ${p.floor?'· Fl '+p.floor:''} · $${parseFloat(p.total||0).toFixed(2)} · ${src} · ${date}</div>
         </div>
         <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:${statusColors[p.status]||'#F3F4F6'};white-space:nowrap;">${statusLabel[p.status]||p.status}</span>
-        <div style="display:flex;gap:6px;align-items:center;">' +
-          (p.status !== 'confirmed' ? '<button onclick="reviewPO(\'' + p.id + '\')" style="padding:5px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Review →</button>' : '') +
-          '<button onclick="deletePORecord(\'' + p.id + '\',\'' + (p.po_number||'') + '\')" style="padding:5px 10px;background:none;border:1px solid var(--red);color:var(--red);border-radius:6px;font-size:12px;cursor:pointer;" title="Delete from queue">🗑</button>' +
-          '</div>
-      </div>`;
+        <div style="display:flex;gap:6px;align-items:center;">
+          ${p.status !== 'confirmed' ? '<button onclick="reviewPO(\'' + p.id + '\')" style="padding:5px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Review →</button>' : ''}
+          <button onclick="deletePORecord('${p.id}','${p.po_number||''}')" style="padding:5px 10px;background:none;border:1px solid #F87171;color:#F87171;border-radius:6px;font-size:12px;cursor:pointer;" title="Delete">🗑</button>
+        </div>`
     }).join('');
   } catch(err) {
     el.innerHTML = '<div class="alert alert-red">Error: ' + err.message + '</div>';
@@ -1667,11 +1671,11 @@ function renderActivityFeed() {
     <div class="feed-item" onclick="${it.type==='po'?`openPOFromFeed('${it.po}')`:`openBillFromFeed('${it.inv}')`}">
       <div class="feed-dot" style="background:${it.dot};"></div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">
+        <div style="font-size:13px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px;">
           ${it.title}
           ${it.flagged?'<span class="badge badge-yellow" style="font-size:9px;">Needs Review</span>':''}
         </div>
-        <div style="font-size:11px;color:var(--ink3);margin-top:1px;">${it.sub}</div>
+        <div style="font-size:11px;color:var(--ink2);margin-top:1px;">${it.sub}</div>
         ${it.meta?`<div style="font-size:10px;color:var(--ink3);opacity:.7;">${it.meta}</div>`:''}
       </div>
       <div style="font-weight:700;font-size:13px;white-space:nowrap;">$${Math.round(it.amount).toLocaleString()}</div>
@@ -1874,6 +1878,13 @@ function renderInboxPOs() {
     }).join('');
 }
 
+
+function togglePOPreview(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
 function quickAssignPO(po) {
   const job = document.getElementById('poi-job-'+po)?.value;
   if (!job) { showToast('Select a job'); return; }
@@ -2004,69 +2015,94 @@ function switchJobTab(tab) {
 // ── PPB SUMMARY CARDS ─────────────────────────────────────────
 
 function renderMaterialStats(job) {
-  // Quick material summary - shows on job select
+  if (!job) { showToast('Select a job first'); return; }
   const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
-  if (!rows.length) return;
+  if (!rows.length) { showToast('No PO data for this job yet'); return; }
 
-  // Group by material, compute qty ordered
+  // Get estimate for comparison
+  const estItems = getJobEstimate(job);
+  const estByName = {};
+  estItems.forEach(it => { estByName[it.name.toUpperCase()] = it; });
+
+  // Group ordered by material
   const matMap = {};
   rows.forEach(r => {
     const mat = (r['MATERIAL']||'').trim(); if (!mat) return;
     const cat = categorize(mat);
-    if (!matMap[mat]) matMap[mat] = {mat, cat, qty:0, spend:0};
-    matMap[mat].qty += parseFloat(r['QTY']||0);
+    if (!matMap[mat]) matMap[mat] = {mat, cat, ordQty:0, spend:0};
+    matMap[mat].ordQty += parseFloat(r['QTY']||0);
     matMap[mat].spend += parseFloat(r['LINE TOTAL']||0);
   });
 
-  const items = Object.values(matMap).sort((a,b) => b.spend-a.spend);
-  const totalBoards = items.filter(m=>m.cat==='boards').reduce((s,m)=>s+m.qty,0);
-  const totalMetal = items.filter(m=>m.cat==='metal').reduce((s,m)=>s+m.qty,0);
-  const totalSpend = items.reduce((s,m)=>s+m.spend,0);
-
-  // Get estimate for comparison
-  const estItems = getJobEstimate(job);
-  const estBoards = estItems.filter(i=>i.cat==='Drywall').reduce((s,i)=>s+(parseFloat(i.qty)||0),0);
-
-  // Build modal content
-  const modal = document.getElementById('po-modal');
-  document.getElementById('po-modal-title').textContent = '📊 ' + job.replace('JOB ','') + ' — Material Overview';
-  document.getElementById('po-modal-footer').innerHTML = '<button class="btn btn-ghost" onclick="closeModal(\'po-modal\')">Close</button>';
+  const totalBoards = Object.values(matMap).filter(m=>m.cat==='boards').reduce((s,m)=>s+m.ordQty,0);
+  const totalMetal = Object.values(matMap).filter(m=>m.cat==='metal').reduce((s,m)=>s+m.ordQty,0);
+  const totalSpend = Object.values(matMap).reduce((s,m)=>s+m.spend,0);
+  const estBoardQty = estItems.filter(i=>i.cat==='Drywall').reduce((s,i)=>s+(parseFloat(i.qty)||0),0);
+  const estMatTotal = estItems.reduce((s,i)=>s+(parseFloat(i.qty)||0)*(parseFloat(i.price)||0),0);
 
   const CAT_ORDER = ['boards','metal','finish','supplies','tax','other'];
-  const CAT_LABEL = {boards:'🟦 Boards',metal:'📐 Metal',finish:'🪣 Finish',supplies:'🔩 Supplies',tax:'Tax',other:'Other'};
+  const CAT_LABEL = {boards:'🟦 Boards',metal:'📐 Metal',finish:'🪣 Finish',supplies:'🔩 Supplies',tax:'💲 Tax',other:'📦 Other'};
+  const CAT_BG = {boards:'rgba(79,142,247,.08)',metal:'rgba(251,191,36,.08)',finish:'rgba(52,211,153,.08)',supplies:'var(--surface2)',tax:'rgba(248,113,113,.08)',other:'var(--surface2)'};
+  const CAT_TC = {boards:'var(--blue)',metal:'var(--yellow)',finish:'var(--green)',supplies:'var(--ink2)',tax:'var(--red)',other:'var(--ink2)'};
 
-  let html = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
-    <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Total Boards</div><div style="font-size:22px;font-weight:800;color:var(--blue);">${Math.round(totalBoards)}</div>${estBoards>0?`<div style="font-size:10px;color:var(--ink3);">Est: ${Math.round(estBoards)} · ${totalBoards>0?((totalBoards/estBoards)*100).toFixed(0)+'%':'—'} ordered</div>`:''}</div>
-    <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Metal Pieces</div><div style="font-size:22px;font-weight:800;color:var(--yellow);">${Math.round(totalMetal)}</div></div>
-    <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Total Spend</div><div style="font-size:20px;font-weight:800;color:var(--accent);">${fmt(totalSpend)}</div></div>
-  </div>`;
+  let html = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin-bottom:4px;">Boards Ordered</div>
+        <div style="font-size:24px;font-weight:800;color:var(--blue);">${Math.round(totalBoards)}</div>
+        ${estBoardQty>0?`<div style="font-size:11px;color:var(--ink3);">Est: ${Math.round(estBoardQty)} · ${((totalBoards/estBoardQty)*100).toFixed(0)}% used</div>`:'<div style="font-size:11px;color:var(--ink3);">Set estimate to compare</div>'}
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin-bottom:4px;">Metal Pieces</div>
+        <div style="font-size:24px;font-weight:800;color:var(--yellow);">${Math.round(totalMetal)}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin-bottom:4px;">Total Spend</div>
+        <div style="font-size:20px;font-weight:800;color:var(--accent);">${fmt(totalSpend)}</div>
+        ${estMatTotal>0?`<div style="font-size:11px;color:var(--ink3);">Est: ${fmt(estMatTotal)}</div>`:''}
+      </div>
+    </div>`;
 
+  // Material breakdown with est vs ordered
   CAT_ORDER.forEach(catKey => {
-    const catItems = items.filter(m=>m.cat===catKey);
+    const catItems = Object.values(matMap).filter(m=>m.cat===catKey).sort((a,b)=>b.ordQty-a.ordQty);
     if (!catItems.length) return;
-    const catTotal = catItems.reduce((s,m)=>s+m.spend,0);
-    const catQty = catItems.reduce((s,m)=>s+m.qty,0);
-    html += `<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${CAT_LABEL[catKey]||catKey} — ${fmt(catTotal)}</div>`;
-    catItems.slice(0,8).forEach(m => {
-      const estMatch = estItems.find(e=>e.name.toUpperCase().includes(m.mat.substring(0,8).toUpperCase()));
-      const estQty = estMatch ? parseFloat(estMatch.qty)||0 : 0;
-      const pct = estQty > 0 ? Math.min((m.qty/estQty)*100, 150) : 0;
-      const barColor = pct > 110 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : 'var(--green)';
-      html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);">
-        <div style="flex:1;font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.mat}</div>
-        <div style="font-size:12px;font-weight:700;white-space:nowrap;">${Math.round(m.qty)} ${estQty>0?'/ '+Math.round(estQty):''}</div>
-        <div style="width:60px;"><div style="height:4px;background:var(--surface3);border-radius:4px;overflow:hidden;">
+    html += `<div style="margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:${CAT_TC[catKey]};text-transform:uppercase;letter-spacing:.05em;background:${CAT_BG[catKey]};padding:5px 8px;border-radius:5px;margin-bottom:6px;">${CAT_LABEL[catKey]||catKey}</div>`;
+    
+    catItems.forEach(m => {
+      // Try to find matching estimate item
+      let estQty = 0;
+      for (const [eName, eItem] of Object.entries(estByName)) {
+        if (eName.includes(m.mat.toUpperCase().substring(0,6)) || m.mat.toUpperCase().includes(eName.substring(0,6))) {
+          estQty = parseFloat(eItem.qty)||0;
+          break;
+        }
+      }
+      
+      const pct = estQty > 0 ? Math.min((m.ordQty/estQty)*100, 150) : 0;
+      const barColor = pct > 110 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : pct > 0 ? 'var(--green)' : 'var(--ink3)';
+      const pctLabel = estQty > 0 ? `${pct.toFixed(0)}%` : '—';
+
+      html += `<div style="display:grid;grid-template-columns:1fr 90px 80px 70px;gap:8px;align-items:center;padding:6px 2px;border-bottom:1px solid rgba(255,255,255,.04);">
+        <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.mat}</div>
+        <div style="text-align:right;">
+          <span style="font-size:13px;font-weight:700;">${Math.round(m.ordQty)}</span>
+          ${estQty>0?`<span style="font-size:10px;color:var(--ink3);"> / ${Math.round(estQty)}</span>`:''}
+        </div>
+        <div style="background:var(--surface3);border-radius:4px;height:6px;overflow:hidden;">
           ${pct>0?`<div style="height:100%;width:${Math.min(pct,100).toFixed(0)}%;background:${barColor};border-radius:4px;"></div>`:''}
-        </div></div>
-        <div style="font-size:11px;color:var(--ink3);white-space:nowrap;">${fmt(m.spend)}</div>
+        </div>
+        <div style="font-size:11px;color:${barColor};font-weight:700;text-align:right;">${pctLabel}</div>
       </div>`;
     });
-    if (catItems.length > 8) html += `<div style="font-size:11px;color:var(--ink3);padding:4px 0;">+${catItems.length-8} more items</div>`;
     html += '</div>';
   });
 
+  document.getElementById('po-modal-title').textContent = '📊 ' + job.replace('JOB ','') + ' — Material Overview';
+  document.getElementById('po-modal-footer').innerHTML = '<button class="btn btn-ghost" onclick="closeModal(\x27po-modal\x27)">Close</button>';
   document.getElementById('po-modal-body').innerHTML = html;
-  modal.classList.add('open');
+  document.getElementById('po-modal').classList.add('open');
 }
 
 function renderJobPPBCards(job) {
@@ -2752,6 +2788,913 @@ document.querySelectorAll('.modal-overlay').forEach(el=>{
 });
 
 // ── ONLOAD ────────────────────────────────────────────────────
+
+// ── MISSING UTILITY FUNCTIONS ─────────────────────────────────
+function getUnassignedPOs() {
+  const assigned = new Set(Object.keys(S.assignments||{}));
+  const uniq = [...new Set(S.rows.map(r=>String(r['PO NUMBER']||'').trim()).filter(Boolean))];
+  return uniq.filter(po => !assigned.has(po));
+}
+
+function getUnmatchedBills() {
+  const seen = new Set();
+  return S.bills.filter(b => {
+    const inv = String(b['INVOICE NUMBER']||b['Invoice Number']||'').trim();
+    if (!inv || seen.has(inv)) return false;
+    seen.add(inv);
+    return !S.billAssignments[inv];
+  });
+}
+
+function renderTracker() {
+  // Material tracker — redirect to jobs page tracker view
+  nav('jobs');
+}
+
+function renderDashboard() { renderHome(); }
+
+function renderBudgets() {}
+function renderActuals() {}
+function renderBillsTracker() {}
+function renderBreakdown() {}
+function initPOWizard() { nav('inbox'); }
+function initBillWizard() { nav('inbox'); }
+
+window.onload = async function() {
+  const sheetInput=document.getElementById('sheet-id-input');
+  if(sheetInput){
+    sheetInput.value=S.sheetId;
+    sheetInput.addEventListener('change',e=>{S.sheetId=e.target.value.trim();});
+  }
+  document.getElementById('app-wrap').style.display='none';
+  document.getElementById('login-screen').style.display='none';
+  checkAuth();
+  try{ sb=supabase.createClient(SB_URL,SB_KEY); }catch(e){}
+  await loadSharedData();
+  await syncAll();
+  populateJobSelects();
+};
+
+</script>
+</body>
+</html
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div>
+              <div style="font-weight:700;font-size:14px;cursor:pointer;color:var(--accent);" onclick="togglePOPreview('inb-${po}')" title="Click to see line items">PO #${po} ▼</div>
+              <div style="font-size:11px;color:var(--ink3);">${sheetJob.replace('JOB ','') || '—'} · ${rows.length} items${bldg?' · Bldg '+bldg:''}${floor?' · Fl '+floor:''}</div>
+            </div>
+            <span style="font-weight:700;">${fmt(total)}</span>
+          </div>
+          <div id="inb-${po}" style="display:none;background:var(--surface3);border-radius:7px;padding:8px 10px;margin-bottom:8px;overflow-x:auto;max-height:200px;overflow-y:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:11px;color:var(--ink);">
+              <thead><tr><th style="padding:3px 6px;text-align:left;color:var(--ink2);font-size:10px;text-transform:uppercase;">Material</th><th style="padding:3px 6px;text-align:right;color:var(--ink2);font-size:10px;">Qty</th><th style="padding:3px 6px;text-align:right;color:var(--ink2);font-size:10px;">Total</th></tr></thead>
+              <tbody>${rows.slice(0,12).map((r,i)=>`<tr style="border-top:1px solid rgba(255,255,255,.05);"><td style="padding:3px 6px;">${r['MATERIAL']||'[TAX]'}</td><td style="padding:3px 6px;text-align:right;font-weight:600;">${r['QTY']||'—'}</td><td style="padding:3px 6px;text-align:right;font-weight:600;">$${Math.round(parseFloat(r['LINE TOTAL']||0)).toLocaleString()}</td></tr>`).join('')}${rows.length>12?`<tr><td colspan="3" style="padding:3px 6px;color:var(--ink3);font-size:10px;">...+${rows.length-12} more lines</td></tr>`:''}</tbody>
+            </table>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 80px 80px auto;gap:8px;align-items:end;">
+            <div>
+              <div style="font-size:10px;color:var(--ink3);margin-bottom:2px;font-weight:700;">JOB</div>
+              <select id="poi-job-${po}" class="inp inp-sm">
+                ${jobs.map(j=>`<option value="${j}" ${j===sheetJob?'selected':''}>${j.replace('JOB ','')}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--ink3);margin-bottom:2px;font-weight:700;">BLDG</div>
+              <input id="poi-bldg-${po}" class="inp inp-sm" value="${bldg}" placeholder="R2"/>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--ink3);margin-bottom:2px;font-weight:700;">FLOOR</div>
+              <input id="poi-floor-${po}" class="inp inp-sm" value="${floor}" placeholder="3"/>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="quickAssignPO('${po}')">Save</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+
+function togglePOPreview(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function quickAssignPO(po) {
+  const job = document.getElementById('poi-job-'+po)?.value;
+  if (!job) { showToast('Select a job'); return; }
+  S.assignments[po] = {
+    job,
+    building: document.getElementById('poi-bldg-'+po)?.value||'',
+    floor: document.getElementById('poi-floor-'+po)?.value||'',
+    unit: '',
+  };
+  S.rows.forEach(r => {
+    if (String(r['PO NUMBER']||'').trim()===po) {
+      if (!r['BUILDING']) r['BUILDING'] = S.assignments[po].building;
+      if (!r['FLOOR']) r['FLOOR'] = S.assignments[po].floor;
+    }
+  });
+  saveSharedData('assignments').then ? saveSharedData('assignments').then(()=>{
+    showToast('✓ PO #'+po+' → '+job.replace('JOB ',''));
+    updateInboxBadge();
+    renderInboxPOs();
+  }) : saveSharedData('assignments');
+}
+
+function renderInboxBills() {
+  const el = document.getElementById('inbox-tab-bills'); if (!el) return;
+  const seen = new Set();
+  const unmatched = S.bills.filter(b=>{
+    const inv = String(b['INVOICE NUMBER']||b['Invoice Number']||'').trim();
+    if (!inv||seen.has(inv)) return false; seen.add(inv);
+    return !S.billAssignments[inv];
+  });
+  if (!unmatched.length) { el.innerHTML = '<div class="alert alert-g">✓ All bills matched</div>'; return; }
+  const jobs = getJobs();
+  const LABOR_CATS = ['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
+  el.innerHTML = `<div style="font-size:12px;color:var(--ink3);margin-bottom:12px;">${unmatched.length} bills need matching</div>` +
+    unmatched.map(b => {
+      const inv = String(b['INVOICE NUMBER']||b['Invoice Number']||'').trim();
+      const vendor = b['VENDOR']||b['Vendor']||'';
+      const total = S.bills.filter(x=>String(x['INVOICE NUMBER']||x['Invoice Number']||'').trim()===inv).reduce((s,x)=>s+parseFloat(x['LINE TOTAL']||0),0);
+      const sugJob = fuzzyDetectJob((b['JOB']||b['Job']||'')+' '+(b['ITEM DESCRIPTION']||'')) || '';
+      const isLabor = isLaborVendor(vendor);
+      return `<div class="card" style="margin-bottom:10px;">
+        <div class="card-body" style="padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+            <div>
+              <div style="font-weight:700;">${vendor}</div>
+              <div style="font-size:11px;color:var(--ink3);">Inv #${inv} <span class="badge ${isLabor?'badge-blue':'badge-orange'}" style="margin-left:4px;">${isLabor?'Labor':'Material'}</span></div>
+            </div>
+            <span style="font-weight:700;">${fmt(total)}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;">
+            <div>
+              <div style="font-size:10px;color:var(--ink3);margin-bottom:2px;font-weight:700;">JOB</div>
+              <select id="bi-job-${inv}" class="inp inp-sm">
+                <option value="">Select...</option>
+                ${jobs.map(j=>`<option value="${j}" ${j===sugJob?'selected':''}>${j.replace('JOB ','')}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--ink3);margin-bottom:2px;font-weight:700;">CATEGORY</div>
+              <select id="bi-cat-${inv}" class="inp inp-sm">
+                ${LABOR_CATS.map(c=>`<option value="${c}">${c}</option>`).join('')}
+                <option value="Material">Material</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="quickMatchBill('${inv}',${total})">Save</button>
+          </div>
+          ${isLabor ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+            <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;font-weight:700;">FLOOR</div><input id="bi-floor-${inv}" class="inp inp-sm" placeholder="3"/></div>
+            <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;font-weight:700;">BLDG</div><input id="bi-bldg-${inv}" class="inp inp-sm" placeholder="R1"/></div>
+          </div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+}
+
+function quickMatchBill(inv, total) {
+  const job = document.getElementById('bi-job-'+inv)?.value;
+  const cat = document.getElementById('bi-cat-'+inv)?.value;
+  if (!job||!cat) { showToast('Select job and category'); return; }
+  S.billAssignments[inv] = {
+    job, category:cat, total,
+    floor: document.getElementById('bi-floor-'+inv)?.value||'',
+    building: document.getElementById('bi-bldg-'+inv)?.value||'',
+  };
+  saveSharedData('billAssignments').then ? saveSharedData('billAssignments').then(()=>{
+    showToast('✓ Bill matched');
+    updateInboxBadge();
+    renderInboxBills();
+  }) : saveSharedData('billAssignments');
+}
+
+// ── JOBS PAGE ─────────────────────────────────────────────────
+let _currentJob = '';
+let _jobMapView = 'material';
+
+function onJobSelect() {
+  _currentJob = document.getElementById('jobs-sel')?.value || '';
+  document.getElementById('jobs-content').style.display = _currentJob ? 'block' : 'none';
+  document.getElementById('jobs-empty').style.display = _currentJob ? 'none' : 'block';
+  document.getElementById('jobs-ppb-cards').style.display = _currentJob ? 'block' : 'none';
+  if (!_currentJob) return;
+  renderJobPPBCards(_currentJob);
+  const activeTab = document.querySelector('#jobs-content .tab-btn.active')?.dataset?.tab || 'map';
+  switchJobTab(activeTab);
+}
+
+function renderJobsPage() {
+  const sel = document.getElementById('jobs-sel'); if (!sel) return;
+  const jobs = getJobs();
+  const cur = _currentJob || sel.value;
+  sel.innerHTML = '<option value="">— Select a Job —</option>' +
+    jobs.map(j=>`<option value="${j}" ${j===cur?'selected':''}>${j.replace('JOB ','')}</option>`).join('');
+  if (cur && jobs.includes(cur)) { sel.value = cur; onJobSelect(); }
+}
+
+function switchJobTab(tab) {
+  document.querySelectorAll('#jobs-content .tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  document.querySelectorAll('#jobs-content .tab-panel').forEach(p=>p.classList.remove('active'));
+  const panel = document.getElementById('jobs-tab-'+tab);
+  if (panel) panel.classList.add('active');
+  if (!_currentJob) return;
+  if (tab==='map') renderJobMap(_currentJob);
+  else if (tab==='estimate') renderEstimateTab(_currentJob);
+  else if (tab==='bills') renderJobBillsTab(_currentJob);
+  else if (tab==='summary') renderJobSummaryTab(_currentJob);
+}
+
+// ── PPB SUMMARY CARDS ─────────────────────────────────────────
+
+
+
+function renderJobPPBCards(job) {
+  const el = document.getElementById('jobs-ppb-cards'); if (!el) return;
+  const rows = S.rows.filter(r=>(r['JOB']||r['Job']||'')===job);
+  const boards = rows.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0);
+  const matSpend = rows.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0);
+  const LABOR_CATS = ['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
+  const laborSpend = Object.values(S.billAssignments||{})
+    .filter(ba=>ba.job===job && LABOR_CATS.some(lc=>(ba.category||'').includes(lc)))
+    .reduce((s,ba)=>s+parseFloat(ba.total||0),0);
+  const total = matSpend + laborSpend;
+  const target = parseFloat(S.targets?.[job]?.pricePerBoard||0);
+  const matPPB = boards>0?matSpend/boards:0;
+  const labPPB = boards>0?laborSpend/boards:0;
+  const totPPB = boards>0?total/boards:0;
+  const ppbColor = target>0?(totPPB>target?'var(--red)':'var(--green)'):'var(--ink)';
+
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:4px;">
+    <div class="ppb-card">
+      <div class="ppb-lbl">Total Boards</div>
+      <div class="ppb-val" style="color:var(--blue);">${Math.round(boards)}</div>
+      <div class="ppb-sub">ordered</div>
+    </div>
+    <div class="ppb-card">
+      <div class="ppb-lbl">Mat $/Board</div>
+      <div class="ppb-val">${matPPB>0?'$'+matPPB.toFixed(0):'—'}</div>
+      <div class="ppb-sub">${fmt(matSpend)}</div>
+    </div>
+    <div class="ppb-card">
+      <div class="ppb-lbl">Labor $/Board</div>
+      <div class="ppb-val">${labPPB>0?'$'+labPPB.toFixed(0):'—'}</div>
+      <div class="ppb-sub">${fmt(laborSpend)}</div>
+    </div>
+    <div class="ppb-card" style="border-color:${target>0?(totPPB>target?'var(--red)':'var(--green)'):'var(--border)'};">
+      <div class="ppb-lbl">Total $/Board</div>
+      <div class="ppb-val" style="color:${ppbColor};">${totPPB>0?'$'+totPPB.toFixed(0):'—'}</div>
+      <div class="ppb-sub">${target>0?'Target: $'+target.toFixed(0):''}</div>
+    </div>
+    <div class="ppb-card" style="cursor:pointer;border-style:dashed;" onclick="editTargetPPB('${job.replace(/'/g,"\\'")}')">
+      <div class="ppb-lbl">Target $/Board <span style="color:var(--accent);">✏</span></div>
+      <div class="ppb-val" style="color:var(--accent);font-size:20px;">${target>0?'$'+target.toFixed(0):'Set →'}</div>
+      <div class="ppb-sub">click to edit</div>
+    </div>
+  </div>`;
+}
+
+function editTargetPPB(job) {
+  const cur = S.targets?.[job]?.pricePerBoard||'';
+  const val = prompt('Target $/board for '+job.replace('JOB ','')+':', cur);
+  if (val===null) return;
+  const num = parseFloat(val); if (isNaN(num)) { showToast('Enter a number'); return; }
+  if (!S.targets) S.targets={};
+  if (!S.targets[job]) S.targets[job]={};
+  S.targets[job].pricePerBoard = num;
+  saveSharedData('targets');
+  renderJobPPBCards(job);
+  showToast('✓ Target: $'+num.toFixed(0)+'/board');
+}
+
+// ── JOB MAP ───────────────────────────────────────────────────
+function renderJobMap(job) {
+  const el = document.getElementById('jobs-tab-map'); if (!el) return;
+  
+  // View toggle
+  const toggleHtml = `<div style="display:flex;gap:8px;margin-bottom:16px;">
+    <button id="jm-mat-btn" onclick="setMapView('material')" class="btn btn-primary btn-sm">📦 Material</button>
+    <button id="jm-lab-btn" onclick="setMapView('labor')" class="btn btn-ghost btn-sm">🔨 Labor</button>
+  </div>
+  <div id="jm-content"></div>`;
+  el.innerHTML = toggleHtml;
+  setMapView(_jobMapView);
+}
+
+function setMapView(view) {
+  _jobMapView = view;
+  const mat = document.getElementById('jm-mat-btn');
+  const lab = document.getElementById('jm-lab-btn');
+  if (mat) { mat.className = view==='material'?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'; }
+  if (lab) { lab.className = view==='labor'?'btn btn-blue btn-sm':'btn btn-ghost btn-sm'; }
+  const el = document.getElementById('jm-content'); if (!el) return;
+  if (view==='material') renderMapMaterial(_currentJob, el);
+  else renderMapLabor(_currentJob, el);
+}
+
+function renderMapMaterial(job, el) {
+  const struct = S.jobStructure?.[job];
+  const rows = S.rows.filter(r=>(r['JOB']||r['Job']||'')===job);
+
+  if (!struct?.floors?.length) {
+    el.innerHTML = `<div class="alert alert-y">No floors set up yet. Click <strong>⚙ Floors & Units</strong> above to define the structure.</div>
+      <div class="section-title" style="margin-top:16px;">PO Data by Floor (auto-detected)</div>`;
+    renderAutoFloors(job, rows, el);
+    return;
+  }
+
+  let html = '';
+  struct.floors.forEach(fl => {
+    const flRows = rows.filter(r => {
+      const rfl = String(r['FLOOR']||'').trim();
+      const rb = String(r['BUILDING']||'').trim();
+      if (rfl !== String(fl.floor)) return false;
+      if (fl.bldg && rb && rb !== fl.bldg) return false;
+      return true;
+    });
+    const flBoards = flRows.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0);
+    const flSpend = flRows.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0);
+    const budBoards = parseFloat(fl.budgetBoards||0);
+    const pct = budBoards>0 ? Math.min((flBoards/budBoards)*100,100) : 0;
+    const barCol = pct>90?'var(--red)':pct>70?'var(--yellow)':'var(--green)';
+
+    html += `<div class="floor-block">
+      <div class="floor-hdr" onclick="toggleFloorBlock(this)">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="floor-num">Floor ${fl.floor}${fl.bldg?' · '+fl.bldg:''}</div>
+            ${flBoards>0?`<span class="badge badge-blue">🟦 ${Math.round(flBoards)} boards</span>`:''}
+            ${budBoards>0?`<span style="font-size:11px;color:var(--ink3);">/ ${Math.round(budBoards)} budgeted</span>`:''}
+          </div>
+          ${budBoards>0?`<div style="width:200px;margin-top:6px;"><div class="prog"><div class="prog-fill" style="width:${pct.toFixed(1)}%;background:${barCol};"></div></div></div>`:''}
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="text-align:right;"><div style="font-size:11px;color:var(--ink3);">Spend</div><div style="font-weight:700;">${fmt(flSpend)}</div></div>
+          <span style="color:var(--ink3);font-size:18px;transition:transform .2s;">›</span>
+        </div>
+      </div>
+      <div class="floor-body" style="display:none;">
+        <div class="unit-grid">`;
+
+    // General tile (untagged to a unit)
+    const genRows = flRows.filter(r=>!String(r['UNIT']||'').trim()||String(r['UNIT']||'').trim()==='N/A');
+    const genBoards = genRows.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0);
+    const genSpend = genRows.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0);
+    if (genBoards>0||genSpend>0) {
+      html += buildUnitCard(job, fl.floor, fl.bldg, 'General', genBoards, 0, genSpend, true);
+    }
+
+    // Unit tiles
+    fl.units.forEach(u => {
+      const uRows = flRows.filter(r=>String(r['UNIT']||'').trim()===String(u.unit));
+      const uBoards = uRows.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0);
+      const uSpend = uRows.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0);
+      html += buildUnitCard(job, fl.floor, fl.bldg, u.unit, uBoards, parseFloat(u.budgetBoards||0), uSpend, false);
+    });
+
+    html += `</div></div></div>`;
+  });
+
+  el.innerHTML = html || '<div class="alert alert-y">No PO data found for this job.</div>';
+}
+
+function toggleFloorBlock(hdr) {
+  const body = hdr.nextElementSibling;
+  const arrow = hdr.querySelector('span:last-child');
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(90deg)';
+}
+
+function buildUnitCard(job, floor, bldg, unit, boards, budgetBoards, spend, isGeneral) {
+  const hasData = boards>0||spend>0;
+  const pct = budgetBoards>0 ? boards/budgetBoards : 0;
+  let cls = 'unit-card';
+  if (!hasData) cls += ' no-data';
+  else if (pct>1) cls += ' over-budget';
+  else if (pct>0.8) cls += ' near-budget';
+  else if (hasData) cls += ' has-data';
+  const safeUnit = unit.replace(/'/g,"\\'");
+  const safeBldg = (bldg||'').replace(/'/g,"\\'");
+  return `<div class="${cls}" onclick="openUnitDetail('${job.replace(/'/g,"\\'")}','${floor}','${safeUnit}','${safeBldg}')">
+    <div class="unit-num">${isGeneral?'⬜ General':'Unit '+unit}</div>
+    ${boards>0?`<div class="unit-boards">🟦 ${Math.round(boards)} boards</div>`:''}
+    ${spend>0?`<div class="unit-spend">${fmt(spend)}</div>`:''}
+    ${!hasData?`<div class="unit-spend">no data</div>`:''}
+  </div>`;
+}
+
+function renderAutoFloors(job, rows, parentEl) {
+  const floorMap = {};
+  rows.forEach(r=>{
+    const fl = String(r['FLOOR']||'').trim()||'—';
+    const b = String(r['BUILDING']||'').trim()||'';
+    const key = b+'||'+fl;
+    if (!floorMap[key]) floorMap[key]={fl,b,rows:[],boards:0,spend:0};
+    floorMap[key].boards += isBoard(r['MATERIAL']||'')?parseFloat(r['QTY']||0):0;
+    floorMap[key].spend += parseFloat(r['LINE TOTAL']||0);
+    floorMap[key].rows.push(r);
+  });
+  const div = document.createElement('div');
+  div.innerHTML = Object.values(floorMap).sort((a,b)=>parseInt(a.fl)-parseInt(b.fl)).map(fl=>`
+    <div style="border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+      <div style="font-weight:700;">Floor ${fl.fl}${fl.b?' · '+fl.b:''}</div>
+      ${fl.boards>0?`<span class="badge badge-blue">${Math.round(fl.boards)} boards</span>`:''}
+      <span style="font-size:12px;color:var(--ink3);">${fl.rows.length} lines</span>
+      <div style="margin-left:auto;font-weight:700;">${fmt(fl.spend)}</div>
+    </div>`).join('');
+  parentEl.appendChild(div);
+}
+
+function renderMapLabor(job, el) {
+  const LABOR_CATS = ['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
+  const rows = S.rows.filter(r=>(r['JOB']||r['Job']||'')===job);
+  const bills = Object.entries(S.billAssignments||{})
+    .filter(([inv,ba])=>ba.job===job && LABOR_CATS.some(lc=>(ba.category||'').includes(lc)))
+    .map(([inv,ba])=>({inv,...ba}));
+
+  if (!bills.length) {
+    el.innerHTML = '<div class="alert alert-y">No labor bills matched to this job. Match bills in the Inbox.</div>';
+    return;
+  }
+
+  // Group by floor
+  const byFloor = {};
+  bills.forEach(ba=>{
+    const fl = String(ba.floor||'—');
+    const b = String(ba.building||'');
+    const key = b+'||'+fl;
+    if (!byFloor[key]) byFloor[key]={fl,b,total:0,cats:{}};
+    byFloor[key].total += parseFloat(ba.total||0);
+    const cat = ba.category||'Other';
+    byFloor[key].cats[cat] = (byFloor[key].cats[cat]||0)+parseFloat(ba.total||0);
+  });
+
+  let html = '';
+  Object.values(byFloor).sort((a,b)=>parseInt(a.fl)-parseInt(b.fl)).forEach(fl=>{
+    const flRows = rows.filter(r=>String(r['FLOOR']||'').trim()===String(fl.fl)&&(!fl.b||!String(r['BUILDING']||'').trim()||String(r['BUILDING']||'').trim()===fl.b));
+    const flBoards = flRows.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0);
+    const labPPB = flBoards>0 ? fl.total/flBoards : 0;
+
+    html += `<div class="floor-block">
+      <div class="floor-hdr" onclick="toggleFloorBlock(this)">
+        <div>
+          <div class="floor-num">Floor ${fl.fl}${fl.b?' · '+fl.b:''}</div>
+          <div style="font-size:11px;color:var(--ink3);margin-top:2px;">${fmt(fl.total)} labor${flBoards>0?' · $'+labPPB.toFixed(0)+'/board':''}</div>
+        </div>
+        <span style="color:var(--ink3);font-size:18px;">›</span>
+      </div>
+      <div class="floor-body" style="display:none;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;padding-top:14px;">
+          ${Object.entries(fl.cats).map(([cat,amt])=>`
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+              <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">${cat}</div>
+              <div style="font-size:18px;font-weight:800;">${fmt(amt)}</div>
+              ${flBoards>0?`<div style="font-size:10px;color:var(--ink3);">$${(amt/flBoards).toFixed(0)}/board</div>`:''}
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+// Unit detail modal
+function openUnitDetail(job, floor, unit, bldg) {
+  const rows = S.rows.filter(r=>{
+    const rfl=String(r['FLOOR']||'').trim(), ru=String(r['UNIT']||'').trim(), rb=String(r['BUILDING']||'').trim();
+    if (rfl!==String(floor)) return false;
+    if (bldg&&rb&&rb!==bldg) return false;
+    if (unit==='General') return !ru||ru==='N/A';
+    return ru===String(unit);
+  });
+  const boards=rows.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0);
+  const spend=rows.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0);
+  const matMap={};
+  rows.forEach(r=>{
+    const mat=(r['MATERIAL']||'').trim()||'[TAX]'; const cat=categorize(r['MATERIAL']||'');
+    if(!matMap[mat]) matMap[mat]={qty:0,total:0,cat,uom:r['UOM']||''};
+    matMap[mat].qty+=parseFloat(r['QTY']||0); matMap[mat].total+=parseFloat(r['LINE TOTAL']||0);
+  });
+  const CAT_ORDER=['boards','metal','finish','supplies','tax','other'];
+  const CAT_BG={boards:'rgba(79,142,247,.12)',metal:'rgba(251,191,36,.12)',finish:'rgba(52,211,153,.12)',supplies:'var(--surface3)',tax:'rgba(248,113,113,.12)',other:'var(--surface3)'};
+  const CAT_TC={boards:'var(--blue)',metal:'var(--yellow)',finish:'var(--green)',supplies:'var(--ink3)',tax:'var(--red)',other:'var(--ink3)'};
+  document.getElementById('unit-modal-title').textContent = `${job.replace('JOB ','')} · Floor ${floor} · ${unit==='General'?'General':'Unit '+unit}`;
+  document.getElementById('unit-modal-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+      <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Boards</div><div style="font-size:24px;font-weight:800;color:var(--blue);">${Math.round(boards)}</div></div>
+      <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Spend</div><div style="font-size:22px;font-weight:800;color:var(--accent);">${fmt(spend)}</div></div>
+      <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Lines</div><div style="font-size:22px;font-weight:800;">${rows.length}</div></div>
+    </div>
+    <div style="overflow-x:auto;"><table class="tbl">
+      <thead><tr><th>Material</th><th>Cat</th><th class="tbl-r">Qty</th><th class="tbl-r">Total</th></tr></thead>
+      <tbody>${CAT_ORDER.flatMap(catKey=>{
+        const items=Object.entries(matMap).filter(([,d])=>d.cat===catKey);
+        if(!items.length) return [];
+        return[`<tr><td colspan="4" style="padding:5px 10px;background:${CAT_BG[catKey]};color:${CAT_TC[catKey]};font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">${catKey.toUpperCase()}</td></tr>`,
+          ...items.map(([mat,d])=>`<tr><td style="font-weight:500;">${mat}</td><td><span class="badge badge-gray" style="font-size:9px;">${d.cat}</span></td><td class="tbl-r">${d.qty>0?Math.round(d.qty):'—'}</td><td class="tbl-r" style="font-weight:700;">${fmt(d.total)}</td></tr>`)
+        ];
+      }).join('')}</tbody>
+    </table></div>`;
+  document.getElementById('unit-modal').classList.add('open');
+}
+
+// ── JOB SETUP ─────────────────────────────────────────────────
+let _editStruct = {floors:[]};
+
+function showJobSetup() {
+  if (!_currentJob) { showToast('Select a job first'); return; }
+  document.getElementById('job-setup-title').textContent = 'Floors & Units — '+_currentJob.replace('JOB ','');
+  _editStruct = JSON.parse(JSON.stringify(S.jobStructure?.[_currentJob] || {floors:[]}));
+  renderJobSetupBody();
+  document.getElementById('job-setup-modal').classList.add('open');
+}
+
+function renderJobSetupBody() {
+  const el = document.getElementById('job-setup-body'); if (!el) return;
+  let html = `<!-- Batch setup -->
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+    <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">⚡ Quick Batch Setup</div>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">FLOORS (e.g. 1,2,3 or 1-5)</div><input id="js-batch-floors" class="inp inp-sm" style="width:120px;" placeholder="1-5 or 1,2,3"/></div>
+      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">BUILDINGS (e.g. R1,R2)</div><input id="js-batch-bldgs" class="inp inp-sm" style="width:100px;" placeholder="R1 or R1,R2"/></div>
+      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">UNITS PER FLOOR (e.g. 101-116)</div><input id="js-batch-units" class="inp inp-sm" style="width:120px;" placeholder="101-116"/></div>
+      <div><div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">BOARD BUDGET/FL</div><input id="js-batch-boards" class="inp inp-sm" style="width:80px;" type="number" placeholder="240"/></div>
+      <button class="btn btn-primary btn-sm" onclick="batchSetupFloors()">⚡ Generate</button>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--ink3);margin-bottom:10px;font-weight:600;">OR add floors one at a time:</div>
+  <div style="display:flex;gap:8px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;">
+    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">FLOOR</div><input id="js-fl" class="inp inp-sm" style="width:65px;" placeholder="3"/></div>
+    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">BLDG</div><input id="js-bldg" class="inp inp-sm" style="width:65px;" placeholder="R1"/></div>
+    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">UNIT START</div><input id="js-us" class="inp inp-sm" style="width:80px;" placeholder="301"/></div>
+    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">UNIT END</div><input id="js-ue" class="inp inp-sm" style="width:80px;" placeholder="316"/></div>
+    <div><div style="font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:2px;">BOARD BUDGET</div><input id="js-bb" class="inp inp-sm" style="width:90px;" type="number" placeholder="240"/></div>
+    <button class="btn btn-primary btn-sm" onclick="addFloorToStruct()">+ Add Floor</button>
+  </div>`;
+
+  (_editStruct.floors||[]).forEach((fl,fi)=>{
+    html += `<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">
+      <div style="background:var(--surface2);padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="font-weight:700;min-width:60px;">Floor ${fl.floor}</div>
+        <input style="width:65px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:12px;" value="${fl.bldg||''}" placeholder="Bldg" oninput="_editStruct.floors[${fi}].bldg=this.value"/>
+        <input type="number" style="width:90px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:12px;" value="${fl.budgetBoards||''}" placeholder="Board budget" oninput="_editStruct.floors[${fi}].budgetBoards=parseFloat(this.value)||0"/>
+        <span class="badge badge-blue">${(fl.units||[]).length} units</span>
+        <button onclick="removeFl(${fi})" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;" title="Delete floor">✕</button>
+      </div>
+      <div style="padding:10px 14px;display:flex;flex-wrap:wrap;gap:6px;">
+        ${(fl.units||[]).map((u,ui)=>`<div style="display:flex;align-items:center;gap:3px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:12px;font-weight:600;">${u.unit}<button onclick="removeUnit(${fi},${ui})" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:11px;padding:0 1px;">✕</button></div>`).join('')}
+        <button onclick="addUnit(${fi})" style="padding:3px 8px;background:var(--surface2);border:1px dashed var(--border);border-radius:5px;font-size:11px;cursor:pointer;color:var(--ink3);">+ Unit</button>
+      </div>
+    </div>`;
+  });
+  if (!(_editStruct.floors||[]).length) html += '<div class="no-data">No floors added yet.</div>';
+  el.innerHTML = html;
+}
+
+
+function batchSetupFloors() {
+  const floorsInput = document.getElementById('js-batch-floors')?.value.trim();
+  const bldgsInput = document.getElementById('js-batch-bldgs')?.value.trim() || '';
+  const unitsInput = document.getElementById('js-batch-units')?.value.trim() || '';
+  const budBoards = parseFloat(document.getElementById('js-batch-boards')?.value||0)||0;
+
+  if (!floorsInput) { showToast('Enter floor range'); return; }
+
+  // Parse floors
+  const floors = [];
+  if (floorsInput.includes('-')) {
+    const [s,e] = floorsInput.split('-').map(Number);
+    for (let i=s;i<=e;i++) floors.push(String(i));
+  } else {
+    floorsInput.split(',').forEach(f => floors.push(f.trim()));
+  }
+
+  // Parse buildings
+  const bldgs = bldgsInput ? bldgsInput.split(',').map(b=>b.trim()) : [''];
+
+  // Parse units
+  let unitRange = [];
+  if (unitsInput && unitsInput.includes('-')) {
+    const [s,e] = unitsInput.split('-').map(Number);
+    for (let u=s;u<=e;u++) unitRange.push(String(u));
+  } else if (unitsInput) {
+    unitRange = unitsInput.split(',').map(u=>u.trim());
+  }
+
+  // Generate floors
+  if (!_editStruct.floors) _editStruct.floors = [];
+  floors.forEach(floor => {
+    bldgs.forEach(bldg => {
+      // Skip if already exists
+      const exists = _editStruct.floors.find(f => String(f.floor)===floor && (f.bldg||'') === bldg);
+      if (exists) return;
+      const units = unitRange.map(u => ({unit: u, budgetBoards: 0}));
+      _editStruct.floors.push({floor, bldg, budgetBoards: budBoards, units});
+    });
+  });
+  _editStruct.floors.sort((a,b) => parseInt(a.floor)-parseInt(b.floor));
+  renderJobSetupBody();
+  showToast('✓ Generated ' + floors.length + ' floor' + (floors.length>1?'s':'') + ' with ' + unitRange.length + ' units each');
+}
+
+function addFloorToStruct() {
+  const floor = document.getElementById('js-fl')?.value.trim(); if (!floor) { showToast('Enter floor number'); return; }
+  const bldg = document.getElementById('js-bldg')?.value.trim()||'';
+  const us = document.getElementById('js-us')?.value.trim();
+  const ue = document.getElementById('js-ue')?.value.trim();
+  const bb = parseFloat(document.getElementById('js-bb')?.value||0)||0;
+  const units = [];
+  if (us) {
+    const sn=parseInt(us), en=ue?parseInt(ue):sn;
+    if (!isNaN(sn)&&!isNaN(en)) for(let u=sn;u<=en;u++) units.push({unit:String(u),budgetBoards:0});
+    else units.push({unit:us,budgetBoards:0});
+  }
+  if (!_editStruct.floors) _editStruct.floors=[];
+  _editStruct.floors.push({floor,bldg,budgetBoards:bb,units});
+  _editStruct.floors.sort((a,b)=>parseInt(a.floor)-parseInt(b.floor));
+  renderJobSetupBody();
+  ['js-fl','js-bldg','js-us','js-ue','js-bb'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+}
+
+function removeFl(fi) { _editStruct.floors.splice(fi,1); renderJobSetupBody(); }
+function addUnit(fi) { const u=prompt('Unit:'); if(!u) return; _editStruct.floors[fi].units.push({unit:u.trim(),budgetBoards:0}); renderJobSetupBody(); }
+function removeUnit(fi,ui) { _editStruct.floors[fi].units.splice(ui,1); renderJobSetupBody(); }
+
+function saveJobStructure() {
+  if (!_currentJob) return;
+  if (!S.jobStructure) S.jobStructure={};
+  S.jobStructure[_currentJob] = _editStruct;
+  saveSharedData('jobStructure').then ? saveSharedData('jobStructure').then(()=>{
+    showToast('✓ Structure saved');
+    closeModal('job-setup-modal');
+    renderJobMap(_currentJob);
+  }) : saveSharedData('jobStructure');
+}
+
+// ── ESTIMATE TAB ──────────────────────────────────────────────
+function getJobEstimate(job) {
+  if (!S.matBanks) S.matBanks={};
+  const key=job+'_est2';
+  if (!S.matBanks[key]) S.matBanks[key]=ESTIMATE_TEMPLATE.map(t=>({cat:t.cat,name:t.name,uom:t.uom,qty:0,price:t.price||0}));
+  return S.matBanks[key];
+}
+function getJobLabor(job) {
+  if (!S.matBanks) S.matBanks={};
+  const key=job+'_labor';
+  if (!S.matBanks[key]) S.matBanks[key]={Framing:0,Hanging:0,Finish:0,Punchout:0,Layout:0,Supervision:0,Other:0};
+  return S.matBanks[key];
+}
+
+const CAT_COLORS={'Metal 20GA':'rgba(79,142,247,.15)','Metal 25GA':'rgba(251,191,36,.15)','Wood':'rgba(52,211,153,.15)','Drywall':'rgba(167,139,250,.15)','Finish':'rgba(251,146,60,.15)','Fasteners':'var(--surface3)'};
+const CAT_TEXT={'Metal 20GA':'var(--blue)','Metal 25GA':'var(--yellow)','Wood':'var(--green)','Drywall':'var(--purple)','Finish':'#FB923C','Fasteners':'var(--ink3)'};
+
+function renderEstimateTab(job) {
+  const el=document.getElementById('jobs-tab-estimate'); if(!el) return;
+  const items=getJobEstimate(job);
+  const LABOR_CATS=['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
+  const labor=getJobLabor(job);
+  let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+    <div><div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;">${job.replace('JOB ','')} — Estimate</div>
+    <div style="font-size:11px;color:var(--ink3);">Set quantities and unit prices</div></div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="addEstLine('${job.replace(/'/g,"\\'")}');" class="btn btn-ghost btn-sm">+ Add Item</button>
+      <button onclick="saveJobEstimate();" class="btn btn-primary btn-sm">Save Estimate</button>
+    </div>
+  </div>
+  <div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;margin-bottom:16px;">
+  <table class="tbl" style="min-width:560px;">
+    <thead><tr><th>Material</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Unit $</th><th class="tbl-r">Total</th><th></th></tr></thead>
+    <tbody id="est-tbody-inner"></tbody>
+    <tfoot><tr style="background:var(--surface3);">
+      <td colspan="4" style="padding:10px 14px;font-weight:700;font-family:'Syne',sans-serif;">MATERIAL TOTAL</td>
+      <td class="tbl-r" style="padding:10px 14px;font-weight:800;font-size:15px;" id="est-mat-total">$0</td>
+      <td></td>
+    </tr></tfoot>
+  </table></div>`;
+
+  html += `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+    <div style="background:var(--surface2);padding:10px 14px;font-weight:700;font-size:13px;font-family:'Syne',sans-serif;">🔨 Labor Budget</div>
+    <div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">
+      ${LABOR_CATS.map(cat=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:10px 11px;">
+        <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">${cat}</div>
+        <div style="display:flex;align-items:center;gap:3px;"><span style="color:var(--ink3);font-size:12px;">$</span>
+        <input type="number" class="est-inp" value="${labor[cat]||''}" placeholder="0" style="flex:1;" oninput="updateLabor('${job.replace(/'/g,"\\'")}','${cat}',this.value)"/></div>
+      </div>`).join('')}
+    </div>
+    <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:13px;font-weight:600;">Labor Total: <span id="est-labor-total" style="color:var(--accent);">$0</span></span>
+      <span style="font-size:15px;font-weight:800;font-family:'Syne',sans-serif;">Grand Total: <span id="est-grand-total" style="color:var(--accent);">$0</span></span>
+    </div>
+  </div>`;
+
+  el.innerHTML = html;
+  renderEstTable(job, items);
+}
+
+function renderEstTable(job, items) {
+  const tbody=document.getElementById('est-tbody-inner'); if(!tbody) return;
+  let lastCat='',html='',matTotal=0;
+  items.forEach((item,i)=>{
+    if(item.cat!==lastCat){
+      html+=`<tr class="est-cat-hdr"><td colspan="6" style="background:${CAT_COLORS[item.cat]||'var(--surface3)'};color:${CAT_TEXT[item.cat]||'var(--ink3)'};">${item.cat}</td></tr>`;
+      lastCat=item.cat;
+    }
+    const total=(parseFloat(item.qty)||0)*(parseFloat(item.price)||0);
+    matTotal+=total;
+    html+=`<tr style="background:${i%2===0?'var(--surface)':'var(--surface2)'};border-bottom:1px solid var(--border);">
+      <td style="padding:6px 10px;font-weight:500;font-size:13px;">${item.name}</td>
+      <td class="tbl-r"><input type="number" class="est-inp" style="width:70px;text-align:right;" value="${item.qty||''}" placeholder="0" oninput="updateEst(${i},'qty',this.value)" min="0"/></td>
+      <td style="color:var(--ink3);font-size:11px;">${item.uom||'EA'}</td>
+      <td class="tbl-r"><input type="number" class="est-inp" style="width:80px;text-align:right;" value="${item.price||''}" placeholder="0.00" step="0.01" oninput="updateEst(${i},'price',this.value)" min="0"/></td>
+      <td class="tbl-r" id="erow-${i}" style="font-weight:700;">${total>0?fmt(total):'—'}</td>
+      <td style="padding:4px;"><button class="est-rem" onclick="removeEstItem(${i})">✕</button></td>
+    </tr>`;
+  });
+  tbody.innerHTML=html;
+  const el=document.getElementById('est-mat-total'); if(el) el.textContent=fmt(matTotal);
+  updateGrandTotal(job);
+}
+
+function updateEst(idx,field,val){
+  const job=_currentJob; if(!job) return;
+  const items=getJobEstimate(job); if(!items[idx]) return;
+  items[idx][field]=parseFloat(val)||0;
+  const total=(parseFloat(items[idx].qty)||0)*(parseFloat(items[idx].price)||0);
+  const cell=document.getElementById('erow-'+idx); if(cell) cell.textContent=total>0?fmt(total):'—';
+  const matTotal=items.reduce((s,it)=>s+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0),0);
+  const el=document.getElementById('est-mat-total'); if(el) el.textContent=fmt(matTotal);
+  updateGrandTotal(job);
+}
+function updateLabor(job,cat,val){
+  getJobLabor(job)[cat]=parseFloat(val)||0;
+  updateGrandTotal(job);
+}
+function updateGrandTotal(job){
+  const matTotal=getJobEstimate(job).reduce((s,it)=>s+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0),0);
+  const labor=getJobLabor(job);
+  const LABOR_CATS=['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
+  const laborTotal=LABOR_CATS.reduce((s,c)=>s+(parseFloat(labor[c]||0)),0);
+  const el1=document.getElementById('est-labor-total'); if(el1) el1.textContent=fmt(laborTotal);
+  const el2=document.getElementById('est-grand-total'); if(el2) el2.textContent=fmt(matTotal+laborTotal);
+}
+function removeEstItem(idx){
+  const job=_currentJob; if(!job) return;
+  getJobEstimate(job).splice(idx,1);
+  renderEstimateTab(job);
+}
+function addEstLine(job){
+  const cats=[...new Set(ESTIMATE_TEMPLATE.map(t=>t.cat))];
+  const cat=prompt('Category? ('+cats.join(', ')+')',cats[0]); if(!cat) return;
+  const name=prompt('Material name:'); if(!name) return;
+  const uom=prompt('UOM:','EA')||'EA';
+  const items=getJobEstimate(job);
+  items.push({cat:cat.trim(),name:name.trim(),uom,qty:0,price:0});
+  items.sort((a,b)=>cats.indexOf(a.cat)-cats.indexOf(b.cat));
+  renderEstimateTab(job);
+}
+function saveJobEstimate(){
+  const job=_currentJob; if(!job) return;
+  saveSharedData('matBanks').then?saveSharedData('matBanks').then(()=>showToast('✓ Estimate saved')):saveSharedData('matBanks');
+}
+
+// ── BILLS TAB ─────────────────────────────────────────────────
+function renderJobBillsTab(job) {
+  const el=document.getElementById('jobs-tab-bills'); if(!el) return;
+  const LABOR_CATS=['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
+  const matched=Object.entries(S.billAssignments||{})
+    .filter(([inv,ba])=>ba.job===job)
+    .map(([inv,ba])=>({inv,...ba}));
+  if(!matched.length){el.innerHTML='<div class="alert alert-y">No bills assigned yet. Match bills in the Inbox.</div>';return;}
+  const total=matched.reduce((s,ba)=>s+parseFloat(ba.total||0),0);
+  el.innerHTML=`<div style="font-size:12px;color:var(--ink3);margin-bottom:12px;">${matched.length} bills · <strong style="color:var(--accent);">${fmt(total)}</strong></div>`+
+    matched.map(ba=>{
+      const isLabor=LABOR_CATS.some(lc=>(ba.category||'').includes(lc));
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);">
+        <div style="flex:1;">
+          <div style="font-weight:600;font-size:13px;">${ba.vendor||'Inv #'+ba.inv}</div>
+          <div style="font-size:10px;color:var(--ink3);">Inv #${ba.inv}${ba.floor?' · Fl '+ba.floor:''}${ba.building?' · Bldg '+ba.building:''}</div>
+        </div>
+        <span class="badge ${isLabor?'badge-blue':'badge-orange'}">${ba.category||'Material'}</span>
+        <div style="font-weight:700;font-size:13px;">${fmt(parseFloat(ba.total||0))}</div>
+        <button onclick="removeBillMatch('${ba.inv}')" class="btn btn-danger btn-sm">↩</button>
+      </div>`;
+    }).join('');
+}
+
+// ── SUMMARY TAB ───────────────────────────────────────────────
+function renderJobSummaryTab(job) {
+  const el=document.getElementById('jobs-tab-summary'); if(!el) return;
+  const LABOR_CATS=['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
+  const rows=S.rows.filter(r=>(r['JOB']||r['Job']||'')===job);
+  const matOrdered=rows.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0);
+  const items=getJobEstimate(job);
+  const matBudget=items.reduce((s,it)=>s+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0),0);
+  const labor=getJobLabor(job);
+  const laborBudget=LABOR_CATS.reduce((s,c)=>s+(parseFloat(labor[c]||0)),0);
+  const laborBilled=Object.values(S.billAssignments||{}).filter(ba=>ba.job===job&&LABOR_CATS.some(lc=>(ba.category||'').includes(lc))).reduce((s,ba)=>s+parseFloat(ba.total||0),0);
+  const matBilled=Object.values(S.billAssignments||{}).filter(ba=>ba.job===job&&!LABOR_CATS.some(lc=>(ba.category||'').includes(lc))).reduce((s,ba)=>s+parseFloat(ba.total||0),0);
+  const totalBudget=matBudget+laborBudget;
+  const totalActual=laborBilled+matBilled;
+  const pct=totalBudget>0?Math.min((totalActual/totalBudget)*100,100):0;
+  const remaining=totalBudget-totalActual;
+
+  el.innerHTML=`
+    <div class="card" style="margin-bottom:14px;"><div class="card-body">
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+        <div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Total Budget</div>
+          <div style="font-size:26px;font-weight:800;font-family:'Syne',sans-serif;">${fmt(totalBudget)}</div></div>
+        <div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);">Actual Paid</div>
+          <div style="font-size:22px;font-weight:700;color:${totalActual>totalBudget?'var(--red)':'var(--green)'};">${fmt(totalActual)}</div></div>
+      </div>
+      <div class="prog"><div class="prog-fill" style="width:${pct.toFixed(1)}%;background:${pct>90?'var(--red)':pct>70?'var(--yellow)':'var(--green)'}"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:5px;font-size:11px;color:var(--ink3);">
+        <span>${pct.toFixed(0)}% used</span>
+        <span style="color:${remaining<0?'var(--red)':'var(--green)'};font-weight:700;">${remaining>=0?fmt(remaining)+' remaining':fmt(Math.abs(remaining))+' OVER'}</span>
+      </div>
+    </div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div class="card"><div class="card-body">
+        <div style="font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">📦 Material</div>
+        <div style="font-size:17px;font-weight:800;margin-bottom:4px;">Budget: ${fmt(matBudget)}</div>
+        <div style="font-size:12px;color:var(--ink2);">Ordered (POs): ${fmt(matOrdered)}</div>
+        <div style="font-size:12px;color:var(--ink2);">Billed (paid): ${fmt(matBilled)}</div>
+        <div style="margin-top:6px;font-size:11px;font-weight:700;color:${matOrdered>matBudget?'var(--red)':'var(--green)'};">${matOrdered>matBudget?'⚠ '+fmt(matOrdered-matBudget)+' over':'✓ '+fmt(matBudget-matOrdered)+' remaining'}</div>
+      </div></div>
+      <div class="card"><div class="card-body">
+        <div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">🔨 Labor</div>
+        <div style="font-size:17px;font-weight:800;margin-bottom:4px;">Budget: ${fmt(laborBudget)}</div>
+        <div style="font-size:12px;color:var(--ink2);">Billed: ${fmt(laborBilled)}</div>
+        <div style="margin-top:6px;font-size:11px;font-weight:700;color:${laborBilled>laborBudget?'var(--red)':'var(--green)'};">${laborBilled>laborBudget?'⚠ '+fmt(laborBilled-laborBudget)+' over':'✓ '+fmt(laborBudget-laborBilled)+' remaining'}</div>
+      </div></div>
+    </div>
+    ${laborBudget>0?`<div class="card"><div class="card-body">
+      <div class="section-title">Labor by Category</div>
+      ${LABOR_CATS.map(cat=>{
+        const bud=parseFloat(labor[cat]||0);
+        const bil=Object.values(S.billAssignments||{}).filter(ba=>ba.job===job&&(ba.category||'').includes(cat)).reduce((s,ba)=>s+parseFloat(ba.total||0),0);
+        if(!bud&&!bil) return '';
+        const p2=bud>0?Math.min((bil/bud)*100,100):0;
+        return `<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="font-weight:600;">${cat}</span><span>${fmt(bil)} <span style="color:var(--ink3);">/ ${fmt(bud)}</span></span></div><div class="prog"><div class="prog-fill" style="width:${p2.toFixed(1)}%;background:${p2>90?'var(--red)':'var(--blue)'}"></div></div></div>`;
+      }).join('')}
+    </div></div>`:'<div class="alert alert-y">Set labor budgets in the Estimate tab.</div>'}`;
+}
+
+// ── RAW DATA ──────────────────────────────────────────────────
+function renderRaw() {
+  const tab=document.getElementById('raw-tab')?.value||'pos';
+  const search=(document.getElementById('raw-search')?.value||'').toLowerCase();
+  const el=document.getElementById('raw-table'); if(!el) return;
+  if(tab==='pdfs'){
+    el.innerHTML='<div class="no-data" style="padding:12px;">Loading PDF extractions...</div>';
+    fetch('https://svvjsumhkbezbyskxxej.supabase.co/rest/v1/po_pdfs?order=created_at.desc&limit=100',
+      {headers:{'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2dmpzdW1oa2JlemJ5c2t4eGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMjYxNzMsImV4cCI6MjA5MTcwMjE3M30.91A6_m36yMsOr2vofpH7wTVVnCtpuM2hssy1K-vStRQ'}}
+    ).then(r=>r.json()).then(rows=>{
+      const filtered=search?rows.filter(r=>JSON.stringify(r).toLowerCase().includes(search)):rows;
+      const cnt=document.getElementById('raw-count'); if(cnt) cnt.textContent=filtered.length+' rows';
+      el.innerHTML=`<table class="tbl"><thead><tr><th>PO#</th><th>Vendor</th><th>Job</th><th>Bldg</th><th>Fl</th><th>Unit</th><th class="tbl-r">Total</th><th>Status</th><th>Source</th></tr></thead>
+      <tbody>${filtered.map(r=>`<tr><td style="font-weight:600;">${r.po_number||'—'}</td><td>${r.vendor||''}</td><td>${r.job_name||''}</td><td>${r.building||''}</td><td>${r.floor||''}</td><td>${r.unit||''}</td><td class="tbl-r">${fmt(parseFloat(r.total||0))}</td><td><span class="badge ${r.status==='confirmed'?'badge-green':r.status==='duplicate'?'badge-red':'badge-yellow'}">${r.status}</span></td><td style="font-size:10px;color:var(--ink3);">${r.source||''}</td></tr>`).join('')}</tbody></table>`;
+    });
+    return;
+  }
+  const data=tab==='bills'?S.bills:S.rows;
+  const cols=tab==='bills'?['VENDOR','INVOICE NUMBER','ITEM DESCRIPTION','QUANTITY','LINE TOTAL','JOB']:['PO NUMBER','JOB','MATERIAL','QTY','UOM','LINE TOTAL','BUILDING','FLOOR','UNIT'];
+  const filtered=search?data.filter(r=>Object.values(r).join(' ').toLowerCase().includes(search)):data;
+  const cnt=document.getElementById('raw-count'); if(cnt) cnt.textContent=filtered.length+' rows';
+  el.innerHTML=`<table class="tbl"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
+  <tbody>${filtered.slice(0,300).map((r,i)=>`<tr>${cols.map(c=>`<td>${r[c]||''}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────
+function renderSettings() {
+  const jobs=getJobs();
+  const el=document.getElementById('settings-jobs-list'); if(!el) return;
+  el.innerHTML=jobs.map(j=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">
+      <span style="flex:1;font-weight:500;cursor:pointer;color:var(--accent);" onclick="renameJob('${j.replace(/'/g,"\\'")}')" title="Rename">✏️ ${j.replace('JOB ','')}</span>
+      <button class="btn btn-danger btn-sm" onclick="removeJob('${j.replace(/'/g,"\\'")}')">Remove</button>
+    </div>`).join('');
+}
+
+// ── MISC HELPERS ──────────────────────────────────────────────
+function closeModal(id){document.getElementById(id)?.classList.remove('open');}
+
+function fmt(n){
+  if(!n||isNaN(n)) return '$0';
+  return '$'+parseFloat(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+}
+
+function toggleAI(){document.getElementById('ai-panel')?.classList.toggle('open');}
+
+document.querySelectorAll('.modal-overlay').forEach(el=>{
+  el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');});
+});
+
+// ── ONLOAD ────────────────────────────────────────────────────
+
 window.onload = async function() {
   const sheetInput=document.getElementById('sheet-id-input');
   if(sheetInput){
