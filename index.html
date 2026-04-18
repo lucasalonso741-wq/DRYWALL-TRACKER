@@ -819,14 +819,35 @@ async function fetchRawData() {
   });
 }
 async function fetchBillData() {
-  if (!S.sheetId) return;
-  const url = `https://docs.google.com/spreadsheets/d/${S.sheetId}/gviz/tq?tqx=out:json&sheet=BILL%20DATA`;
-  const res = await fetch(url); const text = await res.text();
-  const json = JSON.parse(text.substring(47).slice(0, -2));
-  const cols = json.table.cols.map(c => c.label);
-  S.bills = json.table.rows.filter(r => r && r.c && r.c[0]?.v).map(r => {
-    const row = {}; cols.forEach((c, i) => { row[c.trim()] = r.c[i]?.v ?? r.c[i]?.f ?? ''; }); return row;
-  });
+  if (S.sheetId) {
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${S.sheetId}/gviz/tq?tqx=out:json&sheet=BILL%20DATA`;
+      const res = await fetch(url); const text = await res.text();
+      const json = JSON.parse(text.substring(47).slice(0, -2));
+      const cols = json.table.cols.map(c => c.label);
+      S.bills = json.table.rows.filter(r => r && r.c && r.c[0]?.v).map(r => {
+        const row = {}; cols.forEach((c, i) => { row[c.trim()] = r.c[i]?.v ?? r.c[i]?.f ?? ''; }); return row;
+      });
+    } catch(e) { console.warn('Sheet bill fetch failed:', e); S.bills = S.bills || []; }
+  }
+  await loadBillPDFs();
+}
+async function loadBillPDFs() {
+  try {
+    const res = await fetch(SB_URL + '/rest/v1/bill_pdfs?order=created_at.desc&limit=500&select=id,qb_bill_id,invoice_number,vendor,job_name,bill_date,lines,total,status,source,created_at', { headers: { 'apikey': SB_KEY } });
+    const rows = await res.json();
+    if (!Array.isArray(rows) || !rows.length) return;
+    const sbBills = rows.flatMap(p => {
+      const lines = Array.isArray(p.lines) ? p.lines : [];
+      const base = { 'INVOICE NUMBER': p.invoice_number || p.qb_bill_id || '', 'REFERANCE NUMBER': p.invoice_number || '', 'VENDOR': p.vendor || '', 'JOB': p.job_name || '', 'BILL DATE': p.bill_date || '', '_sb_id': p.id, '_sb_source': 'bill_pdfs' };
+      if (lines.length > 1) return lines.map(l => ({...base, 'ITEM DESCRIPTION': l.description || '', 'QUANTITY': l.qty || '', 'LINE TOTAL': l.amount || 0, '_customer_job': l.customer || p.job_name || '' }));
+      return [{...base, 'ITEM DESCRIPTION': lines[0]?.description || '', 'QUANTITY': lines[0]?.qty || '', 'LINE TOTAL': p.total || 0, '_customer_job': lines[0]?.customer || p.job_name || '' }];
+    });
+    const sbInvs = new Set(sbBills.map(b => String(b['INVOICE NUMBER']).trim()).filter(Boolean));
+    const sheetOnly = (S.bills || []).filter(b => !sbInvs.has(String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim()));
+    S.bills = [...sheetOnly, ...sbBills];
+    S.billPDFs = rows;
+  } catch(e) { console.warn('bill_pdfs load failed:', e); }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -844,7 +865,7 @@ async function syncAll() {
     const smi = document.getElementById('sheet-status-mini'); if(smi){smi.textContent='✓ Connected · '+S.rows.length+' PO rows';smi.className='sheet-status ok';}
     const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--green)';
     populateJobSelects(); updateInboxBadge();
-    showToast('✓ Synced — ' + S.rows.length + ' PO rows, ' + S.bills.length + ' bill rows');
+    showToast('✓ Synced — ' + S.rows.length + ' PO rows, ' + S.bills.length + ' bills (' + (S.billPDFs?.length||0) + ' from QBO)');
   } catch(e) {
     showToast('⚠️ Sync failed: ' + e.message, true);
     const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--red)';
@@ -1000,7 +1021,8 @@ function getFeedBillGroups() {
   const groups = {};
   S.bills.forEach(b => {
     const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim(); if (!inv) return;
-    if (!groups[inv]) groups[inv] = {inv, vendor:b['VENDOR']||b['Vendor']||'', job:b['JOB']||b['Job']||'', rows:[], total:0};
+    if (!groups[inv]) groups[inv] = {inv, vendor:b['VENDOR']||b['Vendor']||'', job:b['_customer_job']||b['JOB']||b['Job']||'', rows:[], total:0, fromSB:!!b['_sb_source']};
+    else if (!groups[inv].job && (b['_customer_job']||b['JOB'])) groups[inv].job = b['_customer_job']||b['JOB']||'';
     groups[inv].rows.push(b); groups[inv].total += parseFloat(b['LINE TOTAL']||0);
   });
   return Object.values(groups);
@@ -1273,17 +1295,19 @@ function renderInboxBills() {
   const el = document.getElementById('inbox-tab-bills'); if (!el) return;
   const unmatched = S.bills.filter(b => { const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim(); return inv && !S.billAssignments[inv]; });
   const groups = {};
-  unmatched.forEach(b => { const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim(); if (!groups[inv]) groups[inv]={inv, vendor:b['VENDOR']||'', job:b['JOB']||'', rows:[], total:0}; groups[inv].rows.push(b); groups[inv].total += parseFloat(b['LINE TOTAL']||0); });
+  unmatched.forEach(b => { const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim(); if (!groups[inv]) groups[inv]={inv, vendor:b['VENDOR']||'', job:b['_customer_job']||b['JOB']||'', rows:[], total:0, fromSB:!!b['_sb_source']}; groups[inv].rows.push(b); groups[inv].total += parseFloat(b['LINE TOTAL']||0); if (b['_customer_job'] && !groups[inv].job) groups[inv].job=b['_customer_job']; });
   const list = Object.values(groups);
   if (!list.length) { el.innerHTML = '<div class="alert alert-g">All bills matched! 🎉</div>'; return; }
   let html = `<div style="margin-bottom:10px;font-size:12px;color:var(--ink3);">${list.length} unmatched bills</div>`;
   list.forEach(g => {
     const isLabor = isLaborVendor(g.vendor);
+    const jobTag = g.job ? ` · <span style="color:var(--green);font-weight:700;">${esc(g.job.replace('JOB ',''))}</span>` : ' · <span style="color:var(--yellow);">No job</span>';
+    const srcBadge = g.fromSB ? '<span style="font-size:9px;background:rgba(52,211,153,.15);color:var(--green);padding:1px 5px;border-radius:4px;font-weight:700;margin-right:4px;">QBO</span>' : '';
     html += `<div class="feed-item" style="cursor:pointer;" onclick="openSmartBillModal('${jsesc(g.inv)}')">
       <div class="feed-dot" style="background:${isLabor?'var(--purple)':'var(--yellow)'};"></div>
-      <div style="flex:1;"><div style="font-weight:700;">${isLabor?'🔧':'📦'} Bill #${esc(g.inv)}</div><div style="font-size:12px;color:var(--ink2);">${esc(g.vendor)} · ${g.rows.length} lines</div></div>
+      <div style="flex:1;"><div style="font-weight:700;">${srcBadge}${isLabor?'🔧':'📦'} Bill #${esc(g.inv)}</div><div style="font-size:12px;color:var(--ink2);">${esc(g.vendor)}${jobTag} · ${g.rows.length} lines</div></div>
       <div style="font-weight:700;">${fmt(g.total)}</div>
-    </div>`;
+    </div>`
   });
   el.innerHTML = html;
 }
@@ -1975,8 +1999,8 @@ function openSmartBillModal(inv) {
   if (!billRows.length) { showToast('Bill not found — try syncing'); return; }
   const vendor = billRows[0]['VENDOR']||'';
   const isLabor = isLaborVendor(vendor);
-  const billJobRaw = billRows[0]['JOB']||'';
-  const detectedJob = fuzzyDetectJob(billJobRaw + ' ' + (billRows[0]['ITEM DESCRIPTION']||''));
+  const billJobRaw = billRows[0]['_customer_job'] || billRows[0]['JOB'] || '';
+  const detectedJob = billJobRaw ? fuzzyDetectJob(billJobRaw) : fuzzyDetectJob((billRows[0]['ITEM DESCRIPTION']||''));
   const detectedLoc = fuzzyDetectLocation(billJobRaw + ' ' + (billRows[0]['ITEM DESCRIPTION']||''));
   const billTotal = billRows.reduce((s,b) => s + parseFloat(b['LINE TOTAL']||0), 0);
   const bestPO = !isLabor ? findBestPOMatch(billRows[0]) : null;
