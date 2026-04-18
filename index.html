@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -226,7 +225,6 @@ a{color:var(--accent);}
 <body>
 
 <!-- LOGIN -->
-
 <div id="login-screen" style="display:flex;">
   <div class="login-box">
     <div class="login-logo" id="login-logo-box">🏗️</div>
@@ -238,11 +236,9 @@ a{color:var(--accent);}
 </div>
 
 <!-- APP -->
-
 <div id="app" style="display:none;">
 
 <!-- SIDEBAR -->
-
 <div id="sidebar">
   <div class="nav-logo" id="nav-logo">🏗️</div>
   <div class="nav-divider"></div>
@@ -257,7 +253,6 @@ a{color:var(--accent);}
 </div>
 
 <!-- MAIN -->
-
 <div id="main">
 <div class="topbar">
   <div class="topbar-title" id="page-title">Activity Feed</div>
@@ -268,7 +263,6 @@ a{color:var(--accent);}
 </div>
 
 <!-- PAGE: HOME / FEED -->
-
 <div id="page-home" class="page active">
   <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
     <div class="drop-zone" id="pdf-drop" style="flex:1;min-width:200px;padding:16px;">
@@ -282,7 +276,6 @@ a{color:var(--accent);}
 </div>
 
 <!-- PAGE: DASHBOARD -->
-
 <div id="page-dashboard" class="page">
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;">
     <select id="dash-job-select" class="inp" style="max-width:280px;" onchange="dashJobFilter()">
@@ -298,7 +291,6 @@ a{color:var(--accent);}
 </div>
 
 <!-- PAGE: INBOX (Recent Activity) -->
-
 <div id="page-inbox" class="page">
   <div class="tabs" id="inbox-tabs">
     <button class="tab-btn active" data-tab="bills" onclick="switchInboxTab('bills')">📋 Unmatched Bills</button>
@@ -311,7 +303,6 @@ a{color:var(--accent);}
 </div>
 
 <!-- PAGE: JOBS -->
-
 <div id="page-jobs" class="page">
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
     <select id="jobs-sel" class="inp" style="max-width:280px;" onchange="onJobSelect()">
@@ -339,7 +330,6 @@ a{color:var(--accent);}
 </div>
 
 <!-- PAGE: RAW DATA -->
-
 <div id="page-raw" class="page">
   <div class="tabs">
     <button class="tab-btn active" data-tab="raw-po" onclick="switchRawTab('raw-po')">PO Lines</button>
@@ -352,7 +342,6 @@ a{color:var(--accent);}
 </div>
 
 <!-- PAGE: SETTINGS -->
-
 <div id="page-settings" class="page">
   <div id="settings-body"></div>
 </div>
@@ -361,7 +350,6 @@ a{color:var(--accent);}
 </div><!-- /app -->
 
 <!-- MODALS -->
-
 <div class="modal-overlay" id="po-modal">
   <div class="modal" style="max-width:680px;">
     <div class="modal-hdr"><span class="modal-title" id="po-modal-title">Detail</span><button class="modal-close" onclick="closeModal('po-modal')">✕</button></div>
@@ -384,9 +372,7 @@ a{color:var(--accent);}
 </div>
 
 <!-- AI CHAT -->
-
 <button id="ai-fab" onclick="toggleAI()">🤖</button>
-
 <div id="ai-panel">
   <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center;">
     <span>🤖 AI Assistant</span><button onclick="toggleAI()" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:16px;">✕</button>
@@ -401,7 +387,6 @@ a{color:var(--accent);}
 </div>
 
 <!-- TOAST -->
-
 <div id="toast"></div>
 
 <script>
@@ -421,6 +406,8 @@ const S = {
   floorBudgets: {}, jobStructure: {}, lastSync: '', duplicatePOs: [],
   aiKey: '', appPrefs: { useBackfill: true }, feedSelection: null,
   backfill: { jobs: null, labor: null, materials: {}, poIndex: {} },
+  materialMap: {}, // raw material name → group key (user manual mappings)
+  pendingNewJob: null, // { name, source, po_id } — triggers "New Job Detected" modal
 };
 
 const JOB_ALIASES = {
@@ -527,10 +514,25 @@ function getJobLabor(job) {
 function fuzzyDetectJob(text) {
   if (!text) return null;
   const t = String(text).toUpperCase();
+  // Check explicit aliases first
   for (const [alias, job] of Object.entries(JOB_ALIASES)) { if (t.includes(alias)) return job; }
+  // Normalized comparison against all jobs
+  const tNorm = normalizeJobName(t);
   const jobs = getJobs();
-  for (const job of jobs) { const words = job.split(/\s+/).filter(w => w.length > 3); if (words.some(w => t.includes(w))) return job; }
+  for (const job of jobs) {
+    const jNorm = normalizeJobName(job);
+    if (tNorm.includes(jNorm) || jNorm.includes(tNorm)) return job;
+    // Word-level match
+    const words = job.replace(/^JOB\s+/i,'').split(/\s+/).filter(w => w.length > 3);
+    if (words.length > 0 && words.every(w => t.includes(w))) return job;
+  }
   return null;
+}
+// Returns true if the job name is NOT already in the known jobs list
+function isUnknownJob(rawJob) {
+  if (!rawJob) return false;
+  const matched = fuzzyDetectJob(rawJob);
+  return !matched;
 }
 function resolveJobFromPDF(rawJob, shipTo) {
   const combined = ((rawJob||'') + ' ' + (shipTo||'')).toUpperCase();
@@ -567,18 +569,76 @@ function findBestPOMatch(billRow) {
   }
   return bestScore >= 5 ? best : null;
 }
-function normalizeJobName(s) { return String(s||'').toUpperCase().replace(/JOB\s+/g,'').replace(/[^A-Z0-9]+/g,' ').trim(); }
+function normalizeJobName(s) { return String(s||'').toUpperCase().replace(/^JOB\s+/g,'').replace(/\s*@\s*/g,' AT ').replace(/[^A-Z0-9]+/g,' ').trim(); }
 function getBackfillForJob(job) {
-  // Try S.backfill.jobs array first (from loadBackfillData)
-  const key = normalizeJobName(job);
-  const idx = S.backfill?.jobs || [];
-  const fromArray = idx.find(r => normalizeJobName(r.job || r.job_name || r.name) === key);
-  if (fromArray) return fromArray;
-  // Fallback: try S._backfillJobs object (from loadSharedData simple load)
+  // Backfill data is an object: {jobName: {materialItems:{}, laborVendors:{}, materialTotal, laborTotal, taxTotal}}
   const bf = S._backfillJobs;
   if (!bf) return null;
-  const objKey = Object.keys(bf).find(k => k.toUpperCase().includes(job.replace('JOB ','').toUpperCase()) || job.toUpperCase().includes(k.toUpperCase()));
-  return objKey ? bf[objKey] : null;
+  const targetKey = normalizeJobName(job);
+  // Try exact normalized match first
+  for (const k of Object.keys(bf)) {
+    if (normalizeJobName(k) === targetKey) return bf[k];
+  }
+  // Fallback: substring match
+  const jobBase = job.replace(/^JOB\s+/i,'').toUpperCase();
+  for (const k of Object.keys(bf)) {
+    const ku = k.toUpperCase();
+    if (ku.includes(jobBase.substring(0, Math.min(8, jobBase.length))) || jobBase.includes(ku.substring(0, Math.min(8, ku.length)))) return bf[k];
+  }
+  return null;
+}
+
+// Material normalization — maps raw names to standardized categories
+const MATERIAL_GROUPS = {
+  'DRYWALL_HALF': { label: '1/2" Drywall', patterns: [/1\/2.*(?:DW|DRYWALL|REG|REGULAR|BOARD)/i, /(?:DW|DRYWALL|BOARD).*1\/2/i] },
+  'DRYWALL_58': { label: '5/8" Drywall', patterns: [/5\/8.*(?:DW|DRYWALL|REG|REGULAR|TYPE.?X|FIRE)/i, /(?:DW|DRYWALL|TYPE.?X|FIRE).*5\/8/i] },
+  'DENSHIELD_HALF': { label: '1/2" Denshield', patterns: [/1\/2.*DEN(?:SHIELD|S)/i] },
+  'DENSHIELD_58': { label: '5/8" Denshield', patterns: [/5\/8.*DEN(?:SHIELD|S)/i] },
+  'DENSGLASS': { label: 'Densglass', patterns: [/DENS.?GLASS|DENSGLASS/i] },
+  'MR_BOARD': { label: 'MR Board (Mold Defense)', patterns: [/MR\s*BOARD|MOLD.?DEFENSE|MR\s*BRD/i] },
+  'SHAFT_LINER': { label: 'Shaft Liner', patterns: [/SHAFT.?LINER/i] },
+  'STUD_358': { label: '3-5/8 Stud', patterns: [/3\s*5\/8.*STUD/i] },
+  'STUD_158': { label: '1-5/8 Stud', patterns: [/1\s*5\/8.*STUD/i] },
+  'STUD_6': { label: '6" Stud', patterns: [/^6\s*STUD|\b6\s*STUD/i] },
+  'TRAC_358': { label: '3-5/8 Track', patterns: [/3\s*5\/8.*(?:TRAC|TRACK|RUNNER)/i] },
+  'TRAC_158': { label: '1-5/8 Track', patterns: [/1\s*5\/8.*(?:TRAC|TRACK)/i] },
+  'TRAC_6': { label: '6" Track', patterns: [/^6\s*(?:TRAC|TRACK)|\b6\s*(?:TRAC|TRACK)/i] },
+  'HI_HAT': { label: 'Hi Hat / Furring', patterns: [/HI.?HAT|FURRING/i] },
+  'ANGLE': { label: 'Angle', patterns: [/2X2\s*ANGLE|ANGLE.*20\s*GA/i] },
+  'FLAT_METAL': { label: 'Flat Metal/Strap', patterns: [/FLAT\s*(?:METAL|STRAP)|FLAT\s*METAL/i] },
+  'RC_CHANNEL': { label: 'RC Channel', patterns: [/RC\s*(?:CHANNEL|1|2)/i] },
+  'WOOD_2X4': { label: '2x4 Lumber', patterns: [/2X4/i] },
+  'WOOD_2X6': { label: '2x6 Lumber', patterns: [/2X6/i] },
+  'WOOD_2X8': { label: '2x8 Lumber', patterns: [/2X8/i] },
+  'WOOD_1X4': { label: '1x4 PT', patterns: [/1X4/i] },
+  'WOOD_1X6': { label: '1x6 PT', patterns: [/1X6/i] },
+  'WOOD_1X2': { label: '1x2 PT (Furring Strips)', patterns: [/1X2/i] },
+  'JOINT_COMP': { label: 'Joint Compound', patterns: [/JOINT.?COMP|COMPOUND|DURABOND/i] },
+  'TAPE': { label: 'Tape', patterns: [/\bTAPE\b/i] },
+  'CORNER_BEAD': { label: 'Corner Bead', patterns: [/CORNER.?BEAD|CORNERBEAD/i] },
+  'FIRECAULK': { label: 'Fire Caulk / Sealant', patterns: [/FIRE.?CAULK|FIRECAULK|SMOKE.?SOUND|USG.*SEALANT/i] },
+  'CAULK_LANCO': { label: 'Lanco Caulk', patterns: [/LANCO.?CAULK/i] },
+  'SCREWS': { label: 'Screws (all types)', patterns: [/\bSCREW|FASTENER/i] },
+  'FAST_TRAC': { label: 'Fast Trac Pins', patterns: [/FAST.?TRAC|FASTRAC/i] },
+  'NAILS': { label: 'Nails', patterns: [/\bNAIL|COIL.?NAIL/i] },
+  'TIE_WIRE': { label: 'Tie Wire', patterns: [/TIE.?WIRE/i] },
+  'SANDING': { label: 'Sanding Supplies', patterns: [/SAND(?:ING|PAPER)?|DISC|SPONGE/i] },
+  'MISC': { label: 'Misc / Other', patterns: [/MISC|OTHER/i] },
+  'TAX': { label: 'Tax', patterns: [/^TAX$|SALES.?TAX/i] },
+};
+function normalizeMaterial(raw) {
+  if (!raw) return { group: 'MISC', label: 'Misc' };
+  const r = String(raw).toUpperCase().trim();
+  // Check user manual mappings first
+  const manual = S.materialMap?.[r];
+  if (manual) {
+    const g = MATERIAL_GROUPS[manual];
+    return g ? { group: manual, label: g.label } : { group: manual, label: manual };
+  }
+  for (const [key, def] of Object.entries(MATERIAL_GROUPS)) {
+    if (def.patterns.some(p => p.test(r))) return { group: key, label: def.label };
+  }
+  return { group: 'OTHER', label: raw };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -611,9 +671,9 @@ async function saveSharedData(key) {
   catch(e) { console.error('Failed to save', key, ':', e); showToast('⚠ Save failed', true); }
 }
 async function loadSharedData() {
-  const [budgets, targets, matBanks, assignments, billAssignments, actuals, logo, jobs, floorBudgets, jobStructure, appPrefs, backfillJobs] = await Promise.all([
+  const [budgets, targets, matBanks, assignments, billAssignments, actuals, logo, jobs, floorBudgets, jobStructure, appPrefs, backfillJobs, materialMap] = await Promise.all([
     sbGet('budgets'), sbGet('targets'), sbGet('matBanks'), sbGet('assignments'), sbGet('billAssignments'), sbGet('actuals'),
-    sbGet('logo'), sbGet('jobs'), sbGet('floorBudgets'), sbGet('jobStructure'), sbGet('appPrefs'), sbGet('backfill_jobs')
+    sbGet('logo'), sbGet('jobs'), sbGet('floorBudgets'), sbGet('jobStructure'), sbGet('appPrefs'), sbGet('backfill_jobs'), sbGet('materialMap')
   ]);
   if (budgets) S.budgets = budgets;
   if (targets) S.targets = targets;
@@ -626,6 +686,7 @@ async function loadSharedData() {
   if (jobStructure) S.jobStructure = jobStructure;
   if (appPrefs) S.appPrefs = Object.assign({ useBackfill: true }, appPrefs);
   if (backfillJobs) S._backfillJobs = backfillJobs;
+  if (materialMap) S.materialMap = materialMap;
   if (logo) localStorage.setItem('dw_logo', logo);
   loadLogo();
   console.log('Shared data loaded from Supabase ✓');
@@ -1472,22 +1533,100 @@ function renderJobSummaryTab(job) {
   const matBilled = billAssigns.filter(ba => !LABOR_CATS.some(lc => (ba.category||'').includes(lc))).reduce((s,ba) => s + (parseFloat(ba.total||0)||0), 0);
   const totalBudget = matBudget + laborBudget, totalActual = matBilled + laborBilled;
   const pct = totalBudget > 0 ? Math.min(totalActual/totalBudget*100, 100) : 0;
-  // Material breakdown
-  const mats = {};
-  rows.forEach(r => { const name = (r['MATERIAL']||'').trim()||'Unknown'; if(!mats[name]) mats[name] = {qty:0, spend:0, uom:r['UOM']||''}; mats[name].qty += parseFloat(r['QTY']||0)||0; mats[name].spend += parseFloat(r['LINE TOTAL']||0)||0; });
-  const matRows = Object.entries(mats).sort((a,b) => b[1].spend - a[1].spend);
-  // By building/floor
-  const bf = {};
-  rows.forEach(r => { const key = (r['BUILDING']||'—')+'|'+(r['FLOOR']||'—'); if(!bf[key]) bf[key] = {b:r['BUILDING']||'—', f:r['FLOOR']||'—', spend:0, qty:0}; bf[key].spend += parseFloat(r['LINE TOTAL']||0)||0; bf[key].qty += parseFloat(r['QTY']||0)||0; });
+
+  // Build unified item list: budgeted items + ordered items (materials NOT in estimate also appear)
+  // Key: normalized material group
+  const itemMap = {}; // group → { label, budgetQty, budgetDollars, orderedQty, orderedDollars, rawNames:Set }
+
+  // Add all estimate items (budgeted)
+  items.forEach(it => {
+    const norm = normalizeMaterial(it.name);
+    const key = norm.group;
+    if (!itemMap[key]) itemMap[key] = { label: norm.label, budgetQty: 0, budgetDollars: 0, orderedQty: 0, orderedDollars: 0, rawNames: new Set(), uom: it.uom||'EA', budgeted: true };
+    itemMap[key].budgetQty += parseFloat(it.qty) || 0;
+    itemMap[key].budgetDollars += (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
+    itemMap[key].rawNames.add(it.name);
+  });
+
+  // Add all PO-ordered items (actual)
+  rows.forEach(r => {
+    const raw = (r['MATERIAL']||'').trim(); if (!raw) return;
+    const norm = normalizeMaterial(raw);
+    const key = norm.group;
+    if (!itemMap[key]) itemMap[key] = { label: norm.label, budgetQty: 0, budgetDollars: 0, orderedQty: 0, orderedDollars: 0, rawNames: new Set(), uom: r['UOM']||'EA', budgeted: false };
+    itemMap[key].orderedQty += parseFloat(r['QTY']||0) || 0;
+    itemMap[key].orderedDollars += parseFloat(r['LINE TOTAL']||0) || 0;
+    itemMap[key].rawNames.add(raw);
+  });
+
+  const allItems = Object.entries(itemMap).sort((a,b) => (b[1].orderedDollars + b[1].budgetDollars) - (a[1].orderedDollars + a[1].budgetDollars));
 
   el.innerHTML = `
-    <div class="card" style="margin-bottom:14px;"><div class="card-body"><div style="display:flex;justify-content:space-between;margin-bottom:12px;"><div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Total Budget</div><div style="font-size:26px;font-weight:800;font-family:'Space Grotesk',sans-serif;">${fmt(totalBudget)}</div></div><div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);">Actual Paid</div><div style="font-size:22px;font-weight:700;color:${totalActual>totalBudget?'var(--red)':'var(--green)'};">${fmt(totalActual)}</div></div></div><div class="prog"><div class="prog-fill" style="width:${pct.toFixed(1)}%;background:${pct>90?'var(--red)':pct>70?'var(--yellow)':'var(--green)'}"></div></div></div></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
-      <div class="card"><div class="card-body"><div class="section-title">Quick Summary</div><div style="font-size:12px;color:var(--ink2);line-height:1.8;">Ordered on POs: <strong>${fmt(matOrdered)}</strong><br>Billed materials: <strong>${fmt(matBilled)}</strong><br>Billed labor: <strong>${fmt(laborBilled)}</strong></div></div></div>
-      <div class="card"><div class="card-body"><div class="section-title">Drill Down</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" onclick="switchJobTab('map')">Job Map</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('estimate')">Estimate</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('bills')">Bills</button></div></div></div>
+    <div class="card" style="margin-bottom:16px;"><div class="card-body">
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:12px;">
+        <div><div style="font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Total Budget</div><div style="font-size:28px;font-weight:800;font-family:'Space Grotesk',sans-serif;">${fmt(totalBudget)}</div></div>
+        <div style="text-align:right;"><div style="font-size:11px;color:var(--ink3);">Actual Paid</div><div style="font-size:24px;font-weight:700;color:${totalActual>totalBudget?'var(--red)':'var(--green)'};">${fmt(totalActual)}</div></div>
+      </div>
+      <div class="prog" style="height:10px;"><div class="prog-fill" style="width:${pct.toFixed(1)}%;background:${pct>90?'var(--red)':pct>70?'var(--yellow)':'var(--green)'}"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--ink3);"><span>${pct.toFixed(1)}% used</span><span>${fmt(totalBudget - totalActual)} remaining</span></div>
+    </div></div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
+      <div class="stat"><div class="stat-lbl">Ordered on POs</div><div class="stat-val" style="color:var(--blue);">${fmt(matOrdered)}</div></div>
+      <div class="stat"><div class="stat-lbl">Billed Materials</div><div class="stat-val">${fmt(matBilled)}</div></div>
+      <div class="stat"><div class="stat-lbl">Billed Labor</div><div class="stat-val" style="color:var(--accent);">${fmt(laborBilled)}</div></div>
+      <div class="stat"><div class="stat-lbl">Total Items Tracked</div><div class="stat-val">${allItems.length}</div></div>
     </div>
-    <div class="card" style="margin-bottom:14px;"><div class="card-hdr"><span class="card-title">Everything Tracked</span></div><div class="card-body" style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Material</th><th>UOM</th><th class="tbl-r">Qty</th><th class="tbl-r">Spend</th></tr></thead><tbody>${matRows.length?matRows.map(([name,v]) => '<tr><td>'+esc(name)+'</td><td>'+esc(v.uom)+'</td><td class="tbl-r">'+Math.round(v.qty*100)/100+'</td><td class="tbl-r">'+fmt(v.spend)+'</td></tr>').join(''):'<tr><td colspan="4" class="no-data">No tracked material yet.</td></tr>'}</tbody></table></div></div>
-    <div class="card"><div class="card-hdr"><span class="card-title">By Building / Floor</span></div><div class="card-body" style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Building</th><th>Floor</th><th class="tbl-r">Qty</th><th class="tbl-r">Spend</th></tr></thead><tbody>${Object.values(bf).sort((a,b) => String(a.b).localeCompare(String(b.b))||String(a.f).localeCompare(String(b.f),undefined,{numeric:true})).map(v => '<tr><td>'+esc(v.b)+'</td><td>'+esc(v.f)+'</td><td class="tbl-r">'+Math.round(v.qty*100)/100+'</td><td class="tbl-r">'+fmt(v.spend)+'</td></tr>').join('')||'<tr><td colspan="4" class="no-data">No building/floor tracking yet.</td></tr>'}</tbody></table></div></div>`;
+
+    <div class="card"><div class="card-hdr"><span class="card-title">Job Cost — All Items (Budgeted + Non-Budgeted)</span><span style="font-size:12px;color:var(--ink3);">Normalized • ${allItems.length} groups</span></div><div class="card-body" style="padding:0;">
+      <table class="tbl" style="border:none;"><thead><tr>
+        <th>Material Group</th>
+        <th class="tbl-r">Budget Qty</th>
+        <th class="tbl-r">Actual Qty</th>
+        <th style="width:25%;">Qty Used</th>
+        <th class="tbl-r">Budget $</th>
+        <th class="tbl-r">Actual $</th>
+        <th>Status</th>
+      </tr></thead><tbody>
+      ${allItems.map(([key, it]) => {
+        const qtyPct = it.budgetQty > 0 ? (it.orderedQty / it.budgetQty * 100) : (it.orderedQty > 0 ? 999 : 0);
+        const dollarPct = it.budgetDollars > 0 ? (it.orderedDollars / it.budgetDollars * 100) : (it.orderedDollars > 0 ? 999 : 0);
+        const barColor = qtyPct > 110 ? 'var(--red)' : qtyPct > 85 ? 'var(--yellow)' : qtyPct > 0 ? 'var(--green)' : 'var(--ink3)';
+        let statusBadge = '';
+        if (!it.budgeted && it.orderedDollars > 0) statusBadge = '<span class="badge badge-orange">Non-budgeted</span>';
+        else if (qtyPct > 110) statusBadge = '<span class="badge badge-red">Over ' + Math.round(qtyPct-100) + '%</span>';
+        else if (qtyPct > 85) statusBadge = '<span class="badge badge-yellow">Near cap</span>';
+        else if (qtyPct > 0) statusBadge = '<span class="badge badge-green">On track</span>';
+        else statusBadge = '<span class="badge badge-gray">Not ordered</span>';
+        return `<tr>
+          <td><div style="font-weight:600;">${esc(it.label)}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px;">${esc([...it.rawNames].slice(0,3).join(' • '))}${it.rawNames.size>3?' +'+(it.rawNames.size-3)+' more':''}</div></td>
+          <td class="tbl-r">${it.budgetQty > 0 ? Math.round(it.budgetQty) : '—'}</td>
+          <td class="tbl-r" style="font-weight:700;color:${it.orderedQty>0?'var(--blue)':'var(--ink3)'};">${it.orderedQty > 0 ? Math.round(it.orderedQty) : '—'}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;background:var(--surface3);border-radius:4px;height:8px;overflow:hidden;min-width:80px;">
+                ${qtyPct>0 ? '<div style="height:100%;width:' + Math.min(qtyPct,100).toFixed(0) + '%;background:' + barColor + ';border-radius:4px;"></div>' : ''}
+              </div>
+              <span style="font-size:11px;font-weight:700;color:${barColor};min-width:40px;text-align:right;">${qtyPct > 0 ? (qtyPct>999 ? '∞' : qtyPct.toFixed(0) + '%') : '—'}</span>
+            </div>
+          </td>
+          <td class="tbl-r">${it.budgetDollars > 0 ? fmt(it.budgetDollars) : '—'}</td>
+          <td class="tbl-r" style="font-weight:700;">${it.orderedDollars > 0 ? fmt(it.orderedDollars) : '—'}</td>
+          <td>${statusBadge}</td>
+        </tr>`;
+      }).join('')}
+      ${allItems.length === 0 ? '<tr><td colspan="7" class="no-data" style="text-align:center;">No items tracked yet. Add estimate items or sync POs.</td></tr>' : ''}
+      </tbody></table>
+    </div></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">
+      <div class="card"><div class="card-body"><div class="section-title">Drill Down</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" onclick="switchJobTab('map')">Job Map</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('estimate')">Estimate</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('bills')">Bills</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('allmats')">Historical Data</button></div></div></div>
+      <div class="card"><div class="card-body"><div class="section-title">Labor Breakdown</div>
+        <div style="font-size:13px;color:var(--ink2);line-height:1.9;">
+          ${LABOR_CATS.map(c => { const billed = billAssigns.filter(ba => ba.category === c).reduce((s,ba) => s+parseFloat(ba.total||0), 0); return billed > 0 ? `<div>${c}: <strong>${fmt(billed)}</strong></div>` : ''; }).filter(Boolean).join('') || '<div style="color:var(--ink3);">No labor billed yet</div>'}
+        </div>
+      </div></div>
+    </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1496,88 +1635,102 @@ function renderJobSummaryTab(job) {
 function renderAllMaterialsTab(job) {
   const el = document.getElementById('jobs-tab-allmats'); if (!el) return;
   const bf = getBackfillForJob(job);
-  
-  // Handle both data formats: 
-  // Format A (backfill_jobs array): {job, material_total, labor_total, tax_total, po_count}
-  // Format B (_backfillJobs object): {materialItems:[], laborVendors:[]}
-  
+
   if (!bf) {
-    el.innerHTML = '<div class="alert alert-y">No historical data found for this job. Backfill data is loaded from Supabase (backfill_jobs key).</div>';
+    el.innerHTML = '<div class="alert alert-y">No historical data found for this job. Backfill data loads from Supabase key <code>backfill_jobs</code>.</div>';
     return;
   }
 
-  // Format B: has materialItems array
-  if (bf.materialItems?.length) {
-    const total = bf.materialItems.reduce((s,m) => s + (parseFloat(m.total)||0), 0);
-    const catGroups = {};
-    bf.materialItems.forEach(m => { const cat = categorize(m.description||''); if(!catGroups[cat]) catGroups[cat] = []; catGroups[cat].push(m); });
-    const CAT_ORDER = ['boards','metal','finish','supplies','other','tax'];
-    const CAT_BG = {boards:'rgba(79,142,247,.08)',metal:'rgba(251,191,36,.08)',finish:'rgba(52,211,153,.08)',supplies:'var(--surface2)',tax:'rgba(248,113,113,.08)',other:'var(--surface2)'};
-    const CAT_TC = {boards:'var(--blue)',metal:'var(--yellow)',finish:'var(--green)',supplies:'var(--ink2)',tax:'var(--red)',other:'var(--ink2)'};
-    let html = `<div style="margin-bottom:16px;display:flex;gap:16px;flex-wrap:wrap;">
-      <div class="stat"><div class="stat-lbl">Total Material</div><div class="stat-val" style="color:var(--accent);">${fmt(total)}</div></div>
-      <div class="stat"><div class="stat-lbl">Items</div><div class="stat-val">${bf.materialItems.length}</div></div>
-      ${bf.laborVendors?.length ? '<div class="stat"><div class="stat-lbl">Labor Vendors</div><div class="stat-val">' + bf.laborVendors.length + '</div></div>' : ''}
-    </div>`;
-    html += '<div class="card"><div class="card-hdr"><span class="card-title">All QB Material Items</span></div><div class="card-body" style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Description</th><th>Cat</th><th class="tbl-r">Amount</th><th>% of Total</th></tr></thead><tbody>';
-    CAT_ORDER.forEach(cat => {
-      const items = catGroups[cat]; if (!items?.length) return;
-      const catTotal = items.reduce((s,m) => s + (parseFloat(m.total)||0), 0);
-      html += '<tr><td colspan="4" style="padding:5px 10px;background:'+CAT_BG[cat]+';color:'+CAT_TC[cat]+';font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">'+cat.toUpperCase()+' — '+fmt(catTotal)+'</td></tr>';
-      items.sort((a,b) => (parseFloat(b.total)||0)-(parseFloat(a.total)||0)).forEach(m => {
-        const pct = total > 0 ? ((parseFloat(m.total)||0)/total*100) : 0;
-        html += '<tr><td>'+esc(m.description||'')+'</td><td><span class="badge badge-gray" style="font-size:9px;">'+cat+'</span></td><td class="tbl-r" style="font-weight:700;">'+fmt(parseFloat(m.total)||0)+'</td><td><div style="display:flex;align-items:center;gap:6px;"><div style="width:60px;background:var(--surface3);border-radius:3px;height:5px;overflow:hidden;"><div style="height:100%;width:'+Math.min(pct,100).toFixed(1)+'%;background:'+CAT_TC[cat]+';border-radius:3px;"></div></div><span style="font-size:10px;color:var(--ink3);">'+pct.toFixed(1)+'%</span></div></td></tr>';
-      });
-    });
-    html += '</tbody></table></div></div>';
-    if (bf.laborVendors?.length) {
-      const labTotal = bf.laborVendors.reduce((s,v) => s + (parseFloat(v.total)||0), 0);
-      html += '<div class="card" style="margin-top:14px;"><div class="card-hdr"><span class="card-title">Labor Vendors</span><span style="font-size:12px;color:var(--ink3);">'+fmt(labTotal)+' total</span></div><div class="card-body"><table class="tbl"><thead><tr><th>Vendor</th><th class="tbl-r">Amount</th></tr></thead><tbody>';
-      bf.laborVendors.sort((a,b) => (parseFloat(b.total)||0)-(parseFloat(a.total)||0)).forEach(v => {
-        html += '<tr><td style="font-weight:600;">'+esc(v.vendor||'')+'</td><td class="tbl-r" style="font-weight:700;">'+fmt(parseFloat(v.total)||0)+'</td></tr>';
-      });
-      html += '</tbody></table></div></div>';
-    }
-    el.innerHTML = html;
-    return;
-  }
-
-  // Format A: summary object with material_total, labor_total, etc.
-  const matTotal = parseFloat(bf.material_total||0);
-  const labTotal = parseFloat(bf.labor_total||0);
-  const taxTotal = parseFloat(bf.tax_total||0);
-  const poCount = bf.po_count || 0;
+  // Actual format: { materialItems: {name: amount}, laborVendors: {vendor: amount}, materialTotal, laborTotal, taxTotal }
+  const matItems = bf.materialItems || {};
+  const labVendors = bf.laborVendors || {};
+  const matTotal = parseFloat(bf.materialTotal || 0);
+  const labTotal = parseFloat(bf.laborTotal || 0);
+  const taxTotal = parseFloat(bf.taxTotal || 0);
   const grandTotal = matTotal + labTotal + taxTotal;
 
-  let html = `<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Historical QB Data — ${esc((bf.job||bf.job_name||bf.name||job).replace('JOB ',''))}</span></div><div class="card-body">
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px;">
-      <div class="stat"><div class="stat-lbl">Material Spend</div><div class="stat-val" style="color:var(--blue);">${fmt(matTotal)}</div></div>
-      <div class="stat"><div class="stat-lbl">Labor Spend</div><div class="stat-val" style="color:var(--accent);">${fmt(labTotal)}</div></div>
-      <div class="stat"><div class="stat-lbl">Tax</div><div class="stat-val" style="color:var(--red);">${fmt(taxTotal)}</div></div>
-      <div class="stat"><div class="stat-lbl">Grand Total</div><div class="stat-val">${fmt(grandTotal)}</div></div>
-      ${poCount ? '<div class="stat"><div class="stat-lbl">PO Count</div><div class="stat-val">' + poCount + '</div></div>' : ''}
-    </div>`;
+  // Group materials by normalized group
+  const groupTotals = {};
+  const groupItems = {};
+  Object.entries(matItems).forEach(([name, amt]) => {
+    const amount = parseFloat(amt) || 0;
+    const norm = normalizeMaterial(name);
+    if (!groupTotals[norm.group]) { groupTotals[norm.group] = { label: norm.label, total: 0, items: [] }; }
+    groupTotals[norm.group].total += amount;
+    groupTotals[norm.group].items.push({ name, amount, group: norm.group, label: norm.label });
+  });
+  const sortedGroups = Object.entries(groupTotals).sort((a,b) => b[1].total - a[1].total);
 
-  // Show breakdown bars
-  if (grandTotal > 0) {
-    const matPct = (matTotal/grandTotal*100).toFixed(1);
-    const labPct = (labTotal/grandTotal*100).toFixed(1);
-    const taxPct = (taxTotal/grandTotal*100).toFixed(1);
-    html += `<div style="margin-bottom:12px;">
-      <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px;"><span style="font-size:12px;font-weight:600;min-width:80px;">Material</span><div style="flex:1;background:var(--surface3);border-radius:4px;height:8px;overflow:hidden;"><div style="height:100%;width:${matPct}%;background:var(--blue);border-radius:4px;"></div></div><span style="font-size:12px;color:var(--ink3);min-width:50px;text-align:right;">${matPct}%</span></div>
-      <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px;"><span style="font-size:12px;font-weight:600;min-width:80px;">Labor</span><div style="flex:1;background:var(--surface3);border-radius:4px;height:8px;overflow:hidden;"><div style="height:100%;width:${labPct}%;background:var(--accent);border-radius:4px;"></div></div><span style="font-size:12px;color:var(--ink3);min-width:50px;text-align:right;">${labPct}%</span></div>
-      <div style="display:flex;gap:4px;align-items:center;"><span style="font-size:12px;font-weight:600;min-width:80px;">Tax</span><div style="flex:1;background:var(--surface3);border-radius:4px;height:8px;overflow:hidden;"><div style="height:100%;width:${taxPct}%;background:var(--red);border-radius:4px;"></div></div><span style="font-size:12px;color:var(--ink3);min-width:50px;text-align:right;">${taxPct}%</span></div>
-    </div>`;
-  }
+  let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
+    <div class="stat"><div class="stat-lbl">Material Total</div><div class="stat-val" style="color:var(--blue);">${fmt(matTotal)}</div></div>
+    <div class="stat"><div class="stat-lbl">Labor Total</div><div class="stat-val" style="color:var(--accent);">${fmt(labTotal)}</div></div>
+    <div class="stat"><div class="stat-lbl">Tax</div><div class="stat-val" style="color:var(--red);">${fmt(taxTotal)}</div></div>
+    <div class="stat"><div class="stat-lbl">Grand Total</div><div class="stat-val">${fmt(grandTotal)}</div></div>
+  </div>`;
 
-  // Show any additional detail properties from the backfill object
-  const extraKeys = Object.keys(bf).filter(k => !['job','job_name','name','material_total','labor_total','tax_total','po_count'].includes(k));
-  if (extraKeys.length) {
-    html += '<div style="margin-top:12px;font-size:12px;color:var(--ink3);">Additional fields: ' + extraKeys.map(k => esc(k) + '=' + esc(JSON.stringify(bf[k]).substring(0,60))).join(', ') + '</div>';
-  }
-
+  // Material items — grouped by normalized category with expand
+  html += '<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Materials by Category (Normalized)</span><span style="font-size:12px;color:var(--ink3);">Click row to see raw items & re-map</span></div><div class="card-body">';
+  sortedGroups.forEach(([groupKey, g]) => {
+    const pct = matTotal > 0 ? (g.total / matTotal * 100) : 0;
+    const barCol = pct > 20 ? 'var(--blue)' : pct > 10 ? 'var(--green)' : 'var(--yellow)';
+    html += `<details style="border:1px solid var(--border);border-radius:8px;margin-bottom:8px;padding:0;">
+      <summary style="cursor:pointer;padding:12px 16px;display:flex;align-items:center;gap:12px;">
+        <span style="font-weight:700;font-size:14px;flex:1;">${esc(g.label)}</span>
+        <span style="font-size:12px;color:var(--ink3);">${g.items.length} item${g.items.length>1?'s':''}</span>
+        <div style="width:100px;background:var(--surface3);border-radius:4px;height:6px;overflow:hidden;"><div style="height:100%;width:${Math.min(pct,100).toFixed(1)}%;background:${barCol};border-radius:4px;"></div></div>
+        <span style="font-size:11px;color:var(--ink3);min-width:42px;text-align:right;">${pct.toFixed(1)}%</span>
+        <span style="font-weight:700;min-width:90px;text-align:right;">${fmt(g.total)}</span>
+      </summary>
+      <div style="padding:0 16px 12px;">
+        <table class="tbl" style="margin-top:8px;"><thead><tr><th>Raw Name</th><th class="tbl-r">Amount</th><th style="text-align:right;">Re-map</th></tr></thead><tbody>
+          ${g.items.sort((a,b) => b.amount - a.amount).map(it => `<tr>
+            <td style="font-weight:500;">${esc(it.name)}</td>
+            <td class="tbl-r" style="font-weight:700;">${fmt(it.amount)}</td>
+            <td style="text-align:right;"><button class="btn btn-ghost btn-sm" onclick="openRemapModal('${jsesc(it.name)}','${it.group}')">Re-map</button></td>
+          </tr>`).join('')}
+        </tbody></table>
+      </div>
+    </details>`;
+  });
   html += '</div></div>';
+
+  // Labor vendors
+  if (Object.keys(labVendors).length) {
+    html += '<div class="card"><div class="card-hdr"><span class="card-title">Labor Vendors</span><span style="font-size:12px;color:var(--ink3);">'+fmt(labTotal)+' total</span></div><div class="card-body"><table class="tbl"><thead><tr><th>Vendor</th><th class="tbl-r">Amount</th><th class="tbl-r">% of Labor</th></tr></thead><tbody>';
+    Object.entries(labVendors).sort((a,b) => (parseFloat(b[1])||0)-(parseFloat(a[1])||0)).forEach(([vendor, amt]) => {
+      const a = parseFloat(amt) || 0;
+      const p = labTotal > 0 ? (a/labTotal*100) : 0;
+      html += '<tr><td style="font-weight:600;">'+esc(vendor)+'</td><td class="tbl-r" style="font-weight:700;">'+fmt(a)+'</td><td class="tbl-r" style="color:var(--ink3);">'+p.toFixed(1)+'%</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
   el.innerHTML = html;
+}
+
+function openRemapModal(rawName, currentGroup) {
+  document.getElementById('po-modal-title').textContent = 'Re-map Material';
+  let body = `<div style="margin-bottom:14px;font-size:13px;color:var(--ink2);">Raw name: <strong style="color:var(--ink);">${esc(rawName)}</strong></div>
+    <div style="margin-bottom:14px;font-size:13px;color:var(--ink2);">Currently mapped to: <strong style="color:var(--accent);">${esc(MATERIAL_GROUPS[currentGroup]?.label || currentGroup)}</strong></div>
+    <div class="form-group"><label>Map to Group</label><select id="remap-group" class="inp">
+      ${Object.entries(MATERIAL_GROUPS).map(([k,v]) => `<option value="${k}"${k===currentGroup?' selected':''}>${esc(v.label)}</option>`).join('')}
+      <option value="OTHER"${currentGroup==='OTHER'?' selected':''}>— Other (keep as-is)</option>
+    </select></div>
+    <div style="font-size:11px;color:var(--ink3);margin-top:10px;">This mapping will persist so future items with the same raw name are grouped correctly.</div>`;
+  document.getElementById('po-modal-body').innerHTML = body;
+  document.getElementById('po-modal-footer').innerHTML = `<button class="btn btn-ghost" onclick="closeModal('po-modal')">Cancel</button><button class="btn btn-primary" onclick="saveRemap('${jsesc(rawName)}')">Save Mapping</button>`;
+  document.getElementById('po-modal').classList.add('open');
+}
+async function saveRemap(rawName) {
+  const group = document.getElementById('remap-group')?.value;
+  if (!group) return;
+  if (!S.materialMap) S.materialMap = {};
+  const key = String(rawName).toUpperCase().trim();
+  S.materialMap[key] = group;
+  await saveSharedData('materialMap');
+  closeModal('po-modal');
+  showToast('✓ Mapping saved — ' + rawName + ' → ' + (MATERIAL_GROUPS[group]?.label || group));
+  if (_currentJob) switchJobTab('allmats');
 }
 // ═══════════════════════════════════════════════════════════
 // SMART BILL MODAL
@@ -1716,25 +1869,50 @@ function handlePDFFile(file) {
 function renderPDFResult(po, savedId) {
   const resultEl = document.getElementById('pdf-result');
   const jobs = getJobs();
+  const rawJob = po.job_name || '';
   const matchedJob = resolveJobFromPDF(po.job_name, po.ship_to);
+  const isNewJob = rawJob && !matchedJob;
+  
+  const newJobBanner = isNewJob ? `<div class="alert alert-yellow" style="margin-bottom:14px;">
+    🆕 <strong>New Job Detected:</strong> "${esc(rawJob)}" doesn't match any existing job.
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary btn-sm" onclick="confirmNewJob('${jsesc(rawJob)}')">✓ Create "${esc(rawJob)}" as new job</button>
+      <span style="font-size:11px;color:var(--ink3);align-self:center;">or select existing job below</span>
+    </div>
+  </div>` : '';
+  
   resultEl.innerHTML = `<div style="background:var(--surface);border:1.5px solid var(--green);border-radius:12px;padding:18px 20px;">
     <div style="font-weight:800;font-size:15px;margin-bottom:14px;color:var(--green);">✓ PO Extracted — Review &amp; Confirm</div>
+    ${newJobBanner}
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:16px;">
-      <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">PO NUMBER</label><input class="est-inp" id="pdf-po" value="${po.po_number||''}"/></div>
-      <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">VENDOR</label><input class="est-inp" id="pdf-vendor" value="${po.vendor||''}"/></div>
-      <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">JOB</label><select class="est-inp" id="pdf-job"><option value="">— select —</option>${jobs.map(j=>'<option value="'+j+'"'+(j===matchedJob?' selected':'')+'>'+j.replace('JOB ','')+'</option>').join('')}</select></div>
-      <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">BUILDING</label><input class="est-inp" id="pdf-bldg" value="${po.building||''}"/></div>
-      <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">FLOOR</label><input class="est-inp" id="pdf-floor" value="${po.floor||''}"/></div>
-      <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">UNIT</label><input class="est-inp" id="pdf-unit" value="${po.unit||''}"/></div>
+      <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">PO NUMBER</label><input class="est-inp" id="pdf-po" value="${esc(po.po_number||'')}"/></div>
+      <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">VENDOR</label><input class="est-inp" id="pdf-vendor" value="${esc(po.vendor||'')}"/></div>
+      <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">JOB ${isNewJob ? '<span style="color:var(--yellow);">(unrecognized)</span>' : ''}</label><select class="est-inp" id="pdf-job"><option value="">— select —</option>${jobs.map(j=>'<option value="'+j+'"'+(j===matchedJob?' selected':'')+'>'+j.replace('JOB ','')+'</option>').join('')}</select></div>
+      <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">BUILDING</label><input class="est-inp" id="pdf-bldg" value="${esc(po.building||'')}"/></div>
+      <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">FLOOR</label><input class="est-inp" id="pdf-floor" value="${esc(po.floor||'')}"/></div>
+      <div><label style="font-size:11px;color:var(--ink3);font-weight:700;">UNIT</label><input class="est-inp" id="pdf-unit" value="${esc(po.unit||'')}"/></div>
     </div>
     <div style="overflow-x:auto;margin-bottom:14px;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:var(--surface2);"><th style="padding:7px 10px;text-align:left;">Description</th><th style="padding:7px 8px;text-align:right;">Qty</th><th style="padding:7px 8px;text-align:right;">Rate</th><th style="padding:7px 8px;text-align:right;">Amount</th></tr></thead>
-    <tbody>${(po.lines||[]).map((l,i) => '<tr style="background:'+(i%2?'var(--surface2)':'var(--surface)')+';border-bottom:1px solid var(--border);"><td style="padding:7px 10px;">'+(l.description||l.sku||'')+'</td><td style="padding:7px 8px;text-align:right;">'+(l.qty||'')+'</td><td style="padding:7px 8px;text-align:right;">'+(l.rate?'$'+parseFloat(l.rate).toFixed(2):'')+'</td><td style="padding:7px 8px;text-align:right;font-weight:700;">'+(l.amount?'$'+parseFloat(l.amount).toFixed(2):'')+'</td></tr>').join('')}</tbody>
+    <tbody>${(po.lines||[]).map((l,i) => '<tr style="background:'+(i%2?'var(--surface2)':'var(--surface)')+';border-bottom:1px solid var(--border);"><td style="padding:7px 10px;">'+esc(l.description||l.sku||'')+'</td><td style="padding:7px 8px;text-align:right;">'+(l.qty||'')+'</td><td style="padding:7px 8px;text-align:right;">'+(l.rate?'$'+parseFloat(l.rate).toFixed(2):'')+'</td><td style="padding:7px 8px;text-align:right;font-weight:700;">'+(l.amount?'$'+parseFloat(l.amount).toFixed(2):'')+'</td></tr>').join('')}</tbody>
     <tfoot><tr style="background:var(--ink);color:#fff;"><td colspan="3" style="padding:10px 12px;font-weight:700;">TOTAL</td><td style="padding:10px 12px;text-align:right;font-weight:800;">$${parseFloat(po.total||0).toFixed(2)}</td></tr></tfoot></table></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;">
       <button onclick="document.getElementById('pdf-result').style.display='none'" class="btn btn-ghost">Cancel</button>
       <button onclick="confirmPDFPO(window._lastPDFPO,'${savedId||''}')" class="btn btn-primary">✓ Add to Tracker</button>
     </div></div>`;
   window._lastPDFPO = po;
+}
+async function confirmNewJob(rawName) {
+  const name = (rawName || '').trim(); if (!name) return;
+  // Add to jobs list if not already there
+  if (!S.jobs.includes(name)) {
+    S.jobs.push(name);
+    await saveSharedData('jobs');
+    populateJobSelects();
+  }
+  // Set the dropdown to the new job
+  const sel = document.getElementById('pdf-job');
+  if (sel) sel.value = name;
+  showToast('✓ Job "' + name + '" created — you can now confirm the PO');
 }
 function confirmPDFPO(po, savedId) {
   if (!po) return;
@@ -1770,7 +1948,7 @@ async function loadPendingPOs() {
       return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
         <div style="flex:1;min-width:200px;"><div style="font-weight:700;font-size:14px;">PO #${p.po_number||'—'} <span style="color:var(--ink3);font-weight:400;">· ${p.vendor||'Unknown'}</span></div><div style="font-size:12px;color:var(--ink3);">${p.job_name||'No job'} ${p.building?'· Bldg '+p.building:''} ${p.floor?'· Fl '+p.floor:''} · $${parseFloat(p.total||0).toFixed(2)} · ${src} · ${date}</div></div>
         <span style="padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;background:${statusColors[p.status]||'var(--surface3)'};color:${statusTxt[p.status]||'var(--ink3)'};">${statusLbl[p.status]||p.status}</span>
-        <div style="display:flex;gap:6px;">${p.status!=='confirmed'?'<button onclick="reviewPO(\''+p.id+'\')" class="btn btn-primary btn-sm">Review →</button>':''}<button onclick="deletePORecord(\''+p.id+'\',\''+(p.po_number||'')+'\')" class="btn btn-danger btn-sm">🗑</button></div></div>`;
+        <div style="display:flex;gap:6px;">${p.status!=='confirmed'?'<button onclick="reviewPO(\''+p.id+'\')" class="btn btn-primary btn-sm">Review →</button>':''}<button onclick="editPDFRecord(\''+p.id+'\')" class="btn btn-ghost btn-sm">✏ Edit</button><button onclick="deletePORecord(\''+p.id+'\',\''+(p.po_number||'')+'\')" class="btn btn-danger btn-sm">🗑</button></div></div>`;
     }).join('');
   } catch(err) { el.innerHTML = '<div class="alert alert-red">Error: ' + err.message + '</div>'; }
 }
@@ -1787,10 +1965,58 @@ async function reviewPO(id) {
     }, 100);
   } catch(err) { showToast('Error loading PO: ' + err.message); }
 }
+async function editPDFRecord(id) {
+  try {
+    const res = await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + id, { headers:{'apikey':SB_KEY} });
+    const rows = await res.json(); if (!rows.length) return;
+    const p = rows[0];
+    const jobs = getJobs();
+    document.getElementById('po-modal-title').textContent = 'Edit PDF Record — PO #' + (p.po_number||'');
+    document.getElementById('po-modal-body').innerHTML = `
+      <div class="form-row"><div class="form-group"><label>PO Number</label><input id="ep-po" value="${esc(p.po_number||'')}"/></div>
+      <div class="form-group"><label>Vendor</label><input id="ep-vendor" value="${esc(p.vendor||'')}"/></div></div>
+      <div class="form-row"><div class="form-group"><label>Job</label><select id="ep-job">${jobs.map(j => '<option value="'+esc(j)+'"'+(j===p.job_name?' selected':'')+'>'+esc(j.replace('JOB ',''))+'</option>').join('')}</select></div>
+      <div class="form-group"><label>Status</label><select id="ep-status"><option value="pending"${p.status==='pending'?' selected':''}>Pending</option><option value="confirmed"${p.status==='confirmed'?' selected':''}>Confirmed</option><option value="duplicate"${p.status==='duplicate'?' selected':''}>Duplicate</option></select></div></div>
+      <div class="form-row"><div class="form-group"><label>Building</label><input id="ep-bldg" value="${esc(p.building||'')}"/></div>
+      <div class="form-group"><label>Floor</label><input id="ep-floor" value="${esc(p.floor||'')}"/></div>
+      <div class="form-group"><label>Unit</label><input id="ep-unit" value="${esc(p.unit||'')}"/></div></div>
+      <div class="form-group"><label>Total</label><input type="number" id="ep-total" value="${p.total||0}" step="0.01"/></div>`;
+    document.getElementById('po-modal-footer').innerHTML = `<button class="btn btn-danger" onclick="deletePORecord('${id}','${esc(p.po_number||'')}')">🗑 Delete</button><button class="btn btn-ghost" onclick="closeModal('po-modal')">Cancel</button><button class="btn btn-primary" onclick="savePDFEdit('${id}')">💾 Save Changes</button>`;
+    document.getElementById('po-modal').classList.add('open');
+  } catch(err) { showToast('Error loading record: ' + err.message); }
+}
+async function savePDFEdit(id) {
+  const patch = {
+    po_number: document.getElementById('ep-po')?.value || '',
+    vendor: document.getElementById('ep-vendor')?.value || '',
+    job_name: document.getElementById('ep-job')?.value || '',
+    status: document.getElementById('ep-status')?.value || 'pending',
+    building: document.getElementById('ep-bldg')?.value || '',
+    floor: document.getElementById('ep-floor')?.value || '',
+    unit: document.getElementById('ep-unit')?.value || '',
+    total: parseFloat(document.getElementById('ep-total')?.value) || 0,
+  };
+  try {
+    const res = await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    });
+    if (res.ok) { showToast('✓ Record updated'); closeModal('po-modal'); loadPendingPOs(); }
+    else { const err = await res.text(); showToast('Save failed: ' + err, true); }
+  } catch(err) { showToast('Save error: ' + err.message, true); }
+}
 async function deletePORecord(id, poNumber) {
-  if (!confirm('Delete extraction for PO #' + poNumber + '?')) return;
+  if (!confirm('Delete extraction for PO #' + poNumber + '?\nThis only removes the PDF record — not Google Sheet data.')) return;
   const res = await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + id, { method:'DELETE', headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'} });
-  if (res.ok) { showToast('✓ Removed'); loadPendingPOs(); } else showToast('Error: ' + res.status, true);
+  if (res.ok) { showToast('✓ Removed'); closeModal('po-modal'); loadPendingPOs(); } else showToast('Error: ' + res.status, true);
+}
+// Delete an assignment (saved PO / bill match)
+async function deleteAssignment(type, id) {
+  if (!confirm('Delete ' + type + ' assignment for ' + id + '?\nThe original data stays — only your assignment is removed.')) return;
+  if (type === 'po') { delete S.assignments[id]; await saveSharedData('assignments'); }
+  else if (type === 'bill') { delete S.billAssignments[id]; delete S.actuals[id]; await Promise.all([saveSharedData('billAssignments'), saveSharedData('actuals')]); }
+  showToast('✓ Removed'); renderActivityFeed(); updateInboxBadge();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2023,5 +2249,4 @@ async function init() {
 checkAuth();
 
 </script>
-
 </html>
