@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -225,6 +226,7 @@ a{color:var(--accent);}
 <body>
 
 <!-- LOGIN -->
+
 <div id="login-screen" style="display:flex;">
   <div class="login-box">
     <div class="login-logo" id="login-logo-box">🏗️</div>
@@ -236,9 +238,11 @@ a{color:var(--accent);}
 </div>
 
 <!-- APP -->
+
 <div id="app" style="display:none;">
 
 <!-- SIDEBAR -->
+
 <div id="sidebar">
   <div class="nav-logo" id="nav-logo">🏗️</div>
   <div class="nav-divider"></div>
@@ -253,6 +257,7 @@ a{color:var(--accent);}
 </div>
 
 <!-- MAIN -->
+
 <div id="main">
 <div class="topbar">
   <div class="topbar-title" id="page-title">Activity Feed</div>
@@ -263,19 +268,24 @@ a{color:var(--accent);}
 </div>
 
 <!-- PAGE: HOME / FEED -->
+
 <div id="page-home" class="page active">
   <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
     <div class="drop-zone" id="pdf-drop" style="flex:1;min-width:200px;padding:16px;">
       <div style="font-size:13px;font-weight:600;">📄 Drop PO PDF here or <label style="color:var(--accent);cursor:pointer;">browse<input type="file" accept=".pdf" id="pdf-upload" style="display:none;" onchange="handlePDFFile(this.files[0])"/></label></div>
       <div style="font-size:11px;color:var(--ink3);margin-top:4px;">Auto-extracts PO number, vendor, materials &amp; totals</div>
     </div>
-    <button class="btn btn-ghost" id="feed-bulk-btn" style="display:none;" onclick="openFeedBulkAssignModal()">📦 Bulk Assign Selected</button>
+    <button class="btn btn-ghost" id="feed-select-po-btn" onclick="startFeedSelect('po')">☑ Multi-select POs</button>
+    <button class="btn btn-ghost" id="feed-select-bill-btn" onclick="startFeedSelect('bill')">☑ Multi-select Bills</button>
+    <button class="btn btn-ghost" id="feed-cancel-select-btn" style="display:none;" onclick="clearFeedSelection()">Cancel</button>
+    <button class="btn btn-primary" id="feed-bulk-btn" style="display:none;" onclick="openFeedBulkAssignModal()">📦 Assign Selected to Job</button>
   </div>
   <div id="pdf-result" style="display:none;margin-bottom:16px;"></div>
   <div id="activity-feed"></div>
 </div>
 
 <!-- PAGE: DASHBOARD -->
+
 <div id="page-dashboard" class="page">
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;">
     <select id="dash-job-select" class="inp" style="max-width:280px;" onchange="dashJobFilter()">
@@ -291,6 +301,7 @@ a{color:var(--accent);}
 </div>
 
 <!-- PAGE: INBOX (Recent Activity) -->
+
 <div id="page-inbox" class="page">
   <div class="tabs" id="inbox-tabs">
     <button class="tab-btn active" data-tab="bills" onclick="switchInboxTab('bills')">📋 Unmatched Bills</button>
@@ -303,6 +314,7 @@ a{color:var(--accent);}
 </div>
 
 <!-- PAGE: JOBS -->
+
 <div id="page-jobs" class="page">
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
     <select id="jobs-sel" class="inp" style="max-width:280px;" onchange="onJobSelect()">
@@ -330,6 +342,7 @@ a{color:var(--accent);}
 </div>
 
 <!-- PAGE: RAW DATA -->
+
 <div id="page-raw" class="page">
   <div class="tabs">
     <button class="tab-btn active" data-tab="raw-po" onclick="switchRawTab('raw-po')">PO Lines</button>
@@ -342,6 +355,7 @@ a{color:var(--accent);}
 </div>
 
 <!-- PAGE: SETTINGS -->
+
 <div id="page-settings" class="page">
   <div id="settings-body"></div>
 </div>
@@ -350,6 +364,7 @@ a{color:var(--accent);}
 </div><!-- /app -->
 
 <!-- MODALS -->
+
 <div class="modal-overlay" id="po-modal">
   <div class="modal" style="max-width:680px;">
     <div class="modal-hdr"><span class="modal-title" id="po-modal-title">Detail</span><button class="modal-close" onclick="closeModal('po-modal')">✕</button></div>
@@ -372,7 +387,9 @@ a{color:var(--accent);}
 </div>
 
 <!-- AI CHAT -->
+
 <button id="ai-fab" onclick="toggleAI()">🤖</button>
+
 <div id="ai-panel">
   <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center;">
     <span>🤖 AI Assistant</span><button onclick="toggleAI()" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:16px;">✕</button>
@@ -387,6 +404,7 @@ a{color:var(--accent);}
 </div>
 
 <!-- TOAST -->
+
 <div id="toast"></div>
 
 <script>
@@ -473,17 +491,87 @@ function jsesc(s) { return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'
 function fmt(n) { const v=parseFloat(n)||0; return v>=0?'$'+v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}):'-$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function showToast(msg, isErr) { const t=document.getElementById('toast'); t.innerHTML='<div class="toast-item" style="'+(isErr?'border-color:var(--red);color:var(--red);':'')+'">' + msg + '</div>'; setTimeout(()=>t.innerHTML='',3500); }
 function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
+const CAT_COLOR_MAP = { boards:'var(--blue)', metal:'var(--yellow)', wood:'var(--green)', finish:'#FB923C', supplies:'var(--ink2)', labor:'var(--accent)', tax:'var(--red)', other:'var(--ink3)' };
+const CAT_BG_MAP = { boards:'rgba(79,142,247,.12)', metal:'rgba(251,191,36,.12)', wood:'rgba(52,211,153,.12)', finish:'rgba(251,146,60,.12)', supplies:'rgba(148,163,184,.12)', labor:'rgba(167,139,250,.12)', tax:'rgba(248,113,113,.12)', other:'rgba(148,163,184,.12)' };
+const CAT_OPTIONS = ['boards','metal','wood','finish','supplies','labor','tax','other'];
+// Render a clickable category pill — clicking opens a dropdown to change it
+function catPill(desc, cat) {
+  const c = cat || categorize(desc);
+  const safe = jsesc(desc);
+  return `<span class="cat-pill" onclick="openCatChangeMenu(event, '${safe}')" style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;cursor:pointer;background:${CAT_BG_MAP[c]||'var(--surface3)'};color:${CAT_COLOR_MAP[c]||'var(--ink2)'};text-transform:uppercase;letter-spacing:.03em;border:1px solid transparent;">${c}</span>`;
+}
+function openCatChangeMenu(ev, rawDesc) {
+  ev.stopPropagation();
+  // Remove any existing menu
+  document.querySelectorAll('.cat-change-menu').forEach(m => m.remove());
+  const menu = document.createElement('div');
+  menu.className = 'cat-change-menu';
+  const currentCat = categorize(rawDesc);
+  menu.innerHTML = `<div style="padding:8px 10px;font-size:10px;color:var(--ink3);font-weight:700;text-transform:uppercase;border-bottom:1px solid var(--border);">Change Category</div>` +
+    CAT_OPTIONS.map(c => `<div class="cat-opt" data-cat="${c}" style="padding:8px 12px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;${c===currentCat?'background:var(--surface2);':''}">
+      <span style="width:10px;height:10px;border-radius:50%;background:${CAT_COLOR_MAP[c]};"></span>${c}${c===currentCat?' <span style="margin-left:auto;color:var(--green);">✓</span>':''}
+    </div>`).join('');
+  menu.style.cssText = 'position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:9999;min-width:180px;overflow:hidden;';
+  const r = ev.target.getBoundingClientRect();
+  menu.style.left = Math.min(r.left, window.innerWidth - 200) + 'px';
+  menu.style.top = (r.bottom + 4) + 'px';
+  document.body.appendChild(menu);
+  menu.addEventListener('click', async (e) => {
+    const opt = e.target.closest('.cat-opt'); if (!opt) return;
+    const cat = opt.dataset.cat;
+    await setManualCategory(rawDesc, cat);
+    menu.remove();
+    // Re-render whatever page is open
+    if (typeof renderActivityFeed === 'function') renderActivityFeed();
+    if (_currentJob) { renderJobSummaryTab(_currentJob); renderAllMaterialsTab(_currentJob); }
+    if (document.getElementById('page-raw')?.classList.contains('active')) renderRaw();
+  });
+  menu.addEventListener('mouseenter', () => menu.dataset.hover='1');
+  setTimeout(() => { document.addEventListener('click', () => menu.remove(), { once: true }); }, 50);
+}
 
 function categorize(desc) {
   if (!desc || String(desc).trim() === '') return 'tax';
-  const d = String(desc).toUpperCase();
-  if (/DRYWALL|DENSHIELD|SHAFT.?LINER|DUROCK|FIRECODE|ULTRALIGHT|MR.?BOARD|TYPE.?X|GREENBOARD|HARDIBOARD|REGULAR.?BOARD/.test(d) || /^[0-9\/]+\s*(DW|REG|REGULAR)\b/.test(d) || /\b(1\/2|5\/8|5\/4|1\/4)\s*(DW|REGULAR|MOLD|TYPE|DENIAL|BOARD)\b/.test(d)) return 'boards';
-  if (/STUD|TRACK|RUNNER|FURRING|METAL|ANGLE|CHANNEL|HAT.?CHAN|RESILIENT/.test(d)) return 'metal';
-  if (/COMPOUND|JOINT.?COMP|TAPE|CORNER.?BEAD|CORNERBEAD|BEAD|MUD|SETTING|FIBERGLASS|TOPPING|MESH|SPRAY|PRIMER|TEXTURE/.test(d)) return 'finish';
-  if (/SAND|SANDPAPER|DISC|SPONGE|PAD|STAPLE|SCREW|FASTENER|PIN|ANCHOR|NAIL|TOOL|KNIFE|BIT|BLADE/.test(d)) return 'supplies';
+  const raw = String(desc).trim();
+  const key = raw.toUpperCase();
+  // USER MANUAL OVERRIDE (highest priority) — allow per-line-item category override
+  if (S.materialMap && S.materialMap[key]) {
+    const override = S.materialMap[key];
+    // materialMap can contain either group keys (MATERIAL_GROUPS) or legacy category names
+    const LEGACY_CAT = ['boards','metal','wood','finish','supplies','labor','tax','other'];
+    if (LEGACY_CAT.includes(override)) return override;
+    // Convert MATERIAL_GROUPS key to legacy category
+    const g = MATERIAL_GROUPS?.[override];
+    if (g?.category) return g.category;
+  }
+  const d = raw.toUpperCase();
+  // TAX
+  if (/^TAX$|^SALES.?TAX$/.test(d)) return 'tax';
+  // WOOD — user rule: anything with PT or plywood/lumber is wood
+  if (/\bPT\b|PLYWOOD|\bSPRUCE\b|\bLUMBER\b|2X[0-9]|1X[0-9]|FIRE.?TREATED/.test(d)) return 'wood';
+  // METAL — user rule: anything with 20GA or 25GA is metal; also studs, track, runner, furring, channel
+  if (/\b20\s*GA|\b25\s*GA|\b18\s*GA|\b22\s*GA|\bSTUD\b|\bTRAC(?:K)?\b|RUNNER|FURRING|HI.?HAT|RC.?CHANNEL|RESILIENT|ANGLE|FLAT.?STRAP|TIE.?WIRE/.test(d)) return 'metal';
+  // BOARDS — drywall, denshield, MR board, type X, mold defense, etc. INCLUDING "1/2 DW" style
+  if (/DRYWALL|DENSHIELD|DENSGLASS|DENS\b|SHAFT.?LINER|DUROCK|FIRECODE|ULTRALIGHT|MR.?BOARD|MR.?BRD|TYPE.?X|GREENBOARD|HARDIBOARD|MOLD.?DEFENSE|REGULAR.?BOARD/.test(d)) return 'boards';
+  if (/\bDW\b/.test(d)) return 'boards'; // "1/2 DW", "DW 4x12", "1/2 4X12 REG DW" all catch here
+  if (/\b(1\/2|5\/8|1\/4|3\/8|3\/4)\s*(REG|REGULAR|BOARD|BRD|X)\b/.test(d)) return 'boards';
+  if (/^(1\/2|5\/8)[\sX]/.test(d) && /(REG|DW|BOARD|DRYWALL|DENSHIELD|DENS|TYPE|MOLD|MR)/.test(d)) return 'boards';
+  // FINISH
+  if (/JOINT.?COMP|COMPOUND|\bTAPE\b|CORNER.?BEAD|CORNERBEAD|\bBEAD\b|\bMUD\b|SETTING|FIBERGLASS|TOPPING|MESH|SPRAY|PRIMER|TEXTURE|CAULK|SEALANT|SMOKE.?SOUND|DURABOND/.test(d)) return 'finish';
+  // SUPPLIES/FASTENERS
+  if (/SAND|SANDPAPER|DISC|SPONGE|\bPAD\b|STAPLE|SCREW|FASTENER|\bPIN\b|ANCHOR|\bNAIL\b|TOOL|KNIFE|BIT|BLADE|TAPCON|FAST.?TRAC|FASTRAC/.test(d)) return 'supplies';
+  // LABOR
   if (/LABOR|INSTALL|FRAMING|HANGING|PUNCHOUT|PUNCH.?OUT|FINISH.?WORK|LAYOUT|SUPERVISION|SUB.?CONTRACT/.test(d)) return 'labor';
-  if (/^TAX$|SALES.?TAX/.test(d) || d.trim() === '') return 'tax';
   return 'other';
+}
+// Save a manual category override for a specific line description
+async function setManualCategory(rawDesc, category) {
+  if (!rawDesc) return;
+  if (!S.materialMap) S.materialMap = {};
+  const key = String(rawDesc).toUpperCase().trim();
+  S.materialMap[key] = category;
+  await saveSharedData('materialMap');
+  showToast('✓ Category saved: ' + rawDesc.substring(0,30) + ' → ' + category);
 }
 function isBoard(desc) { return categorize(desc) === 'boards'; }
 function isLaborVendor(vendor) {
@@ -982,16 +1070,25 @@ function feedSelectedIds(type) {
 }
 function clearFeedSelection() {
   S.feedSelection = null;
-  document.getElementById('feed-bulk-btn').style.display = 'none';
+  const bulk = document.getElementById('feed-bulk-btn'); if (bulk) bulk.style.display = 'none';
+  const poBtn = document.getElementById('feed-select-po-btn'); if (poBtn) poBtn.style.display = 'inline-flex';
+  const billBtn = document.getElementById('feed-select-bill-btn'); if (billBtn) billBtn.style.display = 'inline-flex';
+  const cancelBtn = document.getElementById('feed-cancel-select-btn'); if (cancelBtn) cancelBtn.style.display = 'none';
   renderActivityFeed();
 }
 function updateFeedSelection() {
   const checked = feedSelectedIds(S.feedSelection?.type);
   const btn = document.getElementById('feed-bulk-btn');
-  if (btn) btn.style.display = checked.length > 0 ? 'inline-flex' : 'none';
+  if (btn) { btn.style.display = checked.length > 0 ? 'inline-flex' : 'none'; btn.textContent = '📦 Assign ' + checked.length + ' ' + (S.feedSelection?.type === 'bill' ? 'Bill' : 'PO') + (checked.length !== 1 ? 's' : '') + ' to Job'; }
 }
 function startFeedSelect(type) {
   S.feedSelection = {type};
+  const poBtn = document.getElementById('feed-select-po-btn'); if (poBtn) poBtn.style.display = type === 'po' ? 'inline-flex' : 'none';
+  const billBtn = document.getElementById('feed-select-bill-btn'); if (billBtn) billBtn.style.display = type === 'bill' ? 'inline-flex' : 'none';
+  const cancelBtn = document.getElementById('feed-cancel-select-btn'); if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+  if (poBtn && type === 'po') poBtn.style.background = 'var(--accent)';
+  if (billBtn && type === 'bill') billBtn.style.background = 'var(--accent)';
+  nav('home');
   renderActivityFeed();
 }
 
@@ -1293,34 +1390,70 @@ function renderMapMaterial(job, el) {
   const struct = S.jobStructure?.[job];
   const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
   if (!struct?.floors?.length) {
-    el.innerHTML = '<div class="alert alert-y">No floors set up yet. Click <strong>⚙ Floors &amp; Units</strong> above.</div><div class="section-title" style="margin-top:16px;">PO Data by Floor (auto-detected)</div>';
+    el.innerHTML = '<div class="alert alert-y">No floors set up yet. Click <strong>⚙ Floors &amp; Units</strong> above.</div><div class="section-title" style="margin-top:16px;">PO Data by Building &amp; Floor (auto-detected)</div>';
     renderAutoFloors(job, rows, el); return;
   }
-  let html = '';
+  // Group structure floors by building first
+  const byBldg = {};
   struct.floors.forEach(fl => {
-    const flRows = rows.filter(r => { const rfl=String(r['FLOOR']||'').trim(), rb=String(r['BUILDING']||'').trim(); if (rfl !== String(fl.floor)) return false; if (fl.bldg && rb && rb !== fl.bldg) return false; return true; });
-    const flBoards = flRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
-    const flSpend = flRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
-    const budBoards = parseFloat(fl.budgetBoards||0);
-    const pct = budBoards > 0 ? Math.min((flBoards/budBoards)*100, 100) : 0;
-    const barCol = pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--yellow)' : 'var(--green)';
-    html += `<div class="floor-block"><div class="floor-hdr" onclick="toggleFloorBlock(this)"><div>
-      <div style="display:flex;align-items:center;gap:10px;"><div class="floor-num">Floor ${fl.floor}${fl.bldg?' · '+fl.bldg:''}</div>${flBoards>0?'<span class="badge badge-blue">🟦 '+Math.round(flBoards)+' boards</span>':''}${budBoards>0?'<span style="font-size:11px;color:var(--ink3);">/ '+Math.round(budBoards)+' budgeted</span>':''}</div>
-      ${budBoards>0?'<div style="width:200px;margin-top:6px;"><div class="prog"><div class="prog-fill" style="width:'+pct.toFixed(1)+'%;background:'+barCol+';"></div></div></div>':''}
-    </div><div style="display:flex;align-items:center;gap:12px;"><div style="text-align:right;"><div style="font-size:11px;color:var(--ink3);">Spend</div><div style="font-weight:700;">${fmt(flSpend)}</div></div><span style="color:var(--ink3);font-size:18px;transition:transform .2s;">›</span></div></div>
-    <div class="floor-body" style="display:none;"><div class="unit-grid">`;
-    // General tile
-    const genRows = flRows.filter(r => !String(r['UNIT']||'').trim() || String(r['UNIT']||'').trim()==='N/A');
-    const genBoards = genRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
-    const genSpend = genRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
-    if (genBoards > 0 || genSpend > 0) html += buildUnitCard(job, fl.floor, fl.bldg, 'General', genBoards, 0, genSpend, true);
-    fl.units.forEach(u => {
-      const uRows = flRows.filter(r => String(r['UNIT']||'').trim() === String(u.unit));
-      const uBoards = uRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
-      const uSpend = uRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
-      html += buildUnitCard(job, fl.floor, fl.bldg, u.unit, uBoards, parseFloat(u.budgetBoards||0), uSpend, false);
+    const b = fl.bldg || '—';
+    if (!byBldg[b]) byBldg[b] = [];
+    byBldg[b].push(fl);
+  });
+  let html = '';
+  Object.entries(byBldg).sort((a,b) => String(a[0]).localeCompare(String(b[0]))).forEach(([bldg, floors]) => {
+    // Building header
+    const bldgRows = rows.filter(r => (String(r['BUILDING']||'').trim() === bldg) || (bldg === '—' && !String(r['BUILDING']||'').trim()));
+    const bldgBoards = bldgRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+    const bldgSpend = bldgRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+    html += `<div class="card" style="margin-bottom:18px;">
+      <div class="card-hdr" style="background:var(--surface2);">
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;">🏢 Building ${esc(bldg)}</div>
+          <div style="font-size:11px;color:var(--ink3);margin-top:2px;">${esc(job.replace('JOB ',''))} · ${floors.length} floor${floors.length!==1?'s':''}</div>
+        </div>
+        <div style="display:flex;gap:18px;align-items:center;">
+          ${bldgBoards > 0 ? '<div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;">Boards</div><div style="font-weight:700;color:var(--blue);">' + Math.round(bldgBoards) + '</div></div>' : ''}
+          <div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;">Spend</div><div style="font-weight:700;">${fmt(bldgSpend)}</div></div>
+        </div>
+      </div>
+      <div class="card-body" style="padding:14px;">`;
+    floors.forEach(fl => {
+      const flRows = rows.filter(r => { const rfl=String(r['FLOOR']||'').trim(), rb=String(r['BUILDING']||'').trim(); if (rfl !== String(fl.floor)) return false; if (fl.bldg && rb && rb !== fl.bldg) return false; return true; });
+      const flBoards = flRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+      const flSpend = flRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+      const budBoards = parseFloat(fl.budgetBoards||0);
+      const pct = budBoards > 0 ? Math.min((flBoards/budBoards)*100, 100) : 0;
+      const barCol = pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--yellow)' : 'var(--green)';
+      html += `<div class="floor-block" style="margin-bottom:10px;">
+        <div class="floor-hdr" onclick="toggleFloorBlock(this)">
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="floor-num">Floor ${esc(fl.floor)}</div>
+              ${flBoards>0?'<span class="badge badge-blue">🟦 '+Math.round(flBoards)+' boards</span>':''}
+              ${budBoards>0?'<span style="font-size:11px;color:var(--ink3);">/ '+Math.round(budBoards)+' budgeted</span>':''}
+            </div>
+            ${budBoards>0?'<div style="width:200px;margin-top:6px;"><div class="prog"><div class="prog-fill" style="width:'+pct.toFixed(1)+'%;background:'+barCol+';"></div></div></div>':''}
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="text-align:right;"><div style="font-size:11px;color:var(--ink3);">Spend</div><div style="font-weight:700;">${fmt(flSpend)}</div></div>
+            <span style="color:var(--ink3);font-size:18px;transition:transform .2s;">›</span>
+          </div>
+        </div>
+        <div class="floor-body" style="display:none;"><div class="unit-grid">`;
+      const genRows = flRows.filter(r => !String(r['UNIT']||'').trim() || String(r['UNIT']||'').trim()==='N/A');
+      const genBoards = genRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+      const genSpend = genRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+      if (genBoards > 0 || genSpend > 0) html += buildUnitCard(job, fl.floor, fl.bldg, 'General', genBoards, 0, genSpend, true);
+      fl.units.forEach(u => {
+        const uRows = flRows.filter(r => String(r['UNIT']||'').trim() === String(u.unit));
+        const uBoards = uRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+        const uSpend = uRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+        html += buildUnitCard(job, fl.floor, fl.bldg, u.unit, uBoards, parseFloat(u.budgetBoards||0), uSpend, false);
+      });
+      html += '</div></div></div>';
     });
-    html += '</div></div></div>';
+    html += '</div></div>';
   });
   el.innerHTML = html || '<div class="alert alert-y">No PO data found for this job.</div>';
 }
@@ -1335,11 +1468,41 @@ function buildUnitCard(job, floor, bldg, unit, boards, budBoards, spend, isGen) 
 }
 
 function renderAutoFloors(job, rows, parentEl) {
-  const floorMap = {};
-  rows.forEach(r => { const fl=String(r['FLOOR']||'').trim()||'—', b=String(r['BUILDING']||'').trim()||'', key=b+'||'+fl; if(!floorMap[key]) floorMap[key]={fl,b,rows:[],boards:0,spend:0}; floorMap[key].boards += isBoard(r['MATERIAL']||'')?parseFloat(r['QTY']||0):0; floorMap[key].spend += parseFloat(r['LINE TOTAL']||0); floorMap[key].rows.push(r); });
+  // Group by Building first, then Floor inside
+  const byBldg = {};
+  rows.forEach(r => {
+    const b = String(r['BUILDING']||'').trim() || '—';
+    const fl = String(r['FLOOR']||'').trim() || '—';
+    if (!byBldg[b]) byBldg[b] = {};
+    if (!byBldg[b][fl]) byBldg[b][fl] = { rows: [], boards: 0, spend: 0 };
+    byBldg[b][fl].rows.push(r);
+    byBldg[b][fl].boards += isBoard(r['MATERIAL']||'') ? parseFloat(r['QTY']||0) : 0;
+    byBldg[b][fl].spend += parseFloat(r['LINE TOTAL']||0);
+  });
   const div = document.createElement('div');
-  div.innerHTML = Object.values(floorMap).sort((a,b) => parseInt(a.fl)-parseInt(b.fl)).map(fl => `<div style="border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">
-    <div style="font-weight:700;">Floor ${fl.fl}${fl.b?' · '+fl.b:''}</div>${fl.boards>0?'<span class="badge badge-blue">'+Math.round(fl.boards)+' boards</span>':''}<span style="font-size:12px;color:var(--ink3);">${fl.rows.length} lines</span><div style="margin-left:auto;font-weight:700;">${fmt(fl.spend)}</div></div>`).join('');
+  div.innerHTML = Object.entries(byBldg).sort((a,b) => String(a[0]).localeCompare(String(b[0]))).map(([bldg, floors]) => {
+    const bldgSpend = Object.values(floors).reduce((s,f) => s + f.spend, 0);
+    const bldgBoards = Object.values(floors).reduce((s,f) => s + f.boards, 0);
+    return `<div class="card" style="margin-bottom:14px;">
+      <div class="card-hdr" style="background:var(--surface2);">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;">🏢 Building ${esc(bldg)}</div>
+        <div style="display:flex;gap:16px;align-items:center;">
+          ${bldgBoards > 0 ? '<span class="badge badge-blue">' + Math.round(bldgBoards) + ' boards</span>' : ''}
+          <span style="font-weight:700;">${fmt(bldgSpend)}</span>
+        </div>
+      </div>
+      <div class="card-body" style="padding:10px 16px;">
+        ${Object.entries(floors).sort((a,b) => parseInt(a[0])-parseInt(b[0])).map(([fl, f]) => 
+          '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">'+
+            '<div style="font-weight:600;min-width:100px;">Floor ' + esc(fl) + '</div>' +
+            (f.boards>0?'<span class="badge badge-blue">'+Math.round(f.boards)+' boards</span>':'') +
+            '<span style="font-size:12px;color:var(--ink3);">'+f.rows.length+' lines</span>' +
+            '<div style="margin-left:auto;font-weight:700;">'+fmt(f.spend)+'</div>' +
+          '</div>'
+        ).join('')}
+      </div>
+    </div>`;
+  }).join('');
   parentEl.appendChild(div);
 }
 
@@ -1347,17 +1510,41 @@ function renderMapLabor(job, el) {
   const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
   const bills = Object.entries(S.billAssignments||{}).filter(([inv,ba]) => ba.job === job && LABOR_CATS.some(lc => (ba.category||'').includes(lc))).map(([inv,ba]) => ({inv,...ba}));
   if (!bills.length) { el.innerHTML = '<div class="alert alert-y">No labor bills matched to this job yet.</div>'; return; }
-  const byFloor = {};
-  bills.forEach(ba => { const fl=String(ba.floor||'—'), b=String(ba.building||''), key=b+'||'+fl; if(!byFloor[key]) byFloor[key]={fl,b,total:0,cats:{}}; byFloor[key].total += parseFloat(ba.total||0); const cat=ba.category||'Other'; byFloor[key].cats[cat] = (byFloor[key].cats[cat]||0)+parseFloat(ba.total||0); });
+  // Group by Building first, then Floor
+  const byBldg = {};
+  bills.forEach(ba => {
+    const b = String(ba.building||'—');
+    const fl = String(ba.floor||'—');
+    if (!byBldg[b]) byBldg[b] = {};
+    if (!byBldg[b][fl]) byBldg[b][fl] = { total: 0, cats: {} };
+    byBldg[b][fl].total += parseFloat(ba.total||0);
+    const cat = ba.category||'Other';
+    byBldg[b][fl].cats[cat] = (byBldg[b][fl].cats[cat]||0) + parseFloat(ba.total||0);
+  });
   let html = '';
-  Object.values(byFloor).sort((a,b) => parseInt(a.fl)-parseInt(b.fl)).forEach(fl => {
-    const flRows = rows.filter(r => String(r['FLOOR']||'').trim()===String(fl.fl)&&(!fl.b||!String(r['BUILDING']||'').trim()||String(r['BUILDING']||'').trim()===fl.b));
-    const flBoards = flRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
-    const labPPB = flBoards > 0 ? fl.total/flBoards : 0;
-    html += `<div class="floor-block"><div class="floor-hdr" onclick="toggleFloorBlock(this)"><div><div class="floor-num">Floor ${fl.fl}${fl.b?' · '+fl.b:''}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px;">${fmt(fl.total)} labor${flBoards>0?' · $'+labPPB.toFixed(0)+'/board':''}</div></div><span style="color:var(--ink3);font-size:18px;">›</span></div>
-    <div class="floor-body" style="display:none;"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;padding-top:14px;">
-      ${Object.entries(fl.cats).map(([cat,amt]) => '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">'+cat+'</div><div style="font-size:18px;font-weight:800;">'+fmt(amt)+'</div>'+(flBoards>0?'<div style="font-size:10px;color:var(--ink3);">$'+(amt/flBoards).toFixed(0)+'/board</div>':'')+'</div>').join('')}
-    </div></div></div>`;
+  Object.entries(byBldg).sort((a,b) => String(a[0]).localeCompare(String(b[0]))).forEach(([bldg, floors]) => {
+    const bldgTotal = Object.values(floors).reduce((s,f) => s + f.total, 0);
+    html += `<div class="card" style="margin-bottom:16px;">
+      <div class="card-hdr" style="background:var(--surface2);">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;">🏢 Building ${esc(bldg)}</div>
+        <div style="font-weight:700;">${fmt(bldgTotal)}</div>
+      </div>
+      <div class="card-body" style="padding:10px 16px;">`;
+    Object.entries(floors).sort((a,b) => parseInt(a[0])-parseInt(b[0])).forEach(([fl, f]) => {
+      const flRows = rows.filter(r => String(r['FLOOR']||'').trim() === String(fl) && (!bldg || bldg === '—' || String(r['BUILDING']||'').trim() === bldg));
+      const flBoards = flRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
+      const labPPB = flBoards > 0 ? f.total/flBoards : 0;
+      html += `<div class="floor-block" style="margin-bottom:8px;">
+        <div class="floor-hdr" onclick="toggleFloorBlock(this)">
+          <div><div class="floor-num">Floor ${esc(fl)}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px;">${fmt(f.total)}${flBoards>0?' · $'+labPPB.toFixed(0)+'/board':''}</div></div>
+          <span style="color:var(--ink3);font-size:18px;">›</span>
+        </div>
+        <div class="floor-body" style="display:none;"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;padding:14px;">
+          ${Object.entries(f.cats).map(([cat,amt]) => '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">'+esc(cat)+'</div><div style="font-size:18px;font-weight:800;">'+fmt(amt)+'</div>'+(flBoards>0?'<div style="font-size:10px;color:var(--ink3);">$'+(amt/flBoards).toFixed(0)+'/board</div>':'')+'</div>').join('')}
+        </div></div>
+      </div>`;
+    });
+    html += '</div></div>';
   });
   el.innerHTML = html;
 }
@@ -1520,6 +1707,11 @@ function renderJobBillsTab(job) {
 // ═══════════════════════════════════════════════════════════
 // SUMMARY TAB (FIX #4: All material items)
 // ═══════════════════════════════════════════════════════════
+function toggleSummaryView(job, mode) {
+  if (!S._summaryView) S._summaryView = {};
+  S._summaryView[job] = mode;
+  renderJobSummaryTab(job);
+}
 function renderJobSummaryTab(job) {
   const el = document.getElementById('jobs-tab-summary'); if (!el) return;
   const rows = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
@@ -1531,80 +1723,107 @@ function renderJobSummaryTab(job) {
   const billAssigns = Object.values(S.billAssignments||{}).filter(ba => ba.job === job);
   const laborBilled = billAssigns.filter(ba => LABOR_CATS.some(lc => (ba.category||'').includes(lc))).reduce((s,ba) => s + (parseFloat(ba.total||0)||0), 0);
   const matBilled = billAssigns.filter(ba => !LABOR_CATS.some(lc => (ba.category||'').includes(lc))).reduce((s,ba) => s + (parseFloat(ba.total||0)||0), 0);
-  const totalBudget = matBudget + laborBudget, totalActual = matBilled + laborBilled;
+
+  // Get backfill historical data
+  const bf = getBackfillForJob(job);
+  const bfMatTotal = bf ? parseFloat(bf.materialTotal||0) : 0;
+  const bfLabTotal = bf ? parseFloat(bf.laborTotal||0) : 0;
+  const bfTaxTotal = bf ? parseFloat(bf.taxTotal||0) : 0;
+
+  // View mode: 'whole' shows backfill + live combined, 'live' shows only live (current sync)
+  const viewMode = S._summaryView?.[job] || 'whole';
+
+  const totalBudget = matBudget + laborBudget;
+  const totalActualLive = matBilled + laborBilled + matOrdered;
+  const totalActualWhole = totalActualLive + bfMatTotal + bfLabTotal + bfTaxTotal;
+  const totalActual = viewMode === 'whole' ? totalActualWhole : totalActualLive;
   const pct = totalBudget > 0 ? Math.min(totalActual/totalBudget*100, 100) : 0;
 
-  // Build unified item list: budgeted items + ordered items (materials NOT in estimate also appear)
-  // Key: normalized material group
-  const itemMap = {}; // group → { label, budgetQty, budgetDollars, orderedQty, orderedDollars, rawNames:Set }
-
-  // Add all estimate items (budgeted)
+  // Build unified item list
+  const itemMap = {};
   items.forEach(it => {
     const norm = normalizeMaterial(it.name);
     const key = norm.group;
-    if (!itemMap[key]) itemMap[key] = { label: norm.label, budgetQty: 0, budgetDollars: 0, orderedQty: 0, orderedDollars: 0, rawNames: new Set(), uom: it.uom||'EA', budgeted: true };
+    if (!itemMap[key]) itemMap[key] = { label: norm.label, budgetQty: 0, budgetDollars: 0, orderedQty: 0, orderedDollars: 0, bfDollars: 0, rawNames: new Set(), uom: it.uom||'EA', budgeted: true };
     itemMap[key].budgetQty += parseFloat(it.qty) || 0;
     itemMap[key].budgetDollars += (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
     itemMap[key].rawNames.add(it.name);
   });
-
-  // Add all PO-ordered items (actual)
   rows.forEach(r => {
     const raw = (r['MATERIAL']||'').trim(); if (!raw) return;
     const norm = normalizeMaterial(raw);
     const key = norm.group;
-    if (!itemMap[key]) itemMap[key] = { label: norm.label, budgetQty: 0, budgetDollars: 0, orderedQty: 0, orderedDollars: 0, rawNames: new Set(), uom: r['UOM']||'EA', budgeted: false };
+    if (!itemMap[key]) itemMap[key] = { label: norm.label, budgetQty: 0, budgetDollars: 0, orderedQty: 0, orderedDollars: 0, bfDollars: 0, rawNames: new Set(), uom: r['UOM']||'EA', budgeted: false };
     itemMap[key].orderedQty += parseFloat(r['QTY']||0) || 0;
     itemMap[key].orderedDollars += parseFloat(r['LINE TOTAL']||0) || 0;
     itemMap[key].rawNames.add(raw);
   });
+  // Add backfill material items in "whole" mode
+  if (viewMode === 'whole' && bf?.materialItems) {
+    Object.entries(bf.materialItems).forEach(([name, amt]) => {
+      const norm = normalizeMaterial(name);
+      const key = norm.group;
+      if (!itemMap[key]) itemMap[key] = { label: norm.label, budgetQty: 0, budgetDollars: 0, orderedQty: 0, orderedDollars: 0, bfDollars: 0, rawNames: new Set(), uom: 'EA', budgeted: false };
+      itemMap[key].bfDollars += parseFloat(amt) || 0;
+      itemMap[key].rawNames.add(name);
+    });
+  }
 
-  const allItems = Object.entries(itemMap).sort((a,b) => (b[1].orderedDollars + b[1].budgetDollars) - (a[1].orderedDollars + a[1].budgetDollars));
+  const allItems = Object.entries(itemMap).sort((a,b) => (b[1].orderedDollars + b[1].budgetDollars + b[1].bfDollars) - (a[1].orderedDollars + a[1].budgetDollars + a[1].bfDollars));
 
   el.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:12px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">View:</span>
+      <button class="btn ${viewMode==='whole'?'btn-primary':'btn-ghost'} btn-sm" onclick="toggleSummaryView('${jsesc(job)}','whole')">📊 Whole Job (incl. history)</button>
+      <button class="btn ${viewMode==='live'?'btn-primary':'btn-ghost'} btn-sm" onclick="toggleSummaryView('${jsesc(job)}','live')">⚡ Current POs only</button>
+      ${bf ? '<span style="font-size:11px;color:var(--ink3);">History: ' + fmt(bfMatTotal+bfLabTotal+bfTaxTotal) + '</span>' : ''}
+    </div>
     <div class="card" style="margin-bottom:16px;"><div class="card-body">
       <div style="display:flex;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:12px;">
         <div><div style="font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Total Budget</div><div style="font-size:28px;font-weight:800;font-family:'Space Grotesk',sans-serif;">${fmt(totalBudget)}</div></div>
-        <div style="text-align:right;"><div style="font-size:11px;color:var(--ink3);">Actual Paid</div><div style="font-size:24px;font-weight:700;color:${totalActual>totalBudget?'var(--red)':'var(--green)'};">${fmt(totalActual)}</div></div>
+        <div style="text-align:right;"><div style="font-size:11px;color:var(--ink3);">${viewMode==='whole'?'Total Spent (Whole Job)':'Actual (Current)'}</div><div style="font-size:24px;font-weight:700;color:${totalActual>totalBudget?'var(--red)':'var(--green)'};">${fmt(totalActual)}</div></div>
       </div>
       <div class="prog" style="height:10px;"><div class="prog-fill" style="width:${pct.toFixed(1)}%;background:${pct>90?'var(--red)':pct>70?'var(--yellow)':'var(--green)'}"></div></div>
-      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--ink3);"><span>${pct.toFixed(1)}% used</span><span>${fmt(totalBudget - totalActual)} remaining</span></div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--ink3);"><span>${pct.toFixed(1)}% used</span><span>${totalBudget > totalActual ? fmt(totalBudget - totalActual) + ' remaining' : fmt(totalActual - totalBudget) + ' over'}</span></div>
     </div></div>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
       <div class="stat"><div class="stat-lbl">Ordered on POs</div><div class="stat-val" style="color:var(--blue);">${fmt(matOrdered)}</div></div>
-      <div class="stat"><div class="stat-lbl">Billed Materials</div><div class="stat-val">${fmt(matBilled)}</div></div>
+      <div class="stat"><div class="stat-lbl">Billed Material</div><div class="stat-val">${fmt(matBilled)}</div></div>
       <div class="stat"><div class="stat-lbl">Billed Labor</div><div class="stat-val" style="color:var(--accent);">${fmt(laborBilled)}</div></div>
-      <div class="stat"><div class="stat-lbl">Total Items Tracked</div><div class="stat-val">${allItems.length}</div></div>
+      ${viewMode==='whole' && bf ? '<div class="stat"><div class="stat-lbl">Historical Material</div><div class="stat-val" style="color:var(--yellow);">' + fmt(bfMatTotal) + '</div></div><div class="stat"><div class="stat-lbl">Historical Labor</div><div class="stat-val" style="color:var(--yellow);">' + fmt(bfLabTotal) + '</div></div>' : ''}
+      <div class="stat"><div class="stat-lbl">Items Tracked</div><div class="stat-val">${allItems.length}</div></div>
     </div>
 
-    <div class="card"><div class="card-hdr"><span class="card-title">Job Cost — All Items (Budgeted + Non-Budgeted)</span><span style="font-size:12px;color:var(--ink3);">Normalized • ${allItems.length} groups</span></div><div class="card-body" style="padding:0;">
+    <div class="card"><div class="card-hdr"><span class="card-title">Job Cost — All Items ${viewMode==='whole'?'(Whole Job)':'(Current POs)'}</span><span style="font-size:12px;color:var(--ink3);">${allItems.length} groups</span></div><div class="card-body" style="padding:0;">
       <table class="tbl" style="border:none;"><thead><tr>
         <th>Material Group</th>
         <th class="tbl-r">Budget Qty</th>
         <th class="tbl-r">Actual Qty</th>
-        <th style="width:25%;">Qty Used</th>
+        <th style="width:22%;">Qty Used</th>
         <th class="tbl-r">Budget $</th>
         <th class="tbl-r">Actual $</th>
+        ${viewMode==='whole'?'<th class="tbl-r">Historical $</th>':''}
         <th>Status</th>
+        <th>Actions</th>
       </tr></thead><tbody>
       ${allItems.map(([key, it]) => {
         const qtyPct = it.budgetQty > 0 ? (it.orderedQty / it.budgetQty * 100) : (it.orderedQty > 0 ? 999 : 0);
-        const dollarPct = it.budgetDollars > 0 ? (it.orderedDollars / it.budgetDollars * 100) : (it.orderedDollars > 0 ? 999 : 0);
         const barColor = qtyPct > 110 ? 'var(--red)' : qtyPct > 85 ? 'var(--yellow)' : qtyPct > 0 ? 'var(--green)' : 'var(--ink3)';
         let statusBadge = '';
-        if (!it.budgeted && it.orderedDollars > 0) statusBadge = '<span class="badge badge-orange">Non-budgeted</span>';
+        if (!it.budgeted && (it.orderedDollars > 0 || it.bfDollars > 0)) statusBadge = '<span class="badge badge-orange">Non-budgeted</span>';
         else if (qtyPct > 110) statusBadge = '<span class="badge badge-red">Over ' + Math.round(qtyPct-100) + '%</span>';
         else if (qtyPct > 85) statusBadge = '<span class="badge badge-yellow">Near cap</span>';
         else if (qtyPct > 0) statusBadge = '<span class="badge badge-green">On track</span>';
         else statusBadge = '<span class="badge badge-gray">Not ordered</span>';
+        const firstRaw = [...it.rawNames][0] || '';
         return `<tr>
           <td><div style="font-weight:600;">${esc(it.label)}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px;">${esc([...it.rawNames].slice(0,3).join(' • '))}${it.rawNames.size>3?' +'+(it.rawNames.size-3)+' more':''}</div></td>
           <td class="tbl-r">${it.budgetQty > 0 ? Math.round(it.budgetQty) : '—'}</td>
           <td class="tbl-r" style="font-weight:700;color:${it.orderedQty>0?'var(--blue)':'var(--ink3)'};">${it.orderedQty > 0 ? Math.round(it.orderedQty) : '—'}</td>
           <td>
             <div style="display:flex;align-items:center;gap:8px;">
-              <div style="flex:1;background:var(--surface3);border-radius:4px;height:8px;overflow:hidden;min-width:80px;">
+              <div style="flex:1;background:var(--surface3);border-radius:4px;height:8px;overflow:hidden;min-width:60px;">
                 ${qtyPct>0 ? '<div style="height:100%;width:' + Math.min(qtyPct,100).toFixed(0) + '%;background:' + barColor + ';border-radius:4px;"></div>' : ''}
               </div>
               <span style="font-size:11px;font-weight:700;color:${barColor};min-width:40px;text-align:right;">${qtyPct > 0 ? (qtyPct>999 ? '∞' : qtyPct.toFixed(0) + '%') : '—'}</span>
@@ -1612,12 +1831,28 @@ function renderJobSummaryTab(job) {
           </td>
           <td class="tbl-r">${it.budgetDollars > 0 ? fmt(it.budgetDollars) : '—'}</td>
           <td class="tbl-r" style="font-weight:700;">${it.orderedDollars > 0 ? fmt(it.orderedDollars) : '—'}</td>
+          ${viewMode==='whole'?'<td class="tbl-r" style="color:var(--yellow);">' + (it.bfDollars > 0 ? fmt(it.bfDollars) : '—') + '</td>':''}
           <td>${statusBadge}</td>
+          <td>${firstRaw ? '<button class="btn btn-ghost btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(firstRaw) + '\')" title="Re-categorize this item">🏷</button>' : ''}</td>
         </tr>`;
       }).join('')}
-      ${allItems.length === 0 ? '<tr><td colspan="7" class="no-data" style="text-align:center;">No items tracked yet. Add estimate items or sync POs.</td></tr>' : ''}
+      ${allItems.length === 0 ? '<tr><td colspan="' + (viewMode==='whole'?9:8) + '" class="no-data" style="text-align:center;">No items tracked yet. Add estimate items or sync POs.</td></tr>' : ''}
       </tbody></table>
     </div></div>
+
+    ${(() => {
+      // TRACKED POs SECTION — show all POs the user sent to this job, even without location details
+      const tracked = Object.entries(S.assignments||{}).filter(([po, a]) => (a.job||'') === job);
+      if (!tracked.length) return '';
+      const totalTracked = tracked.reduce((s, [po,a]) => s + (parseFloat(a.total)||0), 0);
+      return `<div class="card" style="margin-top:16px;"><div class="card-hdr"><span class="card-title">🎯 Tracked POs for this Job</span><span style="font-size:12px;color:var(--ink3);">${tracked.length} PO${tracked.length!==1?'s':''} · ${fmt(totalTracked)}</span></div><div class="card-body" style="padding:0;"><table class="tbl" style="border:none;"><thead><tr><th>PO#</th><th>Vendor</th><th>Location</th><th class="tbl-r">Total</th><th>Date</th><th>Actions</th></tr></thead><tbody>
+        ${tracked.sort((a,b) => String(b[1].date||'').localeCompare(String(a[1].date||''))).map(([po, a]) => {
+          const loc = [a.building||a.bldg, a.floor?'Fl '+a.floor:'', a.unit?'Unit '+a.unit:''].filter(Boolean).join(' · ');
+          const needsLoc = !a.building && !a.bldg && !a.floor && !a.unit;
+          return `<tr><td style="font-weight:700;">#${esc(po)}</td><td>${esc(a.vendor||'')}</td><td>${loc ? esc(loc) : '<span class="badge badge-yellow">⚠ No location</span>'}</td><td class="tbl-r" style="font-weight:700;">${fmt(a.total||0)}</td><td style="font-size:11px;color:var(--ink3);">${esc(a.date||'')}</td><td><button class="btn ${needsLoc?'btn-primary':'btn-ghost'} btn-sm" onclick="editAssignedPO('${jsesc(po)}')">${needsLoc?'📍 Add Location':'✏ Edit'}</button> <button class="btn btn-danger btn-sm" onclick="deleteAssignment('po','${jsesc(po)}')">🗑</button></td></tr>`;
+        }).join('')}
+      </tbody></table></div></div>`;
+    })()}
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">
       <div class="card"><div class="card-body"><div class="section-title">Drill Down</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" onclick="switchJobTab('map')">Job Map</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('estimate')">Estimate</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('bills')">Bills</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('allmats')">Historical Data</button></div></div></div>
@@ -2036,36 +2271,174 @@ function switchRawTab(tab) {
 function renderRawPO() {
   const el = document.getElementById('raw-tab-raw-po'); if (!el) return;
   if (!S.rows.length) { el.innerHTML = '<div class="no-data">No PO data. Click Sync first.</div>'; return; }
-  let html = '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Job</th><th>Material</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Total</th><th>Bldg</th><th>Fl</th><th>Unit</th><th>Vendor</th></tr></thead><tbody>';
-  S.rows.slice(0, 200).forEach(r => {
-    html += '<tr><td>' + esc(r['PO NUMBER']||'') + '</td><td>' + esc((r['JOB']||'').replace('JOB ','')) + '</td><td>' + esc(r['MATERIAL']||'') + '</td><td class="tbl-r">' + (r['QTY']||'') + '</td><td>' + esc(r['UOM']||'') + '</td><td class="tbl-r">' + fmt(parseFloat(r['LINE TOTAL']||0)) + '</td><td>' + esc(r['BUILDING']||'') + '</td><td>' + esc(r['FLOOR']||'') + '</td><td>' + esc(r['UNIT']||'') + '</td><td>' + esc(r['VENDOR']||'') + '</td></tr>';
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:11px;color:var(--ink3);">Click any row to edit. Data comes from Google Sheet — edits are saved as local overrides.</div><div style="font-size:11px;color:var(--ink3);">' + S.rows.length + ' rows</div></div>';
+  html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Job</th><th>Material</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Total</th><th>Bldg</th><th>Fl</th><th>Unit</th><th>Vendor</th><th>Actions</th></tr></thead><tbody>';
+  S.rows.slice(0, 300).forEach((r, idx) => {
+    html += '<tr><td>' + esc(r['PO NUMBER']||'') + '</td><td>' + esc((r['JOB']||'').replace('JOB ','')) + '</td><td>' + esc(r['MATERIAL']||'') + '</td><td class="tbl-r">' + (r['QTY']||'') + '</td><td>' + esc(r['UOM']||'') + '</td><td class="tbl-r">' + fmt(parseFloat(r['LINE TOTAL']||0)) + '</td><td>' + esc(r['BUILDING']||'') + '</td><td>' + esc(r['FLOOR']||'') + '</td><td>' + esc(r['UNIT']||'') + '</td><td>' + esc(r['VENDOR']||'') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editPORow(' + idx + ')">✏</button> <button class="btn btn-danger btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(r['MATERIAL']||'') + '\')">🏷</button></td></tr>';
   });
   html += '</tbody></table></div>';
-  if (S.rows.length > 200) html += '<div class="no-data">Showing first 200 of ' + S.rows.length + ' rows</div>';
+  if (S.rows.length > 300) html += '<div class="no-data">Showing first 300 of ' + S.rows.length + ' rows</div>';
   el.innerHTML = html;
+}
+function editPORow(idx) {
+  const r = S.rows[idx]; if (!r) return;
+  const jobs = getJobs();
+  document.getElementById('po-modal-title').textContent = 'Edit PO Line — PO #' + (r['PO NUMBER']||'');
+  const currentCat = categorize(r['MATERIAL']||'');
+  document.getElementById('po-modal-body').innerHTML = `
+    <div class="form-row"><div class="form-group"><label>PO Number</label><input id="pe-po" value="${esc(r['PO NUMBER']||'')}"/></div>
+    <div class="form-group"><label>Job</label><select id="pe-job">${jobs.map(j=>'<option value="'+esc(j)+'"'+((r['JOB']||'')===j?' selected':'')+'>'+esc(j.replace('JOB ',''))+'</option>').join('')}<option value="">— unassigned —</option></select></div></div>
+    <div class="form-group"><label>Material Description</label><input id="pe-mat" value="${esc(r['MATERIAL']||'')}"/></div>
+    <div class="form-row"><div class="form-group"><label>Category <span style="color:var(--ink3);font-size:10px;">(currently: ${currentCat})</span></label><select id="pe-cat"><option value="">(auto-detect)</option><option value="boards"${currentCat==='boards'?' selected':''}>Boards/Drywall</option><option value="metal"${currentCat==='metal'?' selected':''}>Metal</option><option value="wood"${currentCat==='wood'?' selected':''}>Wood</option><option value="finish"${currentCat==='finish'?' selected':''}>Finish</option><option value="supplies"${currentCat==='supplies'?' selected':''}>Supplies/Fasteners</option><option value="labor"${currentCat==='labor'?' selected':''}>Labor</option><option value="tax"${currentCat==='tax'?' selected':''}>Tax</option><option value="other"${currentCat==='other'?' selected':''}>Other</option></select></div>
+    <div class="form-group"><label>Qty</label><input id="pe-qty" type="number" step="any" value="${r['QTY']||0}"/></div>
+    <div class="form-group"><label>UOM</label><input id="pe-uom" value="${esc(r['UOM']||'')}"/></div>
+    <div class="form-group"><label>Total</label><input id="pe-total" type="number" step="0.01" value="${r['LINE TOTAL']||0}"/></div></div>
+    <div class="form-row"><div class="form-group"><label>Building</label><input id="pe-bldg" value="${esc(r['BUILDING']||'')}"/></div>
+    <div class="form-group"><label>Floor</label><input id="pe-fl" value="${esc(r['FLOOR']||'')}"/></div>
+    <div class="form-group"><label>Unit</label><input id="pe-un" value="${esc(r['UNIT']||'')}"/></div></div>
+    <div class="form-group"><label>Vendor</label><input id="pe-ven" value="${esc(r['VENDOR']||'')}"/></div>
+    <div style="font-size:11px;color:var(--ink3);margin-top:10px;">💡 Changing the category saves a rule that will auto-categorize any future line with this same description.</div>`;
+  document.getElementById('po-modal-footer').innerHTML = `<button class="btn btn-ghost" onclick="closeModal('po-modal')">Cancel</button><button class="btn btn-primary" onclick="savePORowEdit(${idx})">💾 Save</button>`;
+  document.getElementById('po-modal').classList.add('open');
+}
+async function savePORowEdit(idx) {
+  const r = S.rows[idx]; if (!r) return;
+  const newMat = document.getElementById('pe-mat')?.value || '';
+  const cat = document.getElementById('pe-cat')?.value || '';
+  r['PO NUMBER'] = document.getElementById('pe-po')?.value || '';
+  r['JOB'] = document.getElementById('pe-job')?.value || '';
+  r['MATERIAL'] = newMat;
+  r['QTY'] = parseFloat(document.getElementById('pe-qty')?.value) || 0;
+  r['UOM'] = document.getElementById('pe-uom')?.value || '';
+  r['LINE TOTAL'] = parseFloat(document.getElementById('pe-total')?.value) || 0;
+  r['BUILDING'] = document.getElementById('pe-bldg')?.value || '';
+  r['FLOOR'] = document.getElementById('pe-fl')?.value || '';
+  r['UNIT'] = document.getElementById('pe-un')?.value || '';
+  r['VENDOR'] = document.getElementById('pe-ven')?.value || '';
+  // Save category override if specified
+  if (cat && newMat) {
+    if (!S.materialMap) S.materialMap = {};
+    S.materialMap[newMat.toUpperCase().trim()] = cat;
+    await saveSharedData('materialMap');
+  }
+  // Save row overrides as a local override keyed by PO#|row-index so the edits survive re-sync
+  if (!S.rowOverrides) S.rowOverrides = {};
+  const rowKey = (r['PO NUMBER']||'?') + '|' + idx;
+  S.rowOverrides[rowKey] = {...r};
+  await saveSharedData('rowOverrides');
+  closeModal('po-modal'); renderRawPO(); showToast('✓ Line saved');
+}
+async function setManualCategoryFromRaw(desc) {
+  if (!desc) return;
+  const cats = ['boards','metal','wood','finish','supplies','labor','tax','other'];
+  const current = categorize(desc);
+  const idx = prompt('Set category for: "' + desc + '"\n\nCurrent: ' + current + '\n\n1. Boards/Drywall\n2. Metal\n3. Wood\n4. Finish\n5. Supplies\n6. Labor\n7. Tax\n8. Other\n\nEnter number (1-8) or leave blank to cancel:');
+  if (!idx) return;
+  const cat = cats[parseInt(idx) - 1];
+  if (!cat) { showToast('Invalid choice'); return; }
+  if (!S.materialMap) S.materialMap = {};
+  S.materialMap[desc.toUpperCase().trim()] = cat;
+  await saveSharedData('materialMap');
+  showToast('✓ "' + desc + '" now categorized as: ' + cat);
+  renderRawPO();
 }
 function renderRawBills() {
   const el = document.getElementById('raw-tab-raw-bills'); if (!el) return;
   if (!S.bills.length) { el.innerHTML = '<div class="no-data">No bill data. Click Sync first.</div>'; return; }
-  let html = '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Invoice</th><th>Vendor</th><th>Description</th><th class="tbl-r">Qty</th><th class="tbl-r">Total</th><th>Job</th><th>Status</th></tr></thead><tbody>';
-  S.bills.slice(0, 200).forEach(b => {
+  let html = '<div style="font-size:11px;color:var(--ink3);margin-bottom:12px;">Click ✏ to edit a bill line, or 🏷 to change material category.</div>';
+  html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Invoice</th><th>Vendor</th><th>Description</th><th class="tbl-r">Qty</th><th class="tbl-r">Total</th><th>Job</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+  S.bills.slice(0, 300).forEach((b, idx) => {
     const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim();
     const matched = S.billAssignments[inv];
-    html += '<tr><td>' + esc(inv) + '</td><td>' + esc(b['VENDOR']||b['Vendor']||'') + '</td><td>' + esc(b['ITEM DESCRIPTION']||b['Item Description']||'') + '</td><td class="tbl-r">' + (b['QUANTITY']||'') + '</td><td class="tbl-r">' + fmt(parseFloat(b['LINE TOTAL']||0)) + '</td><td>' + esc((b['JOB']||b['Job']||'').replace('JOB ','')) + '</td><td>' + (matched?'<span class="badge badge-green">Matched</span>':'<span class="badge badge-yellow">Unmatched</span>') + '</td></tr>';
+    const desc = b['ITEM DESCRIPTION']||b['Item Description']||'';
+    html += '<tr><td>' + esc(inv) + '</td><td>' + esc(b['VENDOR']||b['Vendor']||'') + '</td><td>' + esc(desc) + '</td><td class="tbl-r">' + (b['QUANTITY']||'') + '</td><td class="tbl-r">' + fmt(parseFloat(b['LINE TOTAL']||0)) + '</td><td>' + esc((b['JOB']||b['Job']||'').replace('JOB ','')) + '</td><td>' + (matched?'<span class="badge badge-green">Matched</span>':'<span class="badge badge-yellow">Unmatched</span>') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editBillRow(' + idx + ')">✏</button> <button class="btn btn-danger btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(desc) + '\')">🏷</button></td></tr>';
   });
   html += '</tbody></table></div>';
+  if (S.bills.length > 300) html += '<div class="no-data">Showing first 300 of ' + S.bills.length + ' rows</div>';
   el.innerHTML = html;
+}
+function editBillRow(idx) {
+  const b = S.bills[idx]; if (!b) return;
+  const jobs = getJobs();
+  const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim();
+  document.getElementById('po-modal-title').textContent = 'Edit Bill Line — ' + inv;
+  const desc = b['ITEM DESCRIPTION']||b['Item Description']||'';
+  const currentCat = categorize(desc);
+  document.getElementById('po-modal-body').innerHTML = `
+    <div class="form-row"><div class="form-group"><label>Invoice #</label><input id="be-inv" value="${esc(inv)}"/></div>
+    <div class="form-group"><label>Vendor</label><input id="be-ven" value="${esc(b['VENDOR']||b['Vendor']||'')}"/></div></div>
+    <div class="form-group"><label>Description</label><input id="be-desc" value="${esc(desc)}"/></div>
+    <div class="form-row"><div class="form-group"><label>Category <span style="color:var(--ink3);font-size:10px;">(currently: ${currentCat})</span></label><select id="be-cat"><option value="">(auto-detect)</option><option value="boards"${currentCat==='boards'?' selected':''}>Boards</option><option value="metal"${currentCat==='metal'?' selected':''}>Metal</option><option value="wood"${currentCat==='wood'?' selected':''}>Wood</option><option value="finish"${currentCat==='finish'?' selected':''}>Finish</option><option value="supplies"${currentCat==='supplies'?' selected':''}>Supplies</option><option value="labor"${currentCat==='labor'?' selected':''}>Labor</option><option value="tax"${currentCat==='tax'?' selected':''}>Tax</option><option value="other"${currentCat==='other'?' selected':''}>Other</option></select></div>
+    <div class="form-group"><label>Qty</label><input id="be-qty" type="number" step="any" value="${b['QUANTITY']||0}"/></div>
+    <div class="form-group"><label>Total</label><input id="be-total" type="number" step="0.01" value="${b['LINE TOTAL']||0}"/></div></div>
+    <div class="form-group"><label>Job</label><select id="be-job">${jobs.map(j=>'<option value="'+esc(j)+'"'+((b['JOB']||b['Job']||'')===j?' selected':'')+'>'+esc(j.replace('JOB ',''))+'</option>').join('')}<option value="">— unassigned —</option></select></div>`;
+  document.getElementById('po-modal-footer').innerHTML = `<button class="btn btn-ghost" onclick="closeModal('po-modal')">Cancel</button><button class="btn btn-primary" onclick="saveBillRowEdit(${idx})">💾 Save</button>`;
+  document.getElementById('po-modal').classList.add('open');
+}
+async function saveBillRowEdit(idx) {
+  const b = S.bills[idx]; if (!b) return;
+  const newDesc = document.getElementById('be-desc')?.value || '';
+  const cat = document.getElementById('be-cat')?.value || '';
+  b['INVOICE NUMBER'] = document.getElementById('be-inv')?.value || '';
+  b['VENDOR'] = document.getElementById('be-ven')?.value || '';
+  b['ITEM DESCRIPTION'] = newDesc;
+  b['QUANTITY'] = parseFloat(document.getElementById('be-qty')?.value) || 0;
+  b['LINE TOTAL'] = parseFloat(document.getElementById('be-total')?.value) || 0;
+  b['JOB'] = document.getElementById('be-job')?.value || '';
+  if (cat && newDesc) {
+    if (!S.materialMap) S.materialMap = {};
+    S.materialMap[newDesc.toUpperCase().trim()] = cat;
+    await saveSharedData('materialMap');
+  }
+  if (!S.billOverrides) S.billOverrides = {};
+  const k = (b['INVOICE NUMBER']||'?') + '|' + idx;
+  S.billOverrides[k] = {...b};
+  await saveSharedData('billOverrides');
+  closeModal('po-modal'); renderRawBills(); showToast('✓ Bill line saved');
 }
 function renderRawPDF() {
   const el = document.getElementById('raw-tab-raw-pdf'); if (!el) return;
   const manualPOs = Object.entries(S.assignments||{}).filter(([po,a]) => a.manual);
   if (!manualPOs.length) { el.innerHTML = '<div class="no-data">No PDF-extracted POs yet.</div>'; return; }
-  let html = '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Vendor</th><th>Job</th><th class="tbl-r">Total</th><th>Bldg</th><th>Fl</th><th>Date</th></tr></thead><tbody>';
+  let html = '<div style="font-size:11px;color:var(--ink3);margin-bottom:12px;">Click ✏ to edit a PDF-extracted PO assignment, or 🗑 to remove it.</div>';
+  html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Vendor</th><th>Job</th><th class="tbl-r">Total</th><th>Bldg</th><th>Fl</th><th>Unit</th><th>Date</th><th>Actions</th></tr></thead><tbody>';
   manualPOs.forEach(([po, a]) => {
-    html += '<tr><td style="font-weight:600;">' + esc(po) + '</td><td>' + esc(a.vendor||'') + '</td><td>' + esc((a.job||'').replace('JOB ','')) + '</td><td class="tbl-r">' + fmt(parseFloat(a.total||0)) + '</td><td>' + esc(a.building||a.bldg||'') + '</td><td>' + esc(a.floor||'') + '</td><td>' + esc(a.date||'') + '</td></tr>';
+    html += '<tr><td style="font-weight:600;">' + esc(po) + '</td><td>' + esc(a.vendor||'') + '</td><td>' + esc((a.job||'').replace('JOB ','')) + '</td><td class="tbl-r">' + fmt(parseFloat(a.total||0)) + '</td><td>' + esc(a.building||a.bldg||'') + '</td><td>' + esc(a.floor||'') + '</td><td>' + esc(a.unit||'') + '</td><td>' + esc(a.date||'') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editAssignedPO(\'' + jsesc(po) + '\')">✏</button> <button class="btn btn-danger btn-sm" onclick="deleteAssignment(\'po\',\'' + jsesc(po) + '\')">🗑</button></td></tr>';
   });
   html += '</tbody></table></div>';
   el.innerHTML = html;
+}
+function editAssignedPO(po) {
+  const a = S.assignments[po]; if (!a) return;
+  const jobs = getJobs();
+  document.getElementById('po-modal-title').textContent = 'Edit Tracked PO #' + po;
+  document.getElementById('po-modal-body').innerHTML = `
+    <div class="form-group"><label>Job</label><select id="ae-job">${jobs.map(j=>'<option value="'+esc(j)+'"'+((a.job||'')===j?' selected':'')+'>'+esc(j.replace('JOB ',''))+'</option>').join('')}</select></div>
+    <div class="form-row"><div class="form-group"><label>Building</label><input id="ae-bldg" value="${esc(a.building||a.bldg||'')}"/></div>
+    <div class="form-group"><label>Floor</label><input id="ae-fl" value="${esc(a.floor||'')}"/></div>
+    <div class="form-group"><label>Unit</label><input id="ae-un" value="${esc(a.unit||'')}"/></div></div>
+    <div class="form-row"><div class="form-group"><label>Vendor</label><input id="ae-ven" value="${esc(a.vendor||'')}"/></div>
+    <div class="form-group"><label>Total</label><input id="ae-total" type="number" step="0.01" value="${a.total||0}"/></div></div>
+    <div class="form-group"><label>Date</label><input id="ae-date" type="date" value="${esc(a.date||'')}"/></div>
+    <div style="font-size:11px;color:var(--ink3);margin-top:10px;">💡 Use this to add missing location details (building/floor/unit) to a PO you already sent to tracking.</div>`;
+  document.getElementById('po-modal-footer').innerHTML = `<button class="btn btn-danger" onclick="deleteAssignment('po','${jsesc(po)}');closeModal('po-modal')">🗑 Remove Tracking</button><button class="btn btn-ghost" onclick="closeModal('po-modal')">Cancel</button><button class="btn btn-primary" onclick="saveAssignedPO('${jsesc(po)}')">💾 Save</button>`;
+  document.getElementById('po-modal').classList.add('open');
+}
+async function saveAssignedPO(po) {
+  const a = S.assignments[po]; if (!a) return;
+  a.job = document.getElementById('ae-job')?.value || '';
+  a.building = document.getElementById('ae-bldg')?.value || '';
+  a.bldg = a.building; // legacy
+  a.floor = document.getElementById('ae-fl')?.value || '';
+  a.unit = document.getElementById('ae-un')?.value || '';
+  a.vendor = document.getElementById('ae-ven')?.value || '';
+  a.total = parseFloat(document.getElementById('ae-total')?.value) || 0;
+  a.date = document.getElementById('ae-date')?.value || '';
+  await saveSharedData('assignments');
+  closeModal('po-modal');
+  if (typeof renderRawPDF === 'function') renderRawPDF();
+  if (_currentJob && typeof renderJobSummaryTab === 'function') renderJobSummaryTab(_currentJob);
+  showToast('✓ Tracked PO #' + po + ' updated');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2249,4 +2622,5 @@ async function init() {
 checkAuth();
 
 </script>
+
 </html>
