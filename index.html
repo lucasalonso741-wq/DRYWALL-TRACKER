@@ -270,10 +270,11 @@ a{color:var(--accent);}
 <!-- PAGE: HOME / FEED -->
 
 <div id="page-home" class="page active">
+  <div id="new-job-alert-banner" style="display:none;margin-bottom:14px;"></div>
   <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
     <div class="drop-zone" id="pdf-drop" style="flex:1;min-width:200px;padding:16px;">
       <div style="font-size:13px;font-weight:600;">📄 Drop PO PDF here or <label style="color:var(--accent);cursor:pointer;">browse<input type="file" accept=".pdf" id="pdf-upload" style="display:none;" onchange="handlePDFFile(this.files[0])"/></label></div>
-      <div style="font-size:11px;color:var(--ink3);margin-top:4px;">Auto-extracts PO number, vendor, materials &amp; totals</div>
+      <div style="font-size:11px;color:var(--ink3);margin-top:4px;">Auto-extracts PO number, vendor, materials &amp; totals · or email to <strong>po@aadrywalltracker.com</strong></div>
     </div>
     <button class="btn btn-ghost" id="feed-select-po-btn" onclick="startFeedSelect('po')">☑ Multi-select POs</button>
     <button class="btn btn-ghost" id="feed-select-bill-btn" onclick="startFeedSelect('bill')">☑ Multi-select Bills</button>
@@ -304,9 +305,9 @@ a{color:var(--accent);}
 
 <div id="page-inbox" class="page">
   <div class="tabs" id="inbox-tabs">
-    <button class="tab-btn active" data-tab="bills" onclick="switchInboxTab('bills')">📋 Unmatched Bills</button>
+    <button class="tab-btn active" data-tab="bills" onclick="switchInboxTab('bills')">🆕 Review Queue</button>
     <button class="tab-btn" data-tab="pos" onclick="switchInboxTab('pos')">📦 Unassigned POs</button>
-    <button class="tab-btn" data-tab="pdfs" onclick="switchInboxTab('pdfs')">📄 PDF Extractions</button>
+    <button class="tab-btn" data-tab="pdfs" onclick="switchInboxTab('pdfs')">📄 All Extractions</button>
   </div>
   <div id="inbox-tab-bills" class="tab-panel active"></div>
   <div id="inbox-tab-pos" class="tab-panel"></div>
@@ -426,6 +427,8 @@ const S = {
   backfill: { jobs: null, labor: null, materials: {}, poIndex: {} },
   materialMap: {}, // raw material name → group key (user manual mappings)
   pendingNewJob: null, // { name, source, po_id } — triggers "New Job Detected" modal
+  emailPOs: [], // email-extracted POs from Supabase po_pdfs
+  newJobAlerts: [], // unresolved new job alerts from app_data
 };
 
 const JOB_ALIASES = {
@@ -856,29 +859,113 @@ async function loadBillPDFs() {
 async function syncAll() {
   const btn = document.getElementById('sync-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
-  showToast('Syncing from Google Sheet...');
+  showToast('Syncing...');
   try {
-    await Promise.all([fetchRawData(), fetchBillData()]);
+    // Fetch Google Sheet PO data + email-extracted POs in parallel
+    await Promise.all([fetchRawData(), loadEmailPOs(), loadNewJobAlerts()]);
     S.lastSync = new Date().toISOString();
     localStorage.setItem('dw_last_sync', S.lastSync);
     const lsl = document.getElementById('last-sync-label'); if(lsl) lsl.textContent = 'Last sync: ' + new Date().toLocaleTimeString();
-    const smi = document.getElementById('sheet-status-mini'); if(smi){smi.textContent='✓ Connected · '+S.rows.length+' PO rows';smi.className='sheet-status ok';}
+    const smi = document.getElementById('sheet-status-mini'); if(smi){smi.textContent='✓ ' + S.rows.length + ' PO rows · ' + (S.emailPOs?.length||0) + ' email POs';smi.className='sheet-status ok';}
     const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--green)';
     populateJobSelects(); updateInboxBadge();
-    showToast('✓ Synced — ' + S.rows.length + ' PO rows, ' + S.bills.length + ' bills (' + (S.billPDFs?.length||0) + ' from QBO)');
+    showToast('✓ Synced — ' + S.rows.length + ' sheet rows · ' + (S.emailPOs?.length||0) + ' email POs');
   } catch(e) {
     showToast('⚠️ Sync failed: ' + e.message, true);
     const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--red)';
   }
   btn.disabled = false; btn.innerHTML = '⟳';
-  if (S.rows.length > 0) {
-    try { populateJobSelects(); } catch(e) {}
-    try { updateInboxBadge(); } catch(e) {}
-    const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
-    if (activePage === 'home') try { renderHome(); } catch(e) {}
-    else if (activePage === 'dashboard') try { renderDashboard(); } catch(e) {}
-    else if (activePage === 'jobs') try { if(_currentJob) onJobSelect(); } catch(e) {}
+  try { populateJobSelects(); } catch(e) {}
+  try { updateInboxBadge(); } catch(e) {}
+  const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
+  if (activePage === 'home') try { renderHome(); } catch(e) {}
+  else if (activePage === 'dashboard') try { renderDashboard(); } catch(e) {}
+  else if (activePage === 'inbox') try { renderInbox(); } catch(e) {}
+  else if (activePage === 'jobs') try { if(_currentJob) onJobSelect(); } catch(e) {}
+}
+
+// Load email-extracted POs from Supabase po_pdfs table
+async function loadEmailPOs() {
+  try {
+    const res = await fetch(SB_URL + '/rest/v1/po_pdfs?order=created_at.desc&limit=200&select=id,po_number,vendor,job_name,building,floor,unit,model,ship_date,lines,total,status,source,raw_text,created_at', {
+      headers: { 'apikey': SB_KEY }
+    });
+    const rows = await res.json();
+    S.emailPOs = Array.isArray(rows) ? rows : [];
+    // Check for any needs_review items to badge the inbox
+    S._pendingNewJobs = S.emailPOs.filter(p => p.status === 'needs_review').length;
+  } catch(e) { console.warn('loadEmailPOs failed:', e); S.emailPOs = []; }
+}
+
+// Load new job alerts from app_data
+async function loadNewJobAlerts() {
+  try {
+    const alerts = await sbGet('new_job_alerts');
+    S.newJobAlerts = Array.isArray(alerts) ? alerts.filter(a => !a.resolved) : [];
+    renderNewJobAlertBanner();
+  } catch(e) { S.newJobAlerts = []; }
+}
+
+function renderNewJobAlertBanner() {
+  const alerts = (S.newJobAlerts || []).filter(a => !a.resolved);
+  const banner = document.getElementById('new-job-alert-banner');
+  if (!banner) return;
+  if (!alerts.length) { banner.style.display = 'none'; return; }
+  banner.style.display = 'block';
+  banner.innerHTML = alerts.map(a => `
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);border-radius:10px;margin-bottom:8px;">
+      <span style="font-size:18px;">🆕</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:13px;color:var(--yellow);">New Job Detected: "${esc(a.job_name)}"</div>
+        <div style="font-size:12px;color:var(--ink3);">From PO #${esc(a.po_number||'?')} · ${esc(a.vendor||'')} · ${new Date(a.created_at).toLocaleDateString()}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="createJobFromAlert('${jsesc(a.id)}','${jsesc(a.job_name)}','${jsesc(a.po_id||'')}')">✓ Create Job</button>
+        <button class="btn btn-ghost btn-sm" onclick="assignAlertToExisting('${jsesc(a.id)}','${jsesc(a.job_name)}','${jsesc(a.po_id||'')}')">↳ Assign to Existing</button>
+        <button class="btn btn-ghost btn-sm" onclick="dismissJobAlert('${jsesc(a.id)}')">✕ Dismiss</button>
+      </div>
+    </div>`).join('');
+}
+
+async function createJobFromAlert(alertId, jobName, poId) {
+  const name = jobName.trim(); if (!name) return;
+  if (!S.jobs.includes(name)) {
+    S.jobs.push(name);
+    await saveSharedData('jobs');
+    populateJobSelects();
+    // Also add to Supabase jobs table
+    try {
+      await fetch(SB_URL + '/rest/v1/jobs', { method:'POST', headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'}, body:JSON.stringify({name,active:true}) });
+    } catch(e) { console.warn('jobs table insert failed:', e); }
   }
+  if (poId) {
+    await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + poId, { method:'PATCH', headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'}, body:JSON.stringify({status:'pending',job_name:name}) });
+  }
+  await dismissJobAlert(alertId);
+  showToast('✓ Job "' + name + '" created — set it up in Jobs tab');
+}
+
+async function assignAlertToExisting(alertId, rawJobName, poId) {
+  const jobs = getJobs();
+  const sel = prompt('Assign "' + rawJobName + '" to which existing job?\n\n' + jobs.map((j,i) => (i+1)+'. '+j).join('\n') + '\n\nEnter job name exactly:');
+  if (!sel) return;
+  const match = jobs.find(j => j === sel || j.toUpperCase() === sel.toUpperCase());
+  if (!match) { showToast('Job not found — check spelling', true); return; }
+  if (poId) {
+    await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + poId, { method:'PATCH', headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'}, body:JSON.stringify({status:'pending',job_name:match}) });
+  }
+  await dismissJobAlert(alertId);
+  showToast('✓ PO reassigned to ' + match);
+}
+
+async function dismissJobAlert(alertId) {
+  const allAlerts = await sbGet('new_job_alerts') || [];
+  const updated = allAlerts.map(a => a.id === alertId ? {...a, resolved:true} : a);
+  await sbSet('new_job_alerts', updated);
+  S.newJobAlerts = (S.newJobAlerts||[]).filter(a => a.id !== alertId);
+  renderNewJobAlertBanner();
+  await loadEmailPOs();
+  renderActivityFeed();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -928,9 +1015,12 @@ function openJobFromAnywhere(job, tab) {
   if (tab) setTimeout(() => switchJobTab(tab), 50);
 }
 function updateInboxBadge() {
-  const unmatched = S.bills.filter(b => { const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim(); return inv && !S.billAssignments[inv]; }).length;
+  const unmatchedBills = S.bills.filter(b => { const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim(); return inv && !S.billAssignments[inv]; }).length;
+  const needsReviewPOs = (S.emailPOs||[]).filter(p => p.status === 'needs_review').length;
+  const newJobAlerts = (S.newJobAlerts||[]).length;
+  const total = unmatchedBills + needsReviewPOs + newJobAlerts;
   const badge = document.getElementById('inbox-badge');
-  if (badge) badge.style.display = unmatched > 0 ? 'block' : 'none';
+  if (badge) badge.style.display = total > 0 ? 'block' : 'none';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1030,6 +1120,53 @@ function getFeedBillGroups() {
 
 function renderActivityFeed() {
   const el = document.getElementById('activity-feed'); if (!el) return;
+
+  // ── Section 1: Email-extracted POs (from Resend → extract-po edge function) ──
+  const emailPOs = S.emailPOs || [];
+  let emailHtml = '';
+  if (emailPOs.length) {
+    emailHtml += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📧 Email-Extracted POs</div>`;
+    emailPOs.slice(0,30).forEach(p => {
+      const isNew = p.status === 'needs_review';
+      const isConfirmed = p.status === 'confirmed';
+      const isDupe = p.status === 'duplicate';
+      const statusBadge = isNew
+        ? '<span class="badge badge-yellow">⚠ Needs Review</span>'
+        : isConfirmed
+          ? '<span class="badge badge-green">✓ Confirmed</span>'
+          : isDupe
+            ? '<span class="badge badge-red">Duplicate</span>'
+            : '<span class="badge badge-blue">Pending</span>';
+      const src = p.source?.startsWith('email') ? '📧' : '📄';
+      const date = p.created_at ? new Date(p.created_at).toLocaleDateString() : '';
+      // Extract match reason from raw_text prefix
+      const matchLine = (p.raw_text||'').match(/^\[MATCH: ([^\]]+)\]/);
+      const matchReason = matchLine ? matchLine[1] : '';
+      const dotColor = isNew ? 'var(--yellow)' : isConfirmed ? 'var(--green)' : isDupe ? 'var(--red)' : 'var(--blue)';
+      const lines = Array.isArray(p.lines) ? p.lines : [];
+      emailHtml += `<div class="feed-item" data-type="emailpo" data-id="${esc(p.id)}" style="cursor:pointer;">
+        <div class="feed-dot" style="background:${dotColor};margin-top:6px;"></div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-weight:700;font-size:13px;">${src} PO #${esc(p.po_number||'?')}</span>
+            ${statusBadge}
+          </div>
+          <div style="font-size:12px;color:var(--ink2);margin-top:2px;">
+            ${esc(p.vendor||'Unknown vendor')}${p.job_name ? ' · <strong style="color:var(--ink);">' + esc(p.job_name) + '</strong>' : ' · <span style="color:var(--yellow);">No job</span>'}${p.building ? ' · Bldg '+esc(p.building) : ''}${p.floor ? ' · Fl '+esc(p.floor) : ''}
+          </div>
+          ${matchReason ? '<div style="font-size:11px;color:var(--ink3);margin-top:2px;">🔍 ' + esc(matchReason) + '</div>' : ''}
+          <div style="font-size:11px;color:var(--ink3);">${date} · ${lines.length} line${lines.length!==1?'s':''}</div>
+        </div>
+        <div style="text-align:right;white-space:nowrap;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+          <div style="font-weight:700;font-size:14px;color:var(--accent);">${fmt(p.total)}</div>
+          ${!isConfirmed ? '<button onclick="event.stopPropagation();openEmailPOReview(\''+esc(p.id)+'\')" class="btn btn-primary btn-sm">Review →</button>' : '<button onclick="event.stopPropagation();openEmailPOReview(\''+esc(p.id)+'\')" class="btn btn-ghost btn-sm">✏ Edit</button>'}
+        </div>
+      </div>`;
+    });
+    emailHtml += '<div class="divider"></div>';
+  }
+
+  // ── Section 2: Google Sheet POs ──
   const poGroups = getFeedPOGroups();
   const billGroups = getFeedBillGroups();
   const items = [];
@@ -1044,47 +1181,144 @@ function renderActivityFeed() {
     items.push({type:'bill', id:g.inv, job:g.job, vendor:g.vendor, total:g.total, matched, isLabor, rows:g.rows});
   });
 
-  if (!items.length) { el.innerHTML = '<div class="no-data">No data yet. Click ⟳ Sync to pull from your Google Sheet.</div>'; return; }
+  if (!emailPOs.length && !items.length) {
+    el.innerHTML = '<div class="no-data">No data yet. Email a PO PDF to po@aadrywalltracker.com or click ⟳ Sync.</div>';
+    return;
+  }
 
   const selType = S.feedSelection?.type || null;
-  let html = '';
-  items.forEach(item => {
-    const dotColor = item.type === 'po' ? (item.assigned ? 'var(--green)' : 'var(--blue)') : (item.matched ? 'var(--green)' : 'var(--yellow)');
-    const label = item.type === 'po' ? 'PO #' + item.id : 'Bill #' + item.id;
-    const status = item.type === 'po' ? (item.assigned ? '<span class="badge badge-green">Assigned</span>' : '<span class="badge badge-blue">New</span>') :
-      (item.matched ? '<span class="badge badge-green">Matched</span>' : '<span class="badge badge-yellow">Needs Match</span>');
-    const boardsBadge = item.boards > 0 ? ' <span class="badge badge-blue">' + Math.round(item.boards) + ' boards</span>' : '';
-
-    html += `<div class="feed-item" data-type="${item.type}" data-id="${esc(item.id)}">
-      ${selType === item.type ? '<input type="checkbox" class="feed-cb" data-id="' + esc(item.id) + '" style="margin-right:6px;accent-color:var(--accent);cursor:pointer;" onclick="event.stopPropagation();updateFeedSelection()"/>' : ''}
-      <div class="feed-dot" style="background:${dotColor};"></div>
-      <div style="flex:1;min-width:0;">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-weight:700;font-size:13px;">${label}</span>
-          ${status}${boardsBadge}
+  let sheetHtml = '';
+  if (items.length) {
+    sheetHtml += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📊 Sheet POs</div>`;
+    items.forEach(item => {
+      const dotColor = item.type === 'po' ? (item.assigned ? 'var(--green)' : 'var(--blue)') : (item.matched ? 'var(--green)' : 'var(--yellow)');
+      const label = item.type === 'po' ? 'PO #' + item.id : 'Bill #' + item.id;
+      const status = item.type === 'po' ? (item.assigned ? '<span class="badge badge-green">Assigned</span>' : '<span class="badge badge-blue">New</span>') :
+        (item.matched ? '<span class="badge badge-green">Matched</span>' : '<span class="badge badge-yellow">Needs Match</span>');
+      const boardsBadge = item.boards > 0 ? ' <span class="badge badge-blue">' + Math.round(item.boards) + ' boards</span>' : '';
+      sheetHtml += `<div class="feed-item" data-type="${item.type}" data-id="${esc(item.id)}">
+        ${selType === item.type ? '<input type="checkbox" class="feed-cb" data-id="' + esc(item.id) + '" style="margin-right:6px;accent-color:var(--accent);cursor:pointer;" onclick="event.stopPropagation();updateFeedSelection()"/>' : ''}
+        <div class="feed-dot" style="background:${dotColor};"></div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-weight:700;font-size:13px;">${label}</span>
+            ${status}${boardsBadge}
+          </div>
+          <div style="font-size:12px;color:var(--ink2);margin-top:2px;">
+            ${esc(item.vendor)}${item.job ? ' · ' + esc(item.job.replace('JOB ','')) : ''}${item.building ? ' · Bldg ' + esc(item.building) : ''}${item.floor ? ' · Fl ' + esc(item.floor) : ''}
+          </div>
         </div>
-        <div style="font-size:12px;color:var(--ink2);margin-top:2px;">
-          ${esc(item.vendor)}${item.job ? ' · ' + esc(item.job.replace('JOB ','')) : ''}${item.building ? ' · Bldg ' + esc(item.building) : ''}${item.floor ? ' · Fl ' + esc(item.floor) : ''}
+        <div style="text-align:right;white-space:nowrap;">
+          <div style="font-weight:700;">${fmt(item.total)}</div>
+          <div style="font-size:10px;color:var(--ink3);">${item.rows.length} lines</div>
         </div>
-      </div>
-      <div style="text-align:right;white-space:nowrap;">
-        <div style="font-weight:700;">${fmt(item.total)}</div>
-        <div style="font-size:10px;color:var(--ink3);">${item.rows.length} lines</div>
-      </div>
-    </div>`;
-  });
-  el.innerHTML = html;
+      </div>`;
+    });
+  }
 
-  // FIX #1: Attach click listener to each .feed-item div (whole row clickable)
+  el.innerHTML = emailHtml + sheetHtml;
+
   el.querySelectorAll('.feed-item').forEach(div => {
     div.addEventListener('click', function(e) {
-      if (e.target.classList.contains('feed-cb')) return; // checkbox click handled separately
+      if (e.target.classList.contains('feed-cb') || e.target.tagName === 'BUTTON') return;
       const type = this.dataset.type;
       const id = this.dataset.id;
-      if (type === 'po') openPODetailModal(id);
+      if (type === 'emailpo') openEmailPOReview(id);
+      else if (type === 'po') openPODetailModal(id);
       else if (type === 'bill') openSmartBillModal(id);
     });
   });
+}
+
+// Open a review modal for an email-extracted PO
+async function openEmailPOReview(id) {
+  try {
+    const res = await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + id + '&select=*', { headers:{'apikey':SB_KEY} });
+    const rows = await res.json(); if (!rows.length) return;
+    const p = rows[0];
+    const jobs = getJobs();
+    const matchLine = (p.raw_text||'').match(/^\[MATCH: ([^\]]+)\]/);
+    const matchReason = matchLine ? matchLine[1] : 'no match info';
+    const rawJob = p.job_name || '';
+    const lines = Array.isArray(p.lines) ? p.lines : [];
+
+    document.getElementById('po-modal-title').innerHTML = '📧 Email PO Review — #' + esc(p.po_number||'?');
+    document.getElementById('po-modal-body').innerHTML = `
+      <div class="alert alert-b" style="margin-bottom:14px;">
+        <strong>🔍 Auto-match:</strong> ${esc(matchReason)}
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>PO Number</label><input id="epr-po" class="inp" value="${esc(p.po_number||'')}"/></div>
+        <div class="form-group"><label>Vendor</label><input id="epr-vendor" class="inp" value="${esc(p.vendor||'')}"/></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Job ${p.status==='needs_review'?'<span style="color:var(--yellow);">⚠ Unrecognized</span>':''}</label>
+          <select id="epr-job" class="inp">
+            <option value="">— select job —</option>
+            ${jobs.map(j => '<option value="'+esc(j)+'"'+(j===rawJob||j.toUpperCase()===rawJob.toUpperCase()?' selected':'')+'>'+esc(j.replace('JOB ',''))+'</option>').join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Building</label><input id="epr-bldg" class="inp" value="${esc(p.building||'')}"/></div>
+        <div class="form-group"><label>Floor</label><input id="epr-floor" class="inp" value="${esc(p.floor||'')}"/></div>
+        <div class="form-group"><label>Unit</label><input id="epr-unit" class="inp" value="${esc(p.unit||'')}"/></div>
+      </div>
+      ${p.status==='needs_review' ? '<div style="margin-bottom:12px;"><button class="btn btn-primary btn-sm" onclick="createJobFromReview()">✓ Create "'+esc(rawJob)+'" as new job</button></div>' : ''}
+      <div style="overflow-x:auto;margin-bottom:4px;"><table class="tbl" style="font-size:12px;"><thead><tr><th>Description</th><th class="tbl-r">Qty</th><th class="tbl-r">Rate</th><th class="tbl-r">Amount</th></tr></thead>
+      <tbody>${lines.map((l,i) => '<tr style="background:'+(i%2?'var(--surface2)':'')+'"><td>'+esc(l.description||l.sku||'')+'</td><td class="tbl-r">'+(l.qty||'')+'</td><td class="tbl-r">'+(l.rate?fmt(l.rate):'')+'</td><td class="tbl-r" style="font-weight:700;">'+(l.amount?fmt(l.amount):'')+'</td></tr>').join('')}</tbody>
+      <tfoot><tr><td colspan="3" style="padding:8px 12px;font-weight:700;">TOTAL</td><td class="tbl-r" style="font-weight:800;color:var(--accent);">${fmt(p.total)}</td></tr></tfoot></table></div>
+      <div style="font-size:11px;color:var(--ink3);margin-top:4px;">Source: ${esc(p.source||'')} · Received: ${p.created_at?new Date(p.created_at).toLocaleString():''}</div>`;
+
+    window._eprId = id;
+    window._eprRawJob = rawJob;
+    document.getElementById('po-modal-footer').innerHTML = `
+      <button class="btn btn-danger btn-sm" onclick="deletePORecord('${esc(id)}','${esc(p.po_number||'')}')">🗑 Delete</button>
+      <button class="btn btn-ghost" onclick="closeModal('po-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmEmailPO('${esc(id)}')">✓ Verify & Add to Tracker</button>`;
+    document.getElementById('po-modal').classList.add('open');
+  } catch(err) { showToast('Error loading PO: ' + err.message, true); }
+}
+
+function createJobFromReview() {
+  const rawJob = window._eprRawJob || '';
+  if (!rawJob) return;
+  if (!S.jobs.includes(rawJob)) {
+    S.jobs.push(rawJob);
+    saveSharedData('jobs');
+    fetch(SB_URL + '/rest/v1/jobs', { method:'POST', headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'}, body:JSON.stringify({name:rawJob,active:true}) }).catch(()=>{});
+    populateJobSelects();
+  }
+  const sel = document.getElementById('epr-job');
+  if (sel) { const opt = document.createElement('option'); opt.value=rawJob; opt.textContent=rawJob; opt.selected=true; sel.appendChild(opt); }
+  showToast('✓ Job "' + rawJob + '" created — click Verify to confirm PO');
+}
+
+async function confirmEmailPO(id) {
+  const job = document.getElementById('epr-job')?.value;
+  if (!job) { showToast('Select a job first', true); return; }
+  const poNum = document.getElementById('epr-po')?.value || '';
+  const bldg = document.getElementById('epr-bldg')?.value || '';
+  const floor = document.getElementById('epr-floor')?.value || '';
+  const unit = document.getElementById('epr-unit')?.value || '';
+  const vendor = document.getElementById('epr-vendor')?.value || '';
+
+  // Patch the po_pdfs record
+  await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + id, {
+    method:'PATCH',
+    headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({status:'confirmed', job_name:job, building:bldg, floor, unit, po_number:poNum, vendor})
+  });
+
+  // Also save to assignments for dashboard/job view compatibility
+  if (poNum) {
+    S.assignments[poNum] = {job, building:bldg, floor, unit, vendor, manual:true, date:new Date().toISOString().split('T')[0]};
+    await saveSharedData('assignments');
+  }
+
+  closeModal('po-modal');
+  await loadEmailPOs();
+  renderActivityFeed();
+  updateInboxBadge();
+  showToast('✓ PO #' + poNum + ' verified → ' + job.replace('JOB ',''));
 }
 
 function feedSelectedIds(type) {
@@ -1280,7 +1514,7 @@ function renderDashCharts(jobData) {
 // INBOX (FIX #7: includes PDF extractions tab)
 // ═══════════════════════════════════════════════════════════
 function renderInbox() {
-  const activeTab = document.querySelector('#inbox-tabs .tab-btn.active')?.dataset?.tab || 'bills';
+  const activeTab = document.querySelector('#inbox-tabs .tab-btn.active')?.dataset?.tab || 'review';
   switchInboxTab(activeTab);
 }
 function switchInboxTab(tab) {
@@ -1292,30 +1526,74 @@ function switchInboxTab(tab) {
   else if (tab === 'pdfs') renderInboxPDFs();
 }
 function renderInboxBills() {
+  // "Bills" tab now shows email-extracted POs needing review (needs_review status)
   const el = document.getElementById('inbox-tab-bills'); if (!el) return;
-  const unmatched = S.bills.filter(b => { const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim(); return inv && !S.billAssignments[inv]; });
-  const groups = {};
-  unmatched.forEach(b => { const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim(); if (!groups[inv]) groups[inv]={inv, vendor:b['VENDOR']||'', job:b['_customer_job']||b['JOB']||'', rows:[], total:0, fromSB:!!b['_sb_source']}; groups[inv].rows.push(b); groups[inv].total += parseFloat(b['LINE TOTAL']||0); if (b['_customer_job'] && !groups[inv].job) groups[inv].job=b['_customer_job']; });
-  const list = Object.values(groups);
-  if (!list.length) { el.innerHTML = '<div class="alert alert-g">All bills matched! 🎉</div>'; return; }
-  let html = `<div style="margin-bottom:10px;font-size:12px;color:var(--ink3);">${list.length} unmatched bills</div>`;
-  list.forEach(g => {
-    const isLabor = isLaborVendor(g.vendor);
-    const jobTag = g.job ? ` · <span style="color:var(--green);font-weight:700;">${esc(g.job.replace('JOB ',''))}</span>` : ' · <span style="color:var(--yellow);">No job</span>';
-    const srcBadge = g.fromSB ? '<span style="font-size:9px;background:rgba(52,211,153,.15);color:var(--green);padding:1px 5px;border-radius:4px;font-weight:700;margin-right:4px;">QBO</span>' : '';
-    html += `<div class="feed-item" style="cursor:pointer;" onclick="openSmartBillModal('${jsesc(g.inv)}')">
-      <div class="feed-dot" style="background:${isLabor?'var(--purple)':'var(--yellow)'};"></div>
-      <div style="flex:1;"><div style="font-weight:700;">${srcBadge}${isLabor?'🔧':'📦'} Bill #${esc(g.inv)}</div><div style="font-size:12px;color:var(--ink2);">${esc(g.vendor)}${jobTag} · ${g.rows.length} lines</div></div>
-      <div style="font-weight:700;">${fmt(g.total)}</div>
-    </div>`
-  });
+  const review = (S.emailPOs||[]).filter(p => p.status === 'needs_review' || p.status === 'pending');
+  const newJobAlerts = (S.newJobAlerts||[]);
+
+  let html = '';
+
+  // New job alerts section
+  if (newJobAlerts.length) {
+    html += `<div style="margin-bottom:16px;">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--yellow);margin-bottom:8px;">🆕 New Job Alerts (${newJobAlerts.length})</div>
+      <div id="new-job-alert-banner-inbox"></div>
+    </div>`;
+  }
+
+  // Email POs needing review
+  if (!review.length && !newJobAlerts.length) {
+    html += '<div class="alert alert-g">✓ All clear — no POs need review.</div>';
+  } else if (review.length) {
+    html += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);margin-bottom:10px;">📧 Email POs — ${review.length} need review</div>`;
+    review.forEach(p => {
+      const isNewJob = p.status === 'needs_review';
+      const matchLine = (p.raw_text||'').match(/^\[MATCH: ([^\]]+)\]/);
+      const matchReason = matchLine ? matchLine[1] : '';
+      html += `<div class="feed-item" style="cursor:pointer;" onclick="openEmailPOReview('${esc(p.id)}')">
+        <div class="feed-dot" style="background:${isNewJob?'var(--yellow)':'var(--blue)'};"></div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-weight:700;">📧 PO #${esc(p.po_number||'?')}</span>
+            ${isNewJob ? '<span class="badge badge-yellow">⚠ New Job</span>' : '<span class="badge badge-blue">Pending</span>'}
+          </div>
+          <div style="font-size:12px;color:var(--ink2);">${esc(p.vendor||'?')} · ${p.job_name ? '<strong>'+esc(p.job_name)+'</strong>' : '<span style="color:var(--yellow);">No job detected</span>'}</div>
+          ${matchReason ? '<div style="font-size:11px;color:var(--ink3);">🔍 '+esc(matchReason)+'</div>' : ''}
+        </div>
+        <div style="text-align:right;">
+          <div style="font-weight:700;">${fmt(p.total)}</div>
+          <button class="btn btn-primary btn-sm" style="margin-top:4px;" onclick="event.stopPropagation();openEmailPOReview('${esc(p.id)}')">Review →</button>
+        </div>
+      </div>`;
+    });
+  }
+
   el.innerHTML = html;
+
+  // Render new job alerts in inbox
+  if (newJobAlerts.length) {
+    const alertEl = document.getElementById('new-job-alert-banner-inbox');
+    if (alertEl) {
+      alertEl.innerHTML = newJobAlerts.map(a => `
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);border-radius:10px;margin-bottom:8px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:13px;color:var(--yellow);">"${esc(a.job_name)}"</div>
+            <div style="font-size:12px;color:var(--ink3);">PO #${esc(a.po_number||'?')} · ${esc(a.vendor||'')} · ${new Date(a.created_at).toLocaleDateString()}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="createJobFromAlert('${jsesc(a.id)}','${jsesc(a.job_name)}','${jsesc(a.po_id||'')}')">✓ Create Job</button>
+            <button class="btn btn-ghost btn-sm" onclick="assignAlertToExisting('${jsesc(a.id)}','${jsesc(a.job_name)}','${jsesc(a.po_id||'')}')">↳ Assign to Existing</button>
+            <button class="btn btn-ghost btn-sm" onclick="dismissJobAlert('${jsesc(a.id)}')">✕</button>
+          </div>
+        </div>`).join('');
+    }
+  }
 }
 function renderInboxPOs() {
   const el = document.getElementById('inbox-tab-pos'); if (!el) return;
   const unassigned = getFeedPOGroups().filter(g => !S.assignments[g.po]);
-  if (!unassigned.length) { el.innerHTML = '<div class="alert alert-g">All POs assigned! 🎉</div>'; return; }
-  let html = `<div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--ink3);">${unassigned.length} unassigned POs</span><button class="btn btn-ghost btn-sm" onclick="startFeedSelect('po');nav('home')">Multi-select</button></div>`;
+  if (!unassigned.length) { el.innerHTML = '<div class="alert alert-g">All sheet POs assigned! 🎉</div>'; return; }
+  let html = `<div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--ink3);">${unassigned.length} unassigned sheet POs</span><button class="btn btn-ghost btn-sm" onclick="startFeedSelect('po');nav('home')">Multi-select</button></div>`;
   unassigned.forEach(g => {
     html += `<div class="feed-item" style="cursor:pointer;" onclick="openPODetailModal('${jsesc(g.po)}')">
       <div class="feed-dot" style="background:var(--blue);"></div>
@@ -2638,6 +2916,7 @@ async function init() {
   await loadSharedData();
   loadBackfillData(); // load backfill in background (don't await — non-blocking)
   populateJobSelects();
+  await Promise.all([loadEmailPOs(), loadNewJobAlerts()]);
   syncAll();
   renderHome();
 }
