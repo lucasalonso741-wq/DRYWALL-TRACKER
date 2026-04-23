@@ -221,6 +221,18 @@ a{color:var(--accent);}
   #sidebar{position:fixed;top:0;left:0;height:100vh;}
   #main{margin-left:var(--sidebar-w);}
 }
+/* Details/summary collapsible polish */
+details>summary{user-select:none;}
+details>summary::-webkit-details-marker{display:none;}
+details>summary::marker{display:none;}
+details[open]>summary span:last-child{transform:rotate(90deg);}
+details>summary span:last-child{transition:transform .18s;}
+/* AI panel drag cursor */
+#ai-panel>div:first-child{user-select:none;}
+/* PO card hover */
+details[style*="border-radius:10px"]:hover{border-color:var(--accent)!important;transition:border-color .15s;}
+/* Raw data filter */
+#raw-po-filter{min-width:140px;}
 </style>
 </head>
 <body>
@@ -1094,9 +1106,38 @@ function renderSettings() {
         <button class="btn btn-danger btn-sm" onclick="removeLogo()">Remove</button>
       </div>
     </div></div>
-    <div class="card"><div class="card-hdr"><span class="card-title">AI Chat Key</span></div><div class="card-body">
+    <div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">🏷 Material Keywords</span><span style="font-size:12px;color:var(--ink3);">Custom words → category rules</span></div><div class="card-body">
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;">Add keywords so the system auto-categorizes materials. Matching is case-insensitive and checks if the description <em>contains</em> the keyword.</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <input id="kw-word" class="inp inp-sm" placeholder="keyword (e.g. SHEETROCK)" style="max-width:200px;"/>
+        <select id="kw-cat" class="inp inp-sm" style="max-width:160px;">
+          <option value="boards">Boards/Drywall</option>
+          <option value="metal">Metal Framing</option>
+          <option value="finish">Finish/Compound</option>
+          <option value="supplies">Supplies/Fasteners</option>
+          <option value="labor">Labor</option>
+          <option value="tax">Tax</option>
+          <option value="other">Other</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="addKeyword()">+ Add Rule</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <input id="kw-test" class="inp inp-sm" placeholder="Test description — e.g. 5/8 DENS GOLD TYPE X" style="flex:1;max-width:340px;"/>
+        <button class="btn btn-ghost btn-sm" onclick="testKeyword()">▶ Test</button>
+        <span id="kw-test-result" style="font-size:12px;padding:5px 10px;border-radius:6px;background:var(--surface3);display:none;"></span>
+      </div>
+      <div id="kw-list" style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${Object.entries(S.materialMap||{}).slice(0,40).map(([k,v]) => `<span style="display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:12px;"><span style="font-weight:600;">${esc(k)}</span><span style="color:var(--ink3);">→ ${esc(v)}</span><button onclick="deleteKeyword('${jsesc(k)}')" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:11px;padding:0 2px;">✕</button></span>`).join('')}
+        ${Object.keys(S.materialMap||{}).length === 0 ? '<span style="font-size:12px;color:var(--ink3);">No custom rules yet</span>' : ''}
+      </div>
+    </div></div>
+    <div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">AI Chat Key</span></div><div class="card-body">
       <div style="font-size:12px;color:var(--ink3);margin-bottom:8px;">Optional Anthropic API key for AI assistant</div>
       <div style="display:flex;gap:8px;"><input id="ai-key-input" class="inp inp-sm" type="password" value="${S.aiKey||''}" placeholder="sk-ant-..." style="max-width:320px;"/><button class="btn btn-ghost btn-sm" onclick="saveAiKey()">Save</button></div>
+    </div></div>
+    <div class="card" style="border-color:rgba(248,113,113,.3);"><div class="card-hdr" style="background:rgba(248,113,113,.06);"><span class="card-title" style="color:var(--red);">⚠ Danger Zone</span></div><div class="card-body">
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;">Permanently deletes all extracted PO records from Supabase and clears assignments. Use this to start fresh. <strong style="color:var(--red);">This cannot be undone.</strong></div>
+      <button class="btn btn-danger btn-sm" onclick="confirmDataReset()">🗑 Reset All PO Data</button>
     </div></div>`;
 }
 function addJob() {
@@ -1115,6 +1156,45 @@ function renameJob(old) {
 }
 function saveSheetId() { S.sheetId = document.getElementById('sheet-id-input')?.value.trim()||''; showToast('✓ Sheet ID saved — click Sync'); }
 function saveAiKey() { S.aiKey = document.getElementById('ai-key-input')?.value.trim()||''; showToast('✓ AI key saved'); }
+async function addKeyword() {
+  const word = (document.getElementById('kw-word')?.value||'').trim().toUpperCase();
+  const cat = document.getElementById('kw-cat')?.value||'other';
+  if (!word) { showToast('Enter a keyword first', true); return; }
+  if (!S.materialMap) S.materialMap = {};
+  S.materialMap[word] = cat;
+  await saveSharedData('materialMap');
+  document.getElementById('kw-word').value = '';
+  renderSettings();
+  showToast('✓ Keyword "' + word + '" → ' + cat);
+}
+async function deleteKeyword(key) {
+  if (!S.materialMap) return;
+  delete S.materialMap[key];
+  await saveSharedData('materialMap');
+  renderSettings();
+  showToast('Removed: ' + key);
+}
+function testKeyword() {
+  const desc = document.getElementById('kw-test')?.value||'';
+  if (!desc) return;
+  const cat = categorize(desc);
+  const el = document.getElementById('kw-test-result');
+  if (el) { el.style.display='inline-block'; el.textContent='→ ' + cat; el.style.background = {boards:'rgba(79,142,247,.18)',metal:'rgba(251,191,36,.18)',finish:'rgba(52,211,153,.18)',supplies:'rgba(167,139,250,.18)',labor:'rgba(255,107,53,.18)',tax:'rgba(248,113,113,.18)',other:'var(--surface3)'}[cat]||'var(--surface3)'; }
+}
+async function confirmDataReset() {
+  if (!confirm('DELETE all extracted PO records and clear all assignments?\n\nThis will:\n• Delete every record in po_pdfs\n• Clear assignments, actuals, billAssignments\n\nJob names and estimates are kept.\n\nType RESET to confirm or cancel.')) return;
+  const typed = prompt('Type RESET to confirm:');
+  if (typed !== 'RESET') { showToast('Reset cancelled'); return; }
+  showToast('Resetting...');
+  try {
+    await fetch(SB_URL + '/rest/v1/po_pdfs?id=gt.0', { method:'DELETE', headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY} }).catch(()=>{});
+    await fetch(SB_URL + '/rest/v1/po_pdfs', { method:'DELETE', headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'} }).catch(()=>{});
+    S.assignments = {}; S.actuals = {}; S.billAssignments = {}; S.emailPOs = [];
+    await Promise.all([saveSharedData('assignments'), saveSharedData('actuals'), saveSharedData('billAssignments')]);
+    renderActivityFeed(); updateInboxBadge(); renderSettings();
+    showToast('✓ Data reset complete — starting fresh');
+  } catch(e) { showToast('Reset failed: ' + e.message, true); }
+}
 // ═══════════════════════════════════════════════════════════
 // HOME — ACTIVITY FEED (FIX #1: whole row clickable)
 // ═══════════════════════════════════════════════════════════
@@ -1274,28 +1354,37 @@ async function confirmEmailPO(id) {
   if (!job) { showToast('Select a job first', true); return; }
   const poNum = document.getElementById('epr-po')?.value || '';
   const bldg = document.getElementById('epr-bldg')?.value || '';
-  const floor = document.getElementById('epr-floor')?.value || '';
-  const unit = document.getElementById('epr-unit')?.value || '';
+  const floorVal = document.getElementById('epr-floor')?.value || '';
+  const unitVal = document.getElementById('epr-unit')?.value || '';
   const vendor = document.getElementById('epr-vendor')?.value || '';
 
-  // Patch the po_pdfs record
-  await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + id, {
-    method:'PATCH',
-    headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
-    body:JSON.stringify({status:'confirmed', job_name:job, building:bldg, floor, unit, po_number:poNum, vendor})
-  });
+  // Patch the po_pdfs record with full error handling
+  try {
+    const res = await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + id, {
+      method:'PATCH',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'confirmed', job_name:job, building:bldg, floor:floorVal, unit:unitVal, po_number:poNum, vendor})
+    });
+    if (!res.ok) { showToast('Save failed — server returned ' + res.status, true); return; }
+  } catch(e) { showToast('Network error: ' + e.message, true); return; }
 
-  // Also save to assignments for dashboard/job view compatibility
+  // Immediately update S.emailPOs in memory so UI responds without re-fetch
+  const memIdx = S.emailPOs.findIndex(p => p.id === id);
+  if (memIdx >= 0) {
+    S.emailPOs[memIdx] = {...S.emailPOs[memIdx], status:'confirmed', job_name:job, building:bldg, floor:floorVal, unit:unitVal, po_number:poNum, vendor};
+  }
+
+  // Save to assignments for cross-tab compatibility
   if (poNum) {
-    S.assignments[poNum] = {job, building:bldg, floor, unit, vendor, manual:true, date:new Date().toISOString().split('T')[0]};
+    S.assignments[poNum] = {job, building:bldg, floor:floorVal, unit:unitVal, vendor, manual:true, date:new Date().toISOString().split('T')[0], total: memIdx >= 0 ? (S.emailPOs[memIdx].total||0) : 0};
     await saveSharedData('assignments');
   }
 
   closeModal('po-modal');
-  await loadEmailPOs();
   renderActivityFeed();
   updateInboxBadge();
-  showToast('✓ PO #' + poNum + ' verified → ' + job.replace('JOB ',''));
+  if (_currentJob === job) { renderJobPPBCards(job); if (document.querySelector('#jobs-content .tab-btn.active')?.dataset?.tab === 'map') setMapView(_jobMapView); }
+  showToast('✓ PO #' + (poNum||'?') + ' confirmed → ' + job.replace('JOB ',''));
 }
 
 function feedSelectedIds(type) {
@@ -1685,8 +1774,19 @@ function renderRecentPOs(job, el) {
 function renderMapMaterial(job, el) {
   const struct = S.jobStructure?.[job];
   const rows = getEmailPORows().filter(r => (r['JOB']||'') === job);
+  // Build unassigned POs banner
+  const unassignedPOs = (S.emailPOs||[]).filter(p => (p.job_name||'') === job && p.status !== 'duplicate' && (!p.building && !p.floor && !p.unit));
+  let banner = '';
+  if (unassignedPOs.length) {
+    const unassignedTotal = unassignedPOs.reduce((s,p) => s+(parseFloat(p.total)||0), 0);
+    banner = `<div class="alert alert-y" style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <span style="font-size:18px;">📍</span>
+      <div style="flex:1;"><strong>${unassignedPOs.length} PO${unassignedPOs.length!==1?'s':''} need location</strong> — ${fmt(unassignedTotal)} not yet mapped to a floor/unit</div>
+      <button class="btn btn-primary btn-sm" onclick="nav('inbox')">Review Inbox →</button>
+    </div>`;
+  }
   if (!struct?.floors?.length) {
-    el.innerHTML = '<div class="alert alert-y">No floors set up yet. Click <strong>⚙ Floors &amp; Units</strong> above.</div><div class="section-title" style="margin-top:16px;">PO Data by Building &amp; Floor (auto-detected)</div>';
+    el.innerHTML = banner + '<div class="alert alert-y">No floors set up yet. Click <strong>⚙ Floors &amp; Units</strong> above.</div><div class="section-title" style="margin-top:16px;">PO Data by Building &amp; Floor (auto-detected)</div>';
     renderAutoFloors(job, rows, el); return;
   }
   // Group structure floors by building first
@@ -1702,6 +1802,12 @@ function renderMapMaterial(job, el) {
     const bldgRows = rows.filter(r => (String(r['BUILDING']||'').trim() === bldg) || (bldg === '—' && !String(r['BUILDING']||'').trim()));
     const bldgBoards = bldgRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
     const bldgSpend = bldgRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+    // Material category mini-bars
+    const catTotals = {};
+    bldgRows.forEach(r => { const c=categorize(r['MATERIAL']||''); catTotals[c]=(catTotals[c]||0)+parseFloat(r['LINE TOTAL']||0); });
+    const catColors = {boards:'#4F8EF7',metal:'#FBBF24',finish:'#34D399',supplies:'#A78BFA',tax:'#F87171',other:'#5A6280',labor:'#FF6B35'};
+    const catBars = Object.entries(catTotals).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1])
+      .map(([cat,amt]) => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><div style="width:8px;height:8px;border-radius:2px;background:${catColors[cat]||'#5A6280'};flex-shrink:0;"></div><div style="font-size:10px;color:var(--ink3);min-width:60px;">${cat}</div><div style="font-size:10px;font-weight:700;">${fmt(amt)}</div></div>`).join('');
     html += `<div class="card" style="margin-bottom:18px;">
       <div class="card-hdr" style="background:var(--surface2);">
         <div>
@@ -1709,6 +1815,7 @@ function renderMapMaterial(job, el) {
           <div style="font-size:11px;color:var(--ink3);margin-top:2px;">${esc(job.replace('JOB ',''))} · ${floors.length} floor${floors.length!==1?'s':''}</div>
         </div>
         <div style="display:flex;gap:18px;align-items:center;">
+          ${catBars ? '<div style="font-size:10px;">' + catBars + '</div>' : ''}
           ${bldgBoards > 0 ? '<div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;">Boards</div><div style="font-weight:700;color:var(--blue);">' + Math.round(bldgBoards) + '</div></div>' : ''}
           <div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;">Spend</div><div style="font-weight:700;">${fmt(bldgSpend)}</div></div>
         </div>
@@ -1751,7 +1858,7 @@ function renderMapMaterial(job, el) {
     });
     html += '</div></div>';
   });
-  el.innerHTML = html || '<div class="alert alert-y">No PO data found for this job.</div>';
+  el.innerHTML = html || (banner + '<div class="alert alert-y">No PO data found for this job. Confirm POs in the Inbox and assign them to a floor/unit.</div>');
 }
 
 function buildUnitCard(job, floor, bldg, unit, boards, budBoards, spend, isGen) {
@@ -1853,23 +1960,71 @@ function toggleFloorBlock(hdr) {
 }
 
 function openUnitDetail(job, floor, unit, bldg) {
-  const rows = getEmailPORows().filter(r => { const rfl=String(r['FLOOR']||'').trim(), ru=String(r['UNIT']||'').trim(), rb=String(r['BUILDING']||'').trim(); if(rfl!==String(floor)) return false; if(bldg&&rb&&rb!==bldg) return false; if(unit==='General') return !ru||ru==='N/A'; return ru===String(unit); });
+  const rows = getEmailPORows().filter(r => {
+    const rfl=String(r['FLOOR']||'').trim(), ru=String(r['UNIT']||'').trim(), rb=String(r['BUILDING']||'').trim();
+    if (rfl!==String(floor)) return false;
+    if (bldg&&rb&&rb!==bldg) return false;
+    if (unit==='General') return !ru||ru==='N/A';
+    return ru===String(unit);
+  });
+  const unitPOs = (S.emailPOs||[]).filter(p => {
+    if ((p.job_name||'') !== job) return false;
+    if (String(p.floor||'') !== String(floor)) return false;
+    if (bldg && p.building && p.building !== bldg) return false;
+    if (unit==='General') return !p.unit||p.unit==='N/A';
+    return String(p.unit||'') === String(unit);
+  });
   const boards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
   const spend = rows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
   const matMap = {};
-  rows.forEach(r => { const mat=(r['MATERIAL']||'').trim()||'[TAX]', cat=categorize(r['MATERIAL']||''); if(!matMap[mat]) matMap[mat]={qty:0,total:0,cat,uom:r['UOM']||''}; matMap[mat].qty+=parseFloat(r['QTY']||0); matMap[mat].total+=parseFloat(r['LINE TOTAL']||0); });
+  rows.forEach(r => {
+    const mat=(r['MATERIAL']||'').trim()||'[TAX]', cat=categorize(r['MATERIAL']||'');
+    if(!matMap[mat]) matMap[mat]={qty:0,total:0,cat,uom:r['UOM']||''};
+    matMap[mat].qty+=parseFloat(r['QTY']||0); matMap[mat].total+=parseFloat(r['LINE TOTAL']||0);
+  });
   const CAT_ORDER=['boards','metal','finish','supplies','tax','other'];
   const CAT_BG={boards:'rgba(79,142,247,.12)',metal:'rgba(251,191,36,.12)',finish:'rgba(52,211,153,.12)',supplies:'var(--surface3)',tax:'rgba(248,113,113,.12)',other:'var(--surface3)'};
   const CAT_TC={boards:'var(--blue)',metal:'var(--yellow)',finish:'var(--green)',supplies:'var(--ink3)',tax:'var(--red)',other:'var(--ink3)'};
+
+  // POs section
+  let poHtml = '';
+  if (unitPOs.length) {
+    poHtml = `<div style="margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:8px;">📦 Purchase Orders (${unitPOs.length})</div>
+      ${unitPOs.map(p => {
+        const sb = p.status==='confirmed'?'<span class="badge badge-green">✓ Confirmed</span>':p.status==='needs_review'?'<span class="badge badge-yellow">⚠ Review</span>':'<span class="badge badge-blue">Pending</span>';
+        const date = p.created_at ? new Date(p.created_at).toLocaleDateString() : '';
+        const lineCount = Array.isArray(p.lines) ? p.lines.length : 0;
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;transition:border-color .15s;" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'" onclick="closeModal('unit-modal');openEmailPOReview('${esc(p.id)}')">
+          <div style="font-weight:700;font-size:13px;font-family:'Space Grotesk',sans-serif;">#${esc(p.po_number||'?')}</div>
+          ${sb}
+          <div style="flex:1;font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(p.vendor||'—')}</div>
+          <div style="font-size:11px;color:var(--ink3);">${date} · ${lineCount} line${lineCount!==1?'s':''}</div>
+          <div style="font-weight:700;color:var(--accent);white-space:nowrap;">${fmt(p.total||0)}</div>
+          <div style="color:var(--ink3);font-size:14px;">›</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  } else {
+    poHtml = `<div class="alert alert-y" style="margin-bottom:14px;font-size:12px;">No confirmed POs matched to this exact location. <button class="btn btn-ghost btn-sm" style="margin-left:8px;" onclick="nav('inbox');closeModal('unit-modal')">Review Inbox →</button></div>`;
+  }
+
+  // Material breakdown by category
+  const matRows = CAT_ORDER.flatMap(catKey => {
+    const items=Object.entries(matMap).filter(([,d])=>d.cat===catKey); if(!items.length) return [];
+    return [`<tr><td colspan="4" style="padding:5px 10px;background:${CAT_BG[catKey]};color:${CAT_TC[catKey]};font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">${catKey.toUpperCase()}</td></tr>`,
+      ...items.map(([mat,d])=>`<tr><td style="font-weight:500;">${esc(mat)}</td><td><span class="badge badge-gray" style="font-size:9px;">${d.cat}</span></td><td class="tbl-r">${d.qty>0?Math.round(d.qty):'—'}</td><td class="tbl-r" style="font-weight:700;">${fmt(d.total)}</td></tr>`)];
+  }).join('');
+
   document.getElementById('unit-modal-title').textContent = job.replace('JOB ','') + ' · Floor ' + floor + ' · ' + (unit==='General'?'General':'Unit '+unit);
   document.getElementById('unit-modal-body').innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
       <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Boards</div><div style="font-size:24px;font-weight:800;color:var(--blue);">${Math.round(boards)}</div></div>
       <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Spend</div><div style="font-size:22px;font-weight:800;color:var(--accent);">${fmt(spend)}</div></div>
-      <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Lines</div><div style="font-size:22px;font-weight:800;">${rows.length}</div></div>
+      <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">POs</div><div style="font-size:22px;font-weight:800;">${unitPOs.length}</div></div>
     </div>
-    <div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Material</th><th>Cat</th><th class="tbl-r">Qty</th><th class="tbl-r">Total</th></tr></thead>
-    <tbody>${CAT_ORDER.flatMap(catKey => { const items=Object.entries(matMap).filter(([,d])=>d.cat===catKey); if(!items.length) return []; return['<tr><td colspan="4" style="padding:5px 10px;background:'+CAT_BG[catKey]+';color:'+CAT_TC[catKey]+';font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">'+catKey.toUpperCase()+'</td></tr>',...items.map(([mat,d])=>'<tr><td style="font-weight:500;">'+mat+'</td><td><span class="badge badge-gray" style="font-size:9px;">'+d.cat+'</span></td><td class="tbl-r">'+(d.qty>0?Math.round(d.qty):'—')+'</td><td class="tbl-r" style="font-weight:700;">'+fmt(d.total)+'</td></tr>')]; }).join('')}</tbody></table></div>`;
+    ${poHtml}
+    ${rows.length ? `<details open style="border:1px solid var(--border);border-radius:8px;"><summary style="cursor:pointer;padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);">Materials (${rows.length} lines)</summary><div style="overflow-x:auto;"><table class="tbl" style="border:none;"><thead><tr><th>Material</th><th>Cat</th><th class="tbl-r">Qty</th><th class="tbl-r">Total</th></tr></thead><tbody>${matRows}</tbody></table></div></details>` : ''}`;
   document.getElementById('unit-modal').classList.add('open');
 }
 
@@ -2091,17 +2246,17 @@ function renderJobSummaryTab(job) {
       <div class="stat"><div class="stat-lbl">Items Tracked</div><div class="stat-val">${allItems.length}</div></div>
     </div>
 
-    <div class="card"><div class="card-hdr"><span class="card-title">Job Cost — All Items ${viewMode==='whole'?'(Whole Job)':'(Current POs)'}</span><span style="font-size:12px;color:var(--ink3);">${allItems.length} groups</span></div><div class="card-body" style="padding:0;">
+    <details open style="border:1px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden;"><summary style="cursor:pointer;padding:14px 18px;display:flex;align-items:center;gap:10px;background:var(--surface2);list-style:none;"><span style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;flex:1;">📦 Job Cost — All Items ${viewMode==='whole'?'(Whole Job)':'(Current POs)'}</span><span style="font-size:12px;color:var(--ink3);">${allItems.length} groups</span><span style="color:var(--ink3);font-size:16px;margin-left:8px;">›</span></summary><div style="overflow-x:auto;">
       <table class="tbl" style="border:none;"><thead><tr>
         <th>Material Group</th>
         <th class="tbl-r">Budget Qty</th>
         <th class="tbl-r">Actual Qty</th>
-        <th style="width:22%;">Qty Used</th>
+        <th style="width:22%;">Progress</th>
         <th class="tbl-r">Budget $</th>
         <th class="tbl-r">Actual $</th>
         ${viewMode==='whole'?'<th class="tbl-r">Historical $</th>':''}
         <th>Status</th>
-        <th>Actions</th>
+        <th>Re-map</th>
       </tr></thead><tbody>
       ${allItems.map(([key, it]) => {
         const qtyPct = it.budgetQty > 0 ? (it.orderedQty / it.budgetQty * 100) : (it.orderedQty > 0 ? 999 : 0);
@@ -2133,31 +2288,35 @@ function renderJobSummaryTab(job) {
         </tr>`;
       }).join('')}
       ${allItems.length === 0 ? '<tr><td colspan="' + (viewMode==='whole'?9:8) + '" class="no-data" style="text-align:center;">No items tracked yet. Add estimate items or sync POs.</td></tr>' : ''}
-      </tbody></table>
-    </div></div>
+      </tbody></table></div></details>
 
     ${(() => {
-      // TRACKED POs SECTION — show all POs the user sent to this job, even without location details
-      const tracked = Object.entries(S.assignments||{}).filter(([po, a]) => (a.job||'') === job);
-      if (!tracked.length) return '';
-      const totalTracked = tracked.reduce((s, [po,a]) => s + (parseFloat(a.total)||0), 0);
-      return `<div class="card" style="margin-top:16px;"><div class="card-hdr"><span class="card-title">🎯 Tracked POs for this Job</span><span style="font-size:12px;color:var(--ink3);">${tracked.length} PO${tracked.length!==1?'s':''} · ${fmt(totalTracked)}</span></div><div class="card-body" style="padding:0;"><table class="tbl" style="border:none;"><thead><tr><th>PO#</th><th>Vendor</th><th>Location</th><th class="tbl-r">Total</th><th>Date</th><th>Actions</th></tr></thead><tbody>
-        ${tracked.sort((a,b) => String(b[1].date||'').localeCompare(String(a[1].date||''))).map(([po, a]) => {
-          const loc = [a.building||a.bldg, a.floor?'Fl '+a.floor:'', a.unit?'Unit '+a.unit:''].filter(Boolean).join(' · ');
-          const needsLoc = !a.building && !a.bldg && !a.floor && !a.unit;
-          return `<tr><td style="font-weight:700;">#${esc(po)}</td><td>${esc(a.vendor||'')}</td><td>${loc ? esc(loc) : '<span class="badge badge-yellow">⚠ No location</span>'}</td><td class="tbl-r" style="font-weight:700;">${fmt(a.total||0)}</td><td style="font-size:11px;color:var(--ink3);">${esc(a.date||'')}</td><td><button class="btn ${needsLoc?'btn-primary':'btn-ghost'} btn-sm" onclick="editAssignedPO('${jsesc(po)}')">${needsLoc?'📍 Add Location':'✏ Edit'}</button> <button class="btn btn-danger btn-sm" onclick="deleteAssignment('po','${jsesc(po)}')">🗑</button></td></tr>`;
+      // TRACKED POs SECTION — all email POs confirmed for this job
+      const jobPOs = (S.emailPOs||[]).filter(p => (p.job_name||'') === job).sort((a,b) => (b.created_at||'').localeCompare(a.created_at||''));
+      if (!jobPOs.length) return '';
+      const totalTracked = jobPOs.reduce((s,p) => s + (parseFloat(p.total)||0), 0);
+      const unlocated = jobPOs.filter(p => !p.building && !p.floor && !p.unit).length;
+      return `<details open style="border:1px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden;"><summary style="cursor:pointer;padding:14px 18px;display:flex;align-items:center;gap:10px;background:var(--surface2);list-style:none;"><span style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;flex:1;">🧾 All POs for this Job</span><span style="font-size:12px;color:var(--ink3);">${jobPOs.length} PO${jobPOs.length!==1?'s':''} · ${fmt(totalTracked)}${unlocated?' · <span style="color:var(--yellow);">'+unlocated+' unlocated</span>':''}</span><span style="color:var(--ink3);font-size:16px;margin-left:8px;">›</span></summary>
+      <div style="padding:0;"><table class="tbl" style="border:none;"><thead><tr><th>PO#</th><th>Vendor</th><th>Status</th><th>Location</th><th class="tbl-r">Total</th><th>Date</th><th>Actions</th></tr></thead><tbody>
+        ${jobPOs.map(p => {
+          const loc = [p.building?'Bldg '+p.building:'', p.floor?'Fl '+p.floor:'', p.unit?'Unit '+p.unit:''].filter(Boolean).join(' · ');
+          const sb = p.status==='confirmed'?'<span class="badge badge-green">✓</span>':p.status==='needs_review'?'<span class="badge badge-yellow">⚠ Review</span>':'<span class="badge badge-blue">Pending</span>';
+          const date = p.created_at ? new Date(p.created_at).toLocaleDateString() : '';
+          const noLoc = !p.building && !p.floor && !p.unit;
+          return `<tr><td style="font-weight:700;">#${esc(p.po_number||'?')}</td><td>${esc(p.vendor||'')}</td><td>${sb}</td><td>${loc||'<span class="badge badge-yellow">⚠ No location</span>'}</td><td class="tbl-r" style="font-weight:700;">${fmt(p.total||0)}</td><td style="font-size:11px;color:var(--ink3);">${date}</td><td><button class="btn ${noLoc?'btn-primary':'btn-ghost'} btn-sm" onclick="openEmailPOReview('${esc(p.id)}')">${noLoc?'📍 Assign':'✏ Edit'}</button></td></tr>`;
         }).join('')}
-      </tbody></table></div></div>`;
+      </tbody></table></div></details>`;
     })()}
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">
-      <div class="card"><div class="card-body"><div class="section-title">Drill Down</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" onclick="switchJobTab('map')">Job Map</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('estimate')">Estimate</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('bills')">Bills</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('allmats')">Historical Data</button></div></div></div>
-      <div class="card"><div class="card-body"><div class="section-title">Labor Breakdown</div>
+    <details style="border:1px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden;"><summary style="cursor:pointer;padding:14px 18px;display:flex;align-items:center;gap:10px;background:var(--surface2);list-style:none;"><span style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;flex:1;">🔨 Labor &amp; Drill Down</span><span style="color:var(--ink3);font-size:16px;margin-left:8px;">›</span></summary>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px;">
+      <div><div class="section-title" style="margin-bottom:8px;">Quick Navigation</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" onclick="switchJobTab('map')">Job Map</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('estimate')">Estimate</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('bills')">Bills</button></div></div>
+      <div><div class="section-title" style="margin-bottom:8px;">Labor Breakdown</div>
         <div style="font-size:13px;color:var(--ink2);line-height:1.9;">
-          ${LABOR_CATS.map(c => { const billed = billAssigns.filter(ba => ba.category === c).reduce((s,ba) => s+parseFloat(ba.total||0), 0); return billed > 0 ? `<div>${c}: <strong>${fmt(billed)}</strong></div>` : ''; }).filter(Boolean).join('') || '<div style="color:var(--ink3);">No labor billed yet</div>'}
+          ${LABOR_CATS.map(c => { const billed = billAssigns.filter(ba => ba.category === c).reduce((s,ba) => s+parseFloat(ba.total||0), 0); return billed > 0 ? `<div>${c}: <strong>${fmt(billed)}</strong></div>` : ''; }).filter(Boolean).join('') || '<div style="color:var(--ink3);">No labor tracked yet</div>'}
         </div>
-      </div></div>
-    </div>`;
+      </div>
+    </div></details>`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2566,18 +2725,59 @@ function switchRawTab(tab) {
 }
 function renderRawPO() {
   const el = document.getElementById('raw-tab-raw-po'); if (!el) return;
-  const rows = getEmailPORows();
-  if (!rows.length) { el.innerHTML = '<div class="no-data">No PO data yet. Email a PDF or upload via Inbox.</div>'; return; }
-  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:11px;color:var(--ink3);">Extracted PO lines from email PDFs. Click 🏷 to re-categorize a material.</div><div style="font-size:11px;color:var(--ink3);">' + rows.length + ' lines from ' + (S.emailPOs?.length||0) + ' POs</div></div>';
-  html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Status</th><th>Job</th><th>Material</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Total</th><th>Bldg</th><th>Fl</th><th>Unit</th><th>Vendor</th><th></th></tr></thead><tbody>';
-  rows.slice(0, 300).forEach(r => {
-    const po = (S.emailPOs||[]).find(p => p.po_number === r['PO NUMBER']);
-    const status = po?.status || 'pending';
-    const statusBadge = status === 'confirmed' ? '<span class="badge badge-green">✓</span>' : status === 'needs_review' ? '<span class="badge badge-yellow">⚠</span>' : '<span class="badge badge-blue">•</span>';
-    html += '<tr><td style="font-weight:600;">' + esc(r['PO NUMBER']||'') + '</td><td>' + statusBadge + '</td><td>' + esc((r['JOB']||'').replace('JOB ','')) + '</td><td>' + esc(r['MATERIAL']||'') + '</td><td class="tbl-r">' + (r['QTY']||'') + '</td><td>' + esc(r['UOM']||'') + '</td><td class="tbl-r">' + fmt(parseFloat(r['LINE TOTAL']||0)) + '</td><td>' + esc(r['BUILDING']||'') + '</td><td>' + esc(r['FLOOR']||'') + '</td><td>' + esc(r['UNIT']||'') + '</td><td>' + esc(r['VENDOR']||'') + '</td><td><button class="btn btn-ghost btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(r['MATERIAL']||'') + '\')">🏷</button></td></tr>';
+  const pos = S.emailPOs || [];
+  if (!pos.length) { el.innerHTML = '<div class="no-data">No PO data yet. Email a PDF or upload via Inbox.</div>'; return; }
+
+  // Group filter
+  const filterSel = document.getElementById('raw-po-filter')?.value || 'all';
+  const filtered = pos.filter(p => filterSel === 'all' || p.status === filterSel);
+  const totalSpend = filtered.reduce((s,p) => s + (parseFloat(p.total)||0), 0);
+  const confirmed = filtered.filter(p => p.status === 'confirmed').length;
+  const pending = filtered.filter(p => p.status !== 'confirmed' && p.status !== 'duplicate').length;
+
+  let html = `<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+    <select id="raw-po-filter" class="inp inp-sm" style="max-width:160px;" onchange="renderRawPO()">
+      <option value="all">All POs (${pos.length})</option>
+      <option value="confirmed">Confirmed (${pos.filter(p=>p.status==='confirmed').length})</option>
+      <option value="pending">Pending (${pos.filter(p=>p.status==='pending').length})</option>
+      <option value="needs_review">Needs Review (${pos.filter(p=>p.status==='needs_review').length})</option>
+    </select>
+    <span style="font-size:12px;color:var(--ink3);">${filtered.length} POs · ${fmt(totalSpend)} total · <span style="color:var(--green);">${confirmed} confirmed</span>${pending?' · <span style="color:var(--yellow);">'+pending+' pending</span>':''}</span>
+  </div>`;
+
+  filtered.slice(0, 100).forEach(p => {
+    const lines = Array.isArray(p.lines) ? p.lines : [];
+    const sb = p.status==='confirmed'?'<span class="badge badge-green">✓ Confirmed</span>':p.status==='needs_review'?'<span class="badge badge-yellow">⚠ Needs Review</span>':p.status==='duplicate'?'<span class="badge badge-red">Duplicate</span>':'<span class="badge badge-blue">Pending</span>';
+    const loc = [p.building?'Bldg '+p.building:'', p.floor?'Fl '+p.floor:'', p.unit?'Unit '+p.unit:''].filter(Boolean).join(' · ');
+    const date = p.created_at ? new Date(p.created_at).toLocaleDateString() : '';
+    const noLoc = !p.building && !p.floor && !p.unit;
+    html += `<details style="border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden;">
+      <summary style="cursor:pointer;padding:12px 16px;display:flex;align-items:center;gap:10px;list-style:none;background:var(--surface2);">
+        <div style="font-weight:700;font-size:13px;font-family:'Space Grotesk',sans-serif;min-width:100px;">#${esc(p.po_number||'?')}</div>
+        ${sb}
+        <div style="flex:1;font-size:12px;color:var(--ink2);">${esc(p.vendor||'—')}</div>
+        <div style="font-size:12px;color:var(--ink3);">${loc || (noLoc ? '<span style="color:var(--yellow);">⚠ No location</span>' : '')}</div>
+        <div style="font-size:11px;color:var(--ink3);">${date}</div>
+        <div style="font-weight:700;color:var(--accent);min-width:80px;text-align:right;">${fmt(p.total||0)}</div>
+        <button onclick="event.preventDefault();event.stopPropagation();openEmailPOReview('${esc(p.id)}')" class="btn btn-ghost btn-sm" style="margin-left:4px;">${noLoc&&p.status!=='confirmed'?'📍 Assign':'✏ Edit'}</button>
+      </summary>
+      <div style="padding:12px 16px;">
+        <div style="display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--ink3);">Job: <strong style="color:var(--ink);">${esc(p.job_name||'—')}</strong></span>
+          <span style="font-size:11px;color:var(--ink3);">Source: ${esc(p.source||'manual')}</span>
+          ${p.ship_date ? '<span style="font-size:11px;color:var(--ink3);">Ship: '+esc(p.ship_date)+'</span>' : ''}
+        </div>
+        ${lines.length ? `<table class="tbl" style="border:none;font-size:12px;"><thead><tr><th>Description</th><th>Cat</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Amount</th><th></th></tr></thead><tbody>
+          ${lines.map(l => {
+            const cat = categorize(l.description||'');
+            const catColor = {boards:'var(--blue)',metal:'var(--yellow)',finish:'var(--green)',supplies:'var(--ink3)',labor:'#FF6B35',tax:'var(--red)',other:'var(--ink3)'}[cat]||'var(--ink3)';
+            return `<tr><td>${esc(l.description||'')}</td><td><span style="font-size:10px;font-weight:700;color:${catColor};">${cat}</span></td><td class="tbl-r">${l.qty||'—'}</td><td style="color:var(--ink3);">${esc(l.uom||'')}</td><td class="tbl-r" style="font-weight:700;">${fmt(parseFloat(l.amount)||0)}</td><td><button class="btn btn-ghost btn-sm" onclick="setManualCategoryFromRaw('${jsesc(l.description||'')}')">🏷</button></td></tr>`;
+          }).join('')}
+        </tbody></table>` : '<div style="color:var(--ink3);font-size:12px;">No line items extracted</div>'}
+      </div>
+    </details>`;
   });
-  html += '</tbody></table></div>';
-  if (rows.length > 300) html += '<div class="no-data">Showing first 300 of ' + rows.length + ' lines</div>';
+  if (filtered.length > 100) html += '<div class="no-data" style="margin-top:8px;">Showing first 100 of ' + filtered.length + ' POs</div>';
   el.innerHTML = html;
 }
 function editPORow(idx) {
@@ -2889,7 +3089,7 @@ async function sendAI() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// DRAG & DROP for PDF
+// DRAG & DROP for PDF + AI PANEL DRAG
 // ═══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
   const dz = document.getElementById('pdf-drop');
@@ -2897,6 +3097,32 @@ document.addEventListener('DOMContentLoaded', () => {
     dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
     dz.addEventListener('dragleave', () => dz.classList.remove('over'));
     dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); if(e.dataTransfer.files[0]) handlePDFFile(e.dataTransfer.files[0]); });
+  }
+  // Make AI panel draggable by its header
+  const panel = document.getElementById('ai-panel');
+  const hdr = panel?.querySelector('div[style*="border-bottom"]');
+  if (panel && hdr) {
+    hdr.style.cursor = 'move';
+    hdr.title = 'Drag to move';
+    let ox=0, oy=0, startX=0, startY=0, dragging=false;
+    hdr.addEventListener('mousedown', e => {
+      dragging=true;
+      const rect = panel.getBoundingClientRect();
+      // Switch from bottom/right anchoring to top/left for free positioning
+      panel.style.bottom='auto'; panel.style.right='auto';
+      panel.style.left=rect.left+'px'; panel.style.top=rect.top+'px';
+      startX=e.clientX; startY=e.clientY;
+      ox=rect.left; oy=rect.top;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const nx = ox + (e.clientX - startX);
+      const ny = oy + (e.clientY - startY);
+      panel.style.left = Math.max(0, Math.min(nx, window.innerWidth - panel.offsetWidth)) + 'px';
+      panel.style.top = Math.max(0, Math.min(ny, window.innerHeight - panel.offsetHeight)) + 'px';
+    });
+    document.addEventListener('mouseup', () => { dragging=false; });
   }
 });
 
