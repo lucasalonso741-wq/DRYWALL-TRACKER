@@ -253,7 +253,7 @@ a{color:var(--accent);}
   <button class="nav-icon-btn" data-page="raw" onclick="nav('raw')"><span>🗃️</span><span class="label">Data</span></button>
   <button class="nav-icon-btn" data-page="settings" onclick="nav('settings')"><span>⚙️</span><span class="label">Setup</span></button>
   <div class="nav-divider"></div>
-  <button class="nav-sync-btn" id="sync-btn" onclick="syncAll()" title="Sync from Google Sheet">⟳ <span class="sync-dot" id="sync-dot"></span></button>
+  <button class="nav-sync-btn" id="sync-btn" onclick="syncAll()" title="Refresh POs from Supabase">⟳ <span class="sync-dot" id="sync-dot"></span></button>
 </div>
 
 <!-- MAIN -->
@@ -586,9 +586,38 @@ function isLaborVendor(vendor) {
 }
 
 function getJobs() {
-  const fromSheet = [...new Set(S.rows.map(r => r['JOB'] || r['Job'] || '').filter(Boolean))];
-  const all = [...new Set([...S.jobs, ...fromSheet])];
+  const fromPOs = [...new Set((S.emailPOs||[]).map(p => p.job_name || '').filter(Boolean))];
+  const all = [...new Set([...S.jobs, ...fromPOs])];
   return all.filter(Boolean).sort();
+}
+
+function getEmailPORows() {
+  const rows = [];
+  (S.emailPOs || []).forEach(p => {
+    if (p.status === 'duplicate') return;
+    const lines = Array.isArray(p.lines) ? p.lines : [];
+    const base = {
+      'PO NUMBER': p.po_number || '',
+      'JOB': p.job_name || '',
+      'VENDOR': p.vendor || '',
+      'BUILDING': p.building || '',
+      'FLOOR': String(p.floor || ''),
+      'UNIT': String(p.unit || ''),
+      'DATE': p.created_at ? p.created_at.substring(0, 10) : '',
+    };
+    if (lines.length) {
+      lines.forEach(l => rows.push({
+        ...base,
+        'MATERIAL': l.description || '',
+        'QTY': parseFloat(l.qty) || 0,
+        'UOM': l.uom || '',
+        'LINE TOTAL': parseFloat(l.amount) || 0,
+      }));
+    } else {
+      rows.push({...base, 'MATERIAL': '', 'QTY': 0, 'UOM': '', 'LINE TOTAL': parseFloat(p.total) || 0});
+    }
+  });
+  return rows;
 }
 function getJobEstimate(job) {
   if (!S.matBanks) S.matBanks = {};
@@ -861,15 +890,14 @@ async function syncAll() {
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
   showToast('Syncing...');
   try {
-    // Fetch Google Sheet PO data + email-extracted POs in parallel
-    await Promise.all([fetchRawData(), loadEmailPOs(), loadNewJobAlerts()]);
+    await Promise.all([loadEmailPOs(), loadNewJobAlerts()]);
     S.lastSync = new Date().toISOString();
     localStorage.setItem('dw_last_sync', S.lastSync);
     const lsl = document.getElementById('last-sync-label'); if(lsl) lsl.textContent = 'Last sync: ' + new Date().toLocaleTimeString();
-    const smi = document.getElementById('sheet-status-mini'); if(smi){smi.textContent='✓ ' + S.rows.length + ' PO rows · ' + (S.emailPOs?.length||0) + ' email POs';smi.className='sheet-status ok';}
+    const smi = document.getElementById('sheet-status-mini'); if(smi){smi.textContent='✓ ' + (S.emailPOs?.length||0) + ' email POs';smi.className='sheet-status ok';}
     const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--green)';
     populateJobSelects(); updateInboxBadge();
-    showToast('✓ Synced — ' + S.rows.length + ' sheet rows · ' + (S.emailPOs?.length||0) + ' email POs');
+    showToast('✓ Synced — ' + (S.emailPOs?.length||0) + ' email POs');
   } catch(e) {
     showToast('⚠️ Sync failed: ' + e.message, true);
     const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--red)';
@@ -1015,10 +1043,9 @@ function openJobFromAnywhere(job, tab) {
   if (tab) setTimeout(() => switchJobTab(tab), 50);
 }
 function updateInboxBadge() {
-  const unmatchedBills = S.bills.filter(b => { const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim(); return inv && !S.billAssignments[inv]; }).length;
   const needsReviewPOs = (S.emailPOs||[]).filter(p => p.status === 'needs_review').length;
   const newJobAlerts = (S.newJobAlerts||[]).length;
-  const total = unmatchedBills + needsReviewPOs + newJobAlerts;
+  const total = needsReviewPOs + newJobAlerts;
   const badge = document.getElementById('inbox-badge');
   if (badge) badge.style.display = total > 0 ? 'block' : 'none';
 }
@@ -1060,11 +1087,6 @@ function renderSettings() {
         ${jobs.map(j => '<span style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px;">' + esc(j.replace('JOB ','')) + '<button onclick="removeJob(\'' + jsesc(j) + '\')" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:12px;">✕</button></span>').join('')}
       </div>
       <div style="display:flex;gap:8px;"><input id="new-job" class="inp inp-sm" placeholder="New job name" style="max-width:220px;"/><button class="btn btn-ghost btn-sm" onclick="addJob()">+ Add Job</button></div>
-    </div></div>
-    <div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Google Sheet</span></div><div class="card-body">
-      <div style="font-size:12px;color:var(--ink3);margin-bottom:8px;">Sheet ID for PO &amp; Bill data</div>
-      <div style="display:flex;gap:8px;"><input id="sheet-id-input" class="inp inp-sm" value="${esc(S.sheetId)}" style="max-width:400px;"/><button class="btn btn-ghost btn-sm" onclick="saveSheetId()">Save</button></div>
-      <div id="sheet-connected-label" class="sheet-status" style="margin-top:6px;">${S.rows.length>0?'✓ Sheet connected · '+S.rows.length+' rows':'Not synced yet'}</div>
     </div></div>
     <div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Company Logo</span></div><div class="card-body">
       <div style="display:flex;gap:12px;align-items:center;">
@@ -1166,57 +1188,12 @@ function renderActivityFeed() {
     emailHtml += '<div class="divider"></div>';
   }
 
-  // ── Section 2: Google Sheet POs ──
-  const poGroups = getFeedPOGroups();
-  const billGroups = getFeedBillGroups();
-  const items = [];
-  poGroups.slice(0, 40).forEach(g => {
-    const assigned = !!S.assignments[g.po];
-    const boards = g.rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
-    items.push({type:'po', id:g.po, job:g.job, vendor:g.vendor, date:g.date, total:g.total, boards, assigned, building:g.building, floor:g.floor, rows:g.rows});
-  });
-  billGroups.forEach(g => {
-    const matched = !!S.billAssignments[g.inv];
-    const isLabor = isLaborVendor(g.vendor);
-    items.push({type:'bill', id:g.inv, job:g.job, vendor:g.vendor, total:g.total, matched, isLabor, rows:g.rows});
-  });
-
-  if (!emailPOs.length && !items.length) {
-    el.innerHTML = '<div class="no-data">No data yet. Email a PO PDF to po@aadrywalltracker.com or click ⟳ Sync.</div>';
+  if (!emailPOs.length) {
+    el.innerHTML = '<div class="no-data">No POs yet. Email a PDF to po@aadrywalltracker.com or upload via Inbox.</div>';
     return;
   }
 
-  const selType = S.feedSelection?.type || null;
-  let sheetHtml = '';
-  if (items.length) {
-    sheetHtml += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📊 Sheet POs</div>`;
-    items.forEach(item => {
-      const dotColor = item.type === 'po' ? (item.assigned ? 'var(--green)' : 'var(--blue)') : (item.matched ? 'var(--green)' : 'var(--yellow)');
-      const label = item.type === 'po' ? 'PO #' + item.id : 'Bill #' + item.id;
-      const status = item.type === 'po' ? (item.assigned ? '<span class="badge badge-green">Assigned</span>' : '<span class="badge badge-blue">New</span>') :
-        (item.matched ? '<span class="badge badge-green">Matched</span>' : '<span class="badge badge-yellow">Needs Match</span>');
-      const boardsBadge = item.boards > 0 ? ' <span class="badge badge-blue">' + Math.round(item.boards) + ' boards</span>' : '';
-      sheetHtml += `<div class="feed-item" data-type="${item.type}" data-id="${esc(item.id)}">
-        ${selType === item.type ? '<input type="checkbox" class="feed-cb" data-id="' + esc(item.id) + '" style="margin-right:6px;accent-color:var(--accent);cursor:pointer;" onclick="event.stopPropagation();updateFeedSelection()"/>' : ''}
-        <div class="feed-dot" style="background:${dotColor};"></div>
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <span style="font-weight:700;font-size:13px;">${label}</span>
-            ${status}${boardsBadge}
-          </div>
-          <div style="font-size:12px;color:var(--ink2);margin-top:2px;">
-            ${esc(item.vendor)}${item.job ? ' · ' + esc(item.job.replace('JOB ','')) : ''}${item.building ? ' · Bldg ' + esc(item.building) : ''}${item.floor ? ' · Fl ' + esc(item.floor) : ''}
-          </div>
-        </div>
-        <div style="text-align:right;white-space:nowrap;">
-          <div style="font-weight:700;">${fmt(item.total)}</div>
-          <div style="font-size:10px;color:var(--ink3);">${item.rows.length} lines</div>
-        </div>
-      </div>`;
-    });
-  }
-
-  el.innerHTML = emailHtml + sheetHtml;
+  el.innerHTML = emailHtml;
 
   el.querySelectorAll('.feed-item').forEach(div => {
     div.addEventListener('click', function(e) {
@@ -1350,7 +1327,7 @@ function startFeedSelect(type) {
 
 // PO detail modal
 function openPODetailModal(poNum) {
-  const rows = S.rows.filter(r => String(r['PO NUMBER']||'').trim() === poNum);
+  const rows = getEmailPORows().filter(r => String(r['PO NUMBER']||'').trim() === poNum);
   if (!rows.length) return;
   const total = rows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
   const job = rows[0]['JOB']||'';
@@ -1439,18 +1416,17 @@ async function applyFeedBulkAssign() {
 function renderDashboard() {
   const jobs = getJobs();
   const filterJob = document.getElementById('dash-job-select')?.value || '';
-  const rows = filterJob ? S.rows.filter(r => (r['JOB']||'') === filterJob) : S.rows;
+  const allRows = getEmailPORows();
+  const rows = filterJob ? allRows.filter(r => (r['JOB']||'') === filterJob) : allRows;
   const totalSpend = rows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
   const totalBoards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
   const uniquePOs = [...new Set(rows.map(r => String(r['PO NUMBER']||'').trim()).filter(Boolean))];
-  const unmatchedBills = S.bills.filter(b => { const inv = String(b['INVOICE NUMBER']||'').trim(); return inv && !S.billAssignments[inv]; }).length;
 
   document.getElementById('dash-stats').innerHTML = `
     <div class="stat"><div class="stat-lbl">Total Spend</div><div class="stat-val" style="color:var(--accent);">${fmt(totalSpend)}</div></div>
     <div class="stat"><div class="stat-lbl">Boards Ordered</div><div class="stat-val" style="color:var(--blue);">${Math.round(totalBoards)}</div></div>
     <div class="stat"><div class="stat-lbl">POs</div><div class="stat-val">${uniquePOs.length}</div></div>
-    <div class="stat"><div class="stat-lbl">$/Board</div><div class="stat-val">${totalBoards>0?'$'+(totalSpend/totalBoards).toFixed(0):'—'}</div></div>
-    <div class="stat"><div class="stat-lbl">Unmatched Bills</div><div class="stat-val" style="color:${unmatchedBills>0?'var(--yellow)':'var(--green)'};">${unmatchedBills}</div></div>`;
+    <div class="stat"><div class="stat-lbl">$/Board</div><div class="stat-val">${totalBoards>0?'$'+(totalSpend/totalBoards).toFixed(0):'—'}</div></div>`;
 
   // Job cost table (FIX #2: clickable rows)
   const tbody = document.getElementById('dash-job-tbody');
@@ -1458,7 +1434,7 @@ function renderDashboard() {
   const jobsToShow = filterJob ? [filterJob] : jobs;
   const jobData = [];
   jobsToShow.forEach(j => {
-    const jr = S.rows.filter(r => (r['JOB']||'') === j);
+    const jr = getEmailPORows().filter(r => (r['JOB']||'') === j);
     const pos = [...new Set(jr.map(r => String(r['PO NUMBER']||'')).filter(Boolean))].length;
     const boards = jr.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
     const matSpend = jr.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
@@ -1498,7 +1474,7 @@ function renderDashCharts(jobData) {
 
   // Material categories doughnut
   const catTotals = {};
-  S.rows.forEach(r => { const cat = categorize(r['MATERIAL']||''); catTotals[cat] = (catTotals[cat]||0) + parseFloat(r['LINE TOTAL']||0); });
+  getEmailPORows().forEach(r => { const cat = categorize(r['MATERIAL']||''); catTotals[cat] = (catTotals[cat]||0) + parseFloat(r['LINE TOTAL']||0); });
   const catLabels = Object.keys(catTotals).filter(k => catTotals[k] > 0);
   const catColors = {boards:'#4F8EF7',metal:'#FBBF24',finish:'#34D399',supplies:'#A78BFA',tax:'#F87171',other:'#5A6280',labor:'#FF6B35'};
   const c2 = document.getElementById('chart-mat-cats');
@@ -1637,7 +1613,7 @@ function switchJobTab(tab) {
 // PPB Cards
 function renderJobPPBCards(job) {
   const el = document.getElementById('jobs-ppb-cards'); if (!el) return;
-  const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const rows = getEmailPORows().filter(r => (r['JOB']||'') === job);
   const boards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
   const matSpend = rows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
   const laborSpend = Object.values(S.billAssignments||{}).filter(ba => ba.job === job && LABOR_CATS.some(lc => (ba.category||'').includes(lc))).reduce((s,ba) => s + parseFloat(ba.total||0), 0);
@@ -1684,13 +1660,31 @@ function setMapView(v) {
   document.getElementById('jm-lab-btn')?.classList.toggle('btn-primary', v==='labor');
   document.getElementById('jm-lab-btn')?.classList.toggle('btn-ghost', v!=='labor');
   const el = document.getElementById('jm-content'); if (!el) return;
-  if (v === 'material') renderMapMaterial(_currentJob, el);
+  if (v === 'material') { renderMapMaterial(_currentJob, el); renderRecentPOs(_currentJob, el); }
   else renderMapLabor(_currentJob, el);
+}
+
+function renderRecentPOs(job, el) {
+  const recentPOs = (S.emailPOs||[])
+    .filter(p => (p.job_name||'') === job && p.status !== 'duplicate')
+    .sort((a,b) => (b.created_at||'').localeCompare(a.created_at||''))
+    .slice(0, 8);
+  if (!recentPOs.length) return;
+  const totalRecent = recentPOs.reduce((s,p) => s + (parseFloat(p.total)||0), 0);
+  let html = '<div class="card" style="margin-top:18px;"><div class="card-hdr"><span class="card-title">🕐 Recent POs</span><span style="font-size:12px;color:var(--ink3);">' + recentPOs.length + ' most recent · ' + fmt(totalRecent) + '</span></div><div class="card-body" style="padding:0;"><table class="tbl" style="border:none;"><thead><tr><th>PO#</th><th>Vendor</th><th>Location</th><th class="tbl-r">Total</th><th>Status</th><th>Date</th></tr></thead><tbody>';
+  recentPOs.forEach(p => {
+    const loc = [p.building?'Bldg '+p.building:'', p.floor?'Fl '+p.floor:'', p.unit?'Unit '+p.unit:''].filter(Boolean).join(' · ');
+    const statusBadge = p.status==='confirmed' ? '<span class="badge badge-green">✓ Confirmed</span>' : p.status==='needs_review' ? '<span class="badge badge-yellow">⚠ Review</span>' : '<span class="badge badge-blue">Pending</span>';
+    const date = p.created_at ? new Date(p.created_at).toLocaleDateString() : '';
+    html += '<tr style="cursor:pointer;" onclick="openEmailPOReview(\''+esc(p.id)+'\')"><td style="font-weight:700;">#'+esc(p.po_number||'?')+'</td><td>'+esc(p.vendor||'')+'</td><td style="font-size:11px;color:var(--ink3);">'+(loc||'<span style="color:var(--yellow);">No location</span>')+'</td><td class="tbl-r" style="font-weight:700;">'+fmt(p.total||0)+'</td><td>'+statusBadge+'</td><td style="font-size:11px;color:var(--ink3);">'+date+'</td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+  el.innerHTML += html;
 }
 
 function renderMapMaterial(job, el) {
   const struct = S.jobStructure?.[job];
-  const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const rows = getEmailPORows().filter(r => (r['JOB']||'') === job);
   if (!struct?.floors?.length) {
     el.innerHTML = '<div class="alert alert-y">No floors set up yet. Click <strong>⚙ Floors &amp; Units</strong> above.</div><div class="section-title" style="margin-top:16px;">PO Data by Building &amp; Floor (auto-detected)</div>';
     renderAutoFloors(job, rows, el); return;
@@ -1809,7 +1803,7 @@ function renderAutoFloors(job, rows, parentEl) {
 }
 
 function renderMapLabor(job, el) {
-  const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const rows = getEmailPORows().filter(r => (r['JOB']||'') === job);
   const bills = Object.entries(S.billAssignments||{}).filter(([inv,ba]) => ba.job === job && LABOR_CATS.some(lc => (ba.category||'').includes(lc))).map(([inv,ba]) => ({inv,...ba}));
   if (!bills.length) { el.innerHTML = '<div class="alert alert-y">No labor bills matched to this job yet.</div>'; return; }
   // Group by Building first, then Floor
@@ -1859,7 +1853,7 @@ function toggleFloorBlock(hdr) {
 }
 
 function openUnitDetail(job, floor, unit, bldg) {
-  const rows = S.rows.filter(r => { const rfl=String(r['FLOOR']||'').trim(), ru=String(r['UNIT']||'').trim(), rb=String(r['BUILDING']||'').trim(); if(rfl!==String(floor)) return false; if(bldg&&rb&&rb!==bldg) return false; if(unit==='General') return !ru||ru==='N/A'; return ru===String(unit); });
+  const rows = getEmailPORows().filter(r => { const rfl=String(r['FLOOR']||'').trim(), ru=String(r['UNIT']||'').trim(), rb=String(r['BUILDING']||'').trim(); if(rfl!==String(floor)) return false; if(bldg&&rb&&rb!==bldg) return false; if(unit==='General') return !ru||ru==='N/A'; return ru===String(unit); });
   const boards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
   const spend = rows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
   const matMap = {};
@@ -1885,7 +1879,7 @@ function openUnitDetail(job, floor, unit, bldg) {
 function renderEstimateTab(job) {
   const el = document.getElementById('jobs-tab-estimate'); if (!el) return;
   const items = getJobEstimate(job);
-  const rows = S.rows.filter(r => (r['JOB']||'') === job);
+  const rows = getEmailPORows().filter(r => (r['JOB']||'') === job);
   let html = '<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Line</button></div></div><div class="card-body" style="overflow-x:auto;">';
   html += '<table class="tbl"><thead><tr><th>Cat</th><th>Material</th><th>Use</th><th>UOM</th><th class="tbl-r">Price</th><th class="tbl-r" style="min-width:80px;">Qty</th><th class="tbl-r">Total</th><th class="tbl-r">Ordered</th><th></th></tr></thead><tbody>';
   let lastCat = '', grandTotal = 0;
@@ -2016,7 +2010,7 @@ function toggleSummaryView(job, mode) {
 }
 function renderJobSummaryTab(job) {
   const el = document.getElementById('jobs-tab-summary'); if (!el) return;
-  const rows = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  const rows = getEmailPORows().filter(r => (r['JOB']||'') === job);
   const items = getJobEstimate(job);
   const labor = getJobLabor(job);
   const matOrdered = rows.reduce((s,r) => s + (parseFloat(r['LINE TOTAL']||0)||0), 0);
@@ -2346,7 +2340,7 @@ function confirmBillMatch(inv, isLabor) {
 // ═══════════════════════════════════════════════════════════
 function renderMaterialStats(job) {
   if (!job) { showToast('Select a job first'); return; }
-  const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const rows = getEmailPORows().filter(r => (r['JOB']||'') === job);
   if (!rows.length) { showToast('No PO data for this job yet'); return; }
   const estItems = getJobEstimate(job);
   const estByName = {}; estItems.forEach(it => { estByName[it.name.toUpperCase()] = it; });
@@ -2572,14 +2566,18 @@ function switchRawTab(tab) {
 }
 function renderRawPO() {
   const el = document.getElementById('raw-tab-raw-po'); if (!el) return;
-  if (!S.rows.length) { el.innerHTML = '<div class="no-data">No PO data. Click Sync first.</div>'; return; }
-  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:11px;color:var(--ink3);">Click any row to edit. Data comes from Google Sheet — edits are saved as local overrides.</div><div style="font-size:11px;color:var(--ink3);">' + S.rows.length + ' rows</div></div>';
-  html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Job</th><th>Material</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Total</th><th>Bldg</th><th>Fl</th><th>Unit</th><th>Vendor</th><th>Actions</th></tr></thead><tbody>';
-  S.rows.slice(0, 300).forEach((r, idx) => {
-    html += '<tr><td>' + esc(r['PO NUMBER']||'') + '</td><td>' + esc((r['JOB']||'').replace('JOB ','')) + '</td><td>' + esc(r['MATERIAL']||'') + '</td><td class="tbl-r">' + (r['QTY']||'') + '</td><td>' + esc(r['UOM']||'') + '</td><td class="tbl-r">' + fmt(parseFloat(r['LINE TOTAL']||0)) + '</td><td>' + esc(r['BUILDING']||'') + '</td><td>' + esc(r['FLOOR']||'') + '</td><td>' + esc(r['UNIT']||'') + '</td><td>' + esc(r['VENDOR']||'') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editPORow(' + idx + ')">✏</button> <button class="btn btn-danger btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(r['MATERIAL']||'') + '\')">🏷</button></td></tr>';
+  const rows = getEmailPORows();
+  if (!rows.length) { el.innerHTML = '<div class="no-data">No PO data yet. Email a PDF or upload via Inbox.</div>'; return; }
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:11px;color:var(--ink3);">Extracted PO lines from email PDFs. Click 🏷 to re-categorize a material.</div><div style="font-size:11px;color:var(--ink3);">' + rows.length + ' lines from ' + (S.emailPOs?.length||0) + ' POs</div></div>';
+  html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Status</th><th>Job</th><th>Material</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Total</th><th>Bldg</th><th>Fl</th><th>Unit</th><th>Vendor</th><th></th></tr></thead><tbody>';
+  rows.slice(0, 300).forEach(r => {
+    const po = (S.emailPOs||[]).find(p => p.po_number === r['PO NUMBER']);
+    const status = po?.status || 'pending';
+    const statusBadge = status === 'confirmed' ? '<span class="badge badge-green">✓</span>' : status === 'needs_review' ? '<span class="badge badge-yellow">⚠</span>' : '<span class="badge badge-blue">•</span>';
+    html += '<tr><td style="font-weight:600;">' + esc(r['PO NUMBER']||'') + '</td><td>' + statusBadge + '</td><td>' + esc((r['JOB']||'').replace('JOB ','')) + '</td><td>' + esc(r['MATERIAL']||'') + '</td><td class="tbl-r">' + (r['QTY']||'') + '</td><td>' + esc(r['UOM']||'') + '</td><td class="tbl-r">' + fmt(parseFloat(r['LINE TOTAL']||0)) + '</td><td>' + esc(r['BUILDING']||'') + '</td><td>' + esc(r['FLOOR']||'') + '</td><td>' + esc(r['UNIT']||'') + '</td><td>' + esc(r['VENDOR']||'') + '</td><td><button class="btn btn-ghost btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(r['MATERIAL']||'') + '\')">🏷</button></td></tr>';
   });
   html += '</tbody></table></div>';
-  if (S.rows.length > 300) html += '<div class="no-data">Showing first 300 of ' + S.rows.length + ' rows</div>';
+  if (rows.length > 300) html += '<div class="no-data">Showing first 300 of ' + rows.length + ' lines</div>';
   el.innerHTML = html;
 }
 function editPORow(idx) {
@@ -2646,7 +2644,7 @@ async function setManualCategoryFromRaw(desc) {
 }
 function renderRawBills() {
   const el = document.getElementById('raw-tab-raw-bills'); if (!el) return;
-  if (!S.bills.length) { el.innerHTML = '<div class="no-data">No bill data. Click Sync first.</div>'; return; }
+  if (!S.bills?.length) { el.innerHTML = '<div class="no-data">Bill tracking is not active in this view. Use the Inbox to manage incoming POs.</div>'; return; }
   let html = '<div style="font-size:11px;color:var(--ink3);margin-bottom:12px;">Click ✏ to edit a bill line, or 🏷 to change material category.</div>';
   html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Invoice</th><th>Vendor</th><th>Description</th><th class="tbl-r">Qty</th><th class="tbl-r">Total</th><th>Job</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
   S.bills.slice(0, 300).forEach((b, idx) => {
@@ -2867,10 +2865,11 @@ async function sendAI() {
   addAIMsg(q, 'user');
   addAIMsg('Thinking...', 'ai thinking');
   const jobs = getJobs();
-  const totalSpend = S.rows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
-  const totalBoards = S.rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
-  const jobBreakdown = jobs.map(j => { const jr=S.rows.filter(r=>(r['JOB']||'')===j); const spend=jr.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0); const boards=jr.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0); return j+': $'+spend.toFixed(0)+', '+Math.round(boards)+' boards'; }).join('\n');
-  const context = 'You are an AI for A.A. DRYWALL FINISH PAINT LLC. Answer concisely.\n\nJOBS:\n' + jobBreakdown + '\n\nTOTALS: Spend=$'+totalSpend.toFixed(0)+' Boards='+Math.round(totalBoards)+' Bills='+S.bills.length;
+  const aiRows = getEmailPORows();
+  const totalSpend = aiRows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
+  const totalBoards = aiRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
+  const jobBreakdown = jobs.map(j => { const jr=aiRows.filter(r=>(r['JOB']||'')===j); const spend=jr.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0); const boards=jr.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0); return j+': $'+spend.toFixed(0)+', '+Math.round(boards)+' boards'; }).join('\n');
+  const context = 'You are an AI for A.A. DRYWALL FINISH PAINT LLC. Answer concisely.\n\nJOBS:\n' + jobBreakdown + '\n\nTOTALS: Spend=$'+totalSpend.toFixed(0)+' Boards='+Math.round(totalBoards)+' POs='+(S.emailPOs?.length||0);
   const EDGE_URL = SB_URL + '/functions/v1/ai-chat';
   try {
     const res = await fetch(EDGE_URL, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'apikey':SB_KEY}, body:JSON.stringify({question:q,context}) });
