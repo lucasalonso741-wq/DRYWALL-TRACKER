@@ -312,6 +312,67 @@ a{color:var(--accent);}
 ::-webkit-scrollbar-track{background:var(--surface);}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
 ::-webkit-scrollbar-thumb:hover{background:var(--ink3);}
+
+/* ══ ANIMATIONS ═════════════════════════════════════════════ */
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.5;}}
+@keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
+@keyframes slideUp{from{transform:translateY(12px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+@keyframes popIn{0%{transform:scale(.85);opacity:0;}60%{transform:scale(1.05);}100%{transform:scale(1);opacity:1;}}
+@keyframes glow-pulse{0%,100%{box-shadow:0 0 0 rgba(255,107,53,0);}50%{box-shadow:0 0 20px rgba(255,107,53,.35);}}
+@keyframes typing{0%,100%{opacity:.2;}50%{opacity:1;}}
+@keyframes countUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+@keyframes sparkle{0%{transform:scale(0) rotate(0deg);opacity:1;}100%{transform:scale(1.5) rotate(180deg);opacity:0;}}
+.pulse-anim{animation:pulse 2s ease-in-out infinite;}
+.slide-up{animation:slideUp .25s ease;}
+.pop-in{animation:popIn .3s cubic-bezier(.34,1.56,.64,1);}
+.glow-pulse{animation:glow-pulse 2.5s ease-in-out infinite;}
+.shimmer-bg{background:linear-gradient(90deg,var(--surface2) 25%,var(--surface3) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;}
+
+/* ══ UNDO TOAST ══════════════════════════════════════════════ */
+#toast{pointer-events:none;}
+.toast-item{pointer-events:none;}
+.toast-item.has-undo{pointer-events:all;display:flex;align-items:center;gap:12px;}
+.toast-undo-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;transition:background .12s;}
+.toast-undo-btn:hover{background:rgba(255,255,255,.22);}
+
+/* ══ AI PANEL UPGRADE ════════════════════════════════════════ */
+#ai-panel{width:420px;max-height:600px;border-color:rgba(255,107,53,.25);background:var(--surface);}
+.ai-panel-hdr{padding:14px 16px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(255,107,53,.08),rgba(192,38,211,.05));display:flex;justify-content:space-between;align-items:center;}
+.ai-panel-title{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.ai-status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:glow-pulse 2s infinite;}
+.ai-msgs{scrollbar-width:thin;}
+.ai-msg{animation:slideUp .2s ease;line-height:1.6;}
+.ai-msg.ai{background:var(--surface2);border:1px solid var(--border);border-radius:10px 10px 10px 2px;}
+.ai-msg.user{background:linear-gradient(135deg,var(--accent),#c026d3);border-radius:10px 10px 2px 10px;box-shadow:0 2px 12px rgba(255,107,53,.3);}
+.ai-msg.thinking{color:var(--ink3);font-style:normal;display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);}
+.ai-typing-dots{display:flex;gap:4px;align-items:center;}
+.ai-typing-dots span{width:5px;height:5px;border-radius:50%;background:var(--ink3);animation:typing .8s ease-in-out infinite;}
+.ai-typing-dots span:nth-child(2){animation-delay:.2s;}
+.ai-typing-dots span:nth-child(3){animation-delay:.4s;}
+.ai-chip{display:inline-flex;align-items:center;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--surface3);color:var(--ink2);margin:2px;transition:all .12s;white-space:nowrap;}
+.ai-chip:hover{border-color:var(--accent);color:var(--accent);background:rgba(255,107,53,.07);}
+.ai-chip.action{border-color:rgba(52,211,153,.3);color:var(--green);background:rgba(52,211,153,.06);}
+.ai-chip.action:hover{background:rgba(52,211,153,.12);}
+.ai-chips-row{display:flex;flex-wrap:wrap;gap:2px;padding:6px 12px;border-top:1px solid var(--border);background:var(--surface2);}
+.ai-inp-row{padding:10px 12px;border-top:1px solid var(--border);display:flex;gap:8px;background:var(--surface);}
+.ai-clear-btn{background:none;border:none;color:var(--ink3);cursor:pointer;font-size:11px;padding:2px 8px;border-radius:4px;transition:color .12s;}
+.ai-clear-btn:hover{color:var(--red);}
+#ai-fab{animation:glow-pulse 3s ease-in-out infinite;}
+
+/* ══ ANIMATED STAT CARDS ═════════════════════════════════════ */
+.stat.loaded .stat-val{animation:countUp .4s ease;}
+.dash-job-card{transition:all .2s;}
+.dash-job-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);border-color:var(--accent);}
+
+/* ══ PAGE TRANSITIONS ════════════════════════════════════════ */
+.page.active{animation:slideUp .2s ease;}
+
+/* ══ DELETE / UNDO CONFIRM ═══════════════════════════════════ */
+.delete-confirm-bar{display:flex;align-items:center;gap:10px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:10px;padding:10px 14px;margin-bottom:12px;}
+.delete-confirm-bar .label{flex:1;font-size:12px;color:var(--red);}
+
+/* ══ SPARKLE ═════════════════════════════════════════════════ */
+.sparkle{position:fixed;pointer-events:none;z-index:9999;font-size:18px;animation:sparkle .6s ease-out forwards;}
 </style>
 </head>
 <body>
@@ -482,17 +543,30 @@ a{color:var(--accent);}
 
 <!-- AI CHAT -->
 
-<button id="ai-fab" onclick="toggleAI()">🤖</button>
+<button id="ai-fab" onclick="toggleAI()" title="AI Assistant">🤖</button>
 
 <div id="ai-panel">
-  <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center;">
-    <span>🤖 AI Assistant</span><button onclick="toggleAI()" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:16px;">✕</button>
+  <div class="ai-panel-hdr">
+    <div class="ai-panel-title">
+      <div class="ai-status-dot"></div>
+      AA Assistant
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button class="ai-clear-btn" onclick="clearAIHistory()" title="Clear chat">🗑</button>
+      <button onclick="toggleAI()" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:16px;line-height:1;">✕</button>
+    </div>
   </div>
   <div class="ai-msgs" id="ai-msgs">
-    <div class="ai-msg ai">Hi! Ask me anything about your drywall jobs, spending, or materials.</div>
+    <div class="ai-msg ai" style="font-size:13px;">Hi! I'm your AA Drywall AI. I can analyze your jobs, assign POs, set budgets, and navigate the app for you.<br><br>Try: <em>"Assign PO 1234 to Margate"</em> or <em>"Show me job costs"</em> or <em>"What's over budget?"</em></div>
+  </div>
+  <div class="ai-chips-row" id="ai-quick-chips">
+    <span class="ai-chip" onclick="aiQuick('What jobs are over budget?')">💸 Over budget?</span>
+    <span class="ai-chip" onclick="aiQuick('Show me flagged POs')">🚩 Flagged POs</span>
+    <span class="ai-chip" onclick="aiQuick('Which job has the highest cost per board?')">📊 Cost/board</span>
+    <span class="ai-chip" onclick="aiQuick('What should I order next?')">📦 What to order</span>
   </div>
   <div class="ai-inp-row">
-    <input id="ai-input" class="inp" placeholder="Ask about your jobs..." onkeydown="if(event.key==='Enter')sendAI()"/>
+    <input id="ai-input" class="inp inp-sm" placeholder="Ask or command the app…" onkeydown="if(event.key==='Enter')sendAI()" style="flex:1;"/>
     <button class="btn btn-primary btn-sm" onclick="sendAI()">→</button>
   </div>
 </div>
@@ -585,7 +659,57 @@ const CAT_TEXT={'Metal 20GA':'var(--blue)','Metal 25GA':'var(--yellow)','Wood':'
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function jsesc(s) { return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 function fmt(n) { const v=parseFloat(n)||0; return v>=0?'$'+v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}):'-$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}); }
-function showToast(msg, isErr) { const t=document.getElementById('toast'); t.innerHTML='<div class="toast-item" style="'+(isErr?'border-color:var(--red);color:var(--red);':'')+'">' + msg + '</div>'; setTimeout(()=>t.innerHTML='',3500); }
+// ── UNDO STACK ──────────────────────────────────────────────
+const _undoStack = [];
+function pushUndo(label, restoreFn) {
+  _undoStack.push({ label, restoreFn, ts: Date.now() });
+  if (_undoStack.length > 20) _undoStack.shift();
+}
+function doUndo() {
+  const entry = _undoStack.pop();
+  if (!entry) return;
+  entry.restoreFn();
+  showToast('↩ Undone: ' + entry.label);
+}
+
+function showToast(msg, isErr, undoFn) {
+  const t = document.getElementById('toast');
+  if (undoFn) {
+    t.innerHTML = `<div class="toast-item has-undo" style="background:var(--surface2);border:1px solid ${isErr?'var(--red)':'var(--border)'};color:${isErr?'var(--red)':'var(--ink)'};">
+      <span>${msg}</span>
+      <button class="toast-undo-btn" onclick="(${undoFn.toString()})();document.getElementById('toast').innerHTML=''">↩ Undo</button>
+    </div>`;
+    setTimeout(() => t.innerHTML = '', 7000);
+  } else {
+    t.innerHTML = `<div class="toast-item" style="${isErr?'border-color:var(--red);color:var(--red);':''}">${msg}</div>`;
+    setTimeout(() => t.innerHTML = '', 3500);
+  }
+}
+
+function sparkle(x, y) {
+  const emojis = ['✨','⭐','💥','🎯'];
+  for (let i = 0; i < 3; i++) {
+    const el = document.createElement('div');
+    el.className = 'sparkle';
+    el.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    el.style.left = (x + (Math.random()-0.5)*60) + 'px';
+    el.style.top = (y + (Math.random()-0.5)*40) + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 700);
+  }
+}
+
+function animateCounter(el, to, prefix='', suffix='', decimals=0) {
+  const from = 0, dur = 600, start = performance.now();
+  const tick = (now) => {
+    const p = Math.min((now - start) / dur, 1);
+    const ease = 1 - Math.pow(1-p, 3);
+    const val = from + (to - from) * ease;
+    el.textContent = prefix + (decimals ? val.toFixed(decimals) : Math.round(val).toLocaleString()) + suffix;
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
 function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
 const CAT_COLOR_MAP = { boards:'var(--blue)', metal:'var(--yellow)', wood:'var(--green)', finish:'#FB923C', supplies:'var(--ink2)', labor:'var(--accent)', tax:'var(--red)', other:'var(--ink3)' };
 const CAT_BG_MAP = { boards:'rgba(79,142,247,.12)', metal:'rgba(251,191,36,.12)', wood:'rgba(52,211,153,.12)', finish:'rgba(251,146,60,.12)', supplies:'rgba(148,163,184,.12)', labor:'rgba(167,139,250,.12)', tax:'rgba(248,113,113,.12)', other:'rgba(148,163,184,.12)' };
@@ -1176,8 +1300,13 @@ function addJob() {
   inp.value = ''; renderSettings(); populateJobSelects(); showToast('✓ Job added');
 }
 function removeJob(name) {
-  S.jobs = S.jobs.filter(j => j !== name); saveSharedData('jobs');
-  renderSettings(); populateJobSelects(); showToast('Job removed');
+  if (!confirm('Remove job "' + name.replace('JOB ','') + '" from the list?\n(PO data in Google Sheet is unaffected)')) return;
+  const idx = S.jobs.indexOf(name);
+  S.jobs = S.jobs.filter(j => j !== name);
+  saveSharedData('jobs');
+  renderSettings(); populateJobSelects();
+  const undoFn = () => { if (idx >= 0) S.jobs.splice(idx, 0, name); else S.jobs.push(name); saveSharedData('jobs'); renderSettings(); populateJobSelects(); showToast('↩ Job restored'); };
+  showToast('🗑 Job "' + name.replace('JOB ','') + '" removed', false, undoFn);
 }
 function renameJob(old) {
   const nw = prompt('New name for ' + old + ':', old); if (!nw || nw === old) return;
@@ -1547,16 +1676,22 @@ async function deleteSelectedAssignments() {
   const ids = feedSelectedIds(type);
   if (!ids.length) { showToast('Select items first'); return; }
   if (!confirm('Remove assignments for ' + ids.length + ' ' + (type==='bill'?'bill':'PO') + (ids.length!==1?'s':'') + '?\n\nOriginal data stays — only tracking is removed.')) return;
+  let snapshot = {};
   if (type === 'po') {
-    ids.forEach(po => { delete S.assignments[po]; });
+    ids.forEach(po => { if (S.assignments[po]) snapshot[po] = JSON.parse(JSON.stringify(S.assignments[po])); delete S.assignments[po]; });
     await saveSharedData('assignments');
   } else {
-    ids.forEach(inv => { delete S.billAssignments[inv]; delete S.actuals?.[inv]; });
+    ids.forEach(inv => { if (S.billAssignments[inv]) snapshot[inv] = JSON.parse(JSON.stringify(S.billAssignments[inv])); delete S.billAssignments[inv]; delete S.actuals?.[inv]; });
     await saveSharedData('billAssignments');
   }
   clearFeedSelection();
   updateInboxBadge();
-  showToast('✓ Removed ' + ids.length + ' assignment' + (ids.length!==1?'s':''));
+  const undoFn = async () => {
+    if (type === 'po') { Object.assign(S.assignments, snapshot); await saveSharedData('assignments'); }
+    else { Object.assign(S.billAssignments, snapshot); await saveSharedData('billAssignments'); }
+    renderActivityFeed(); updateInboxBadge(); showToast('↩ Assignments restored');
+  };
+  showToast('🗑 Removed ' + ids.length + ' assignment' + (ids.length!==1?'s':''), false, undoFn);
 }
 
 // PO detail modal
@@ -1666,11 +1801,19 @@ function renderDashboard() {
   const unmatchedBills = S.bills.filter(b => { const inv = String(b['INVOICE NUMBER']||'').trim(); return inv && !S.billAssignments[inv]; }).length;
 
   document.getElementById('dash-stats').innerHTML = `
-    <div class="stat"><div class="stat-lbl">Total Spend</div><div class="stat-val" style="color:var(--accent);">${fmt(totalSpend)}</div></div>
-    <div class="stat"><div class="stat-lbl">Boards Ordered</div><div class="stat-val" style="color:var(--blue);">${Math.round(totalBoards)}</div></div>
-    <div class="stat"><div class="stat-lbl">POs</div><div class="stat-val">${uniquePOs.length}</div></div>
-    <div class="stat"><div class="stat-lbl">$/Board</div><div class="stat-val">${totalBoards>0?'$'+(totalSpend/totalBoards).toFixed(0):'—'}</div></div>
-    <div class="stat"><div class="stat-lbl">Unmatched Bills</div><div class="stat-val" style="color:${unmatchedBills>0?'var(--yellow)':'var(--green)'};">${unmatchedBills}</div></div>`;
+    <div class="stat loaded"><div class="stat-lbl">Total Spend</div><div class="stat-val" id="ds-spend" style="color:var(--accent);">$0</div></div>
+    <div class="stat loaded"><div class="stat-lbl">Boards Ordered</div><div class="stat-val" id="ds-boards" style="color:var(--blue);">0</div></div>
+    <div class="stat loaded"><div class="stat-lbl">POs</div><div class="stat-val" id="ds-pos">0</div></div>
+    <div class="stat loaded"><div class="stat-lbl">$/Board</div><div class="stat-val" id="ds-ppb">${totalBoards>0?'—':'—'}</div></div>
+    <div class="stat loaded"><div class="stat-lbl">Unmatched Bills</div><div class="stat-val" id="ds-bills" style="color:${unmatchedBills>0?'var(--yellow)':'var(--green)'};">0</div></div>`;
+  // Animate counters after paint
+  requestAnimationFrame(() => {
+    const spendEl = document.getElementById('ds-spend'); if(spendEl) animateCounter(spendEl, totalSpend, '$', '', 0);
+    const boardsEl = document.getElementById('ds-boards'); if(boardsEl) animateCounter(boardsEl, Math.round(totalBoards), '', '', 0);
+    const posEl = document.getElementById('ds-pos'); if(posEl) animateCounter(posEl, uniquePOs.length, '', '', 0);
+    if (totalBoards > 0) { const ppbEl = document.getElementById('ds-ppb'); if(ppbEl) animateCounter(ppbEl, totalSpend/totalBoards, '$', '', 0); }
+    const billsEl = document.getElementById('ds-bills'); if(billsEl) animateCounter(billsEl, unmatchedBills, '', '', 0);
+  });
 
   // Job cost table (FIX #2: clickable rows)
   const tbody = document.getElementById('dash-job-tbody');
@@ -2325,9 +2468,19 @@ function updateGrandTotal() {
 }
 function removeEstItem(i) {
   const items = getJobEstimate(_currentJob);
+  const removed = JSON.parse(JSON.stringify(items[i]));
+  const job = _currentJob;
   items.splice(i, 1);
-  saveJobEstimate(_currentJob);
-  renderEstimateTab(_currentJob);
+  saveJobEstimate(job);
+  renderEstimateTab(job);
+  const undoFn = () => {
+    const cur = getJobEstimate(job);
+    cur.splice(i, 0, removed);
+    saveJobEstimate(job);
+    renderEstimateTab(job);
+    showToast('↩ Item restored');
+  };
+  showToast('🗑 "' + (removed.name||'Item') + '" removed', false, undoFn);
 }
 function addEstLine() {
   const items = getJobEstimate(_currentJob);
@@ -3009,14 +3162,35 @@ async function savePDFEdit(id) {
 async function deletePORecord(id, poNumber) {
   if (!confirm('Delete extraction for PO #' + poNumber + '?\nThis only removes the PDF record — not Google Sheet data.')) return;
   const res = await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + id, { method:'DELETE', headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'} });
-  if (res.ok) { showToast('✓ Removed'); closeModal('po-modal'); loadPendingPOs(); } else showToast('Error: ' + res.status, true);
+  if (res.ok) {
+    showToast('🗑 PO #' + poNumber + ' record deleted', false);
+    closeModal('po-modal'); loadPendingPOs();
+  } else showToast('Error: ' + res.status, true);
 }
-// Delete an assignment (saved PO / bill match)
+
 async function deleteAssignment(type, id) {
   if (!confirm('Delete ' + type + ' assignment for ' + id + '?\nThe original data stays — only your assignment is removed.')) return;
-  if (type === 'po') { delete S.assignments[id]; await saveSharedData('assignments'); }
-  else if (type === 'bill') { delete S.billAssignments[id]; delete S.actuals[id]; await Promise.all([saveSharedData('billAssignments'), saveSharedData('actuals')]); }
-  showToast('✓ Removed'); renderActivityFeed(); updateInboxBadge();
+  let snapshot;
+  if (type === 'po') {
+    snapshot = S.assignments[id] ? JSON.parse(JSON.stringify(S.assignments[id])) : null;
+    delete S.assignments[id];
+    await saveSharedData('assignments');
+  } else if (type === 'bill') {
+    snapshot = { bill: S.billAssignments[id] ? JSON.parse(JSON.stringify(S.billAssignments[id])) : null, actual: S.actuals[id] ? JSON.parse(JSON.stringify(S.actuals[id])) : null };
+    delete S.billAssignments[id]; delete S.actuals[id];
+    await Promise.all([saveSharedData('billAssignments'), saveSharedData('actuals')]);
+  }
+  const undoFn = async () => {
+    if (type === 'po' && snapshot) { S.assignments[id] = snapshot; await saveSharedData('assignments'); }
+    else if (type === 'bill' && snapshot) {
+      if (snapshot.bill) S.billAssignments[id] = snapshot.bill;
+      if (snapshot.actual) S.actuals[id] = snapshot.actual;
+      await Promise.all([saveSharedData('billAssignments'), saveSharedData('actuals')]);
+    }
+    renderActivityFeed(); updateInboxBadge(); showToast('↩ Assignment restored');
+  };
+  showToast('🗑 Assignment removed', false, undoFn);
+  renderActivityFeed(); updateInboxBadge();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3269,8 +3443,20 @@ function addFloorToStruct() {
   _editStruct.floors.push({floor:fl, bldg, budgetBoards:bb, units});
   renderJobSetupBody(); showToast('✓ Floor added');
 }
-function removeFl(fi) { _editStruct.floors.splice(fi,1); renderJobSetupBody(); }
-function removeUnit(fi,ui) { _editStruct.floors[fi].units.splice(ui,1); renderJobSetupBody(); }
+function removeFl(fi) {
+  const removed = JSON.parse(JSON.stringify(_editStruct.floors[fi]));
+  _editStruct.floors.splice(fi, 1);
+  renderJobSetupBody();
+  const undoFn = () => { _editStruct.floors.splice(fi, 0, removed); renderJobSetupBody(); showToast('↩ Floor restored'); };
+  showToast('🗑 Floor ' + (removed.floor||fi+1) + ' removed', false, undoFn);
+}
+function removeUnit(fi, ui) {
+  const removed = JSON.parse(JSON.stringify(_editStruct.floors[fi].units[ui]));
+  _editStruct.floors[fi].units.splice(ui, 1);
+  renderJobSetupBody();
+  const undoFn = () => { _editStruct.floors[fi].units.splice(ui, 0, removed); renderJobSetupBody(); showToast('↩ Unit restored'); };
+  showToast('🗑 Unit ' + (removed.unit||ui+1) + ' removed', false, undoFn);
+}
 function addUnit(fi) { const u = prompt('Unit number:'); if(u) { _editStruct.floors[fi].units.push({unit:u.trim(),budgetBoards:0}); renderJobSetupBody(); } }
 function smartGenerate() {
   const bldgsInput = document.getElementById('js-bldgs')?.value.trim()||'';
@@ -3312,10 +3498,30 @@ function saveJobStructure() {
 // ═══════════════════════════════════════════════════════════
 // AI CHAT
 // ═══════════════════════════════════════════════════════════
-function toggleAI() { document.getElementById('ai-panel').classList.toggle('open'); }
+function toggleAI() {
+  const panel = document.getElementById('ai-panel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    setTimeout(() => document.getElementById('ai-input')?.focus(), 100);
+  }
+}
+function clearAIHistory() {
+  document.getElementById('ai-msgs').innerHTML = '<div class="ai-msg ai">Chat cleared. What do you need?</div>';
+}
+function aiQuick(q) {
+  document.getElementById('ai-input').value = q;
+  sendAI();
+}
 function addAIMsg(text, cls) {
   const msgs = document.getElementById('ai-msgs');
-  msgs.innerHTML += '<div class="ai-msg ' + cls + '">' + text.replace(/\n/g,'<br>') + '</div>';
+  const div = document.createElement('div');
+  div.className = 'ai-msg ' + cls;
+  if (cls.includes('thinking')) {
+    div.innerHTML = '<div class="ai-typing-dots"><span></span><span></span><span></span></div><span style="margin-left:4px;font-size:12px;">Thinking…</span>';
+  } else {
+    div.innerHTML = text.replace(/\n/g, '<br>');
+  }
+  msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
 }
 function removeLastAIMsg() {
@@ -3362,19 +3568,115 @@ function buildAIContext() {
     return `CURRENT JOB: ${_currentJob}, ${floors} floors, ${totalUnits} units`;
   })() : '';
 
-  return `You are an expert AI assistant for A.A. DRYWALL FINISH PAINT LLC, a drywall framing, hanging, and finish paint contractor. You track material costs, labor, POs, and job budgets. Be concise but specific with numbers. Use the data below to answer accurately.
+  // Unassigned POs list for AI reference
+  const unassignedList = getFeedPOGroups().filter(g => !S.assignments[g.po]).slice(0,10).map(g => `PO#${g.po} vendor=${g.vendor||'?'} job=${g.job||'?'} total=$${g.rows.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0).toFixed(0)}`).join('\n');
+
+  return `You are an expert AI assistant built into the AA Drywall Tracker app for A.A. DRYWALL FINISH PAINT LLC (drywall framing, hanging, finish paint). You have full access to live job data below and can EXECUTE actions in the app using ACTION tags.
 
 TODAY: ${new Date().toLocaleDateString()}
 COMPANY TOTALS: spend=$${totalSpend.toFixed(0)}, boards=${Math.round(totalBoards)}, unmatched_bills=${unmatchedBills}, unassigned_POs=${unassignedPOs}
 MATERIAL CATEGORIES: ${catBreakdown}
 
-JOB DETAILS:
+JOB DETAILS (material_spend, boards hung, labor billed, estimate, units, $/board, target, total_budget):
 ${jobDetails}
 
-${flaggedPOs ? 'FLAGGED POs: ' + flaggedPOs : ''}
+${flaggedPOs ? 'FLAGGED POs (need attention): ' + flaggedPOs : ''}
+${unassignedList ? 'UNASSIGNED POs:\n' + unassignedList : ''}
 ${curJobCtx}
+AVAILABLE JOBS: ${getJobs().join(', ')}
 
-You can help with: cost analysis, per-unit estimates, budget tracking, material ordering patterns, labor cost questions, job comparisons, and identifying anomalies.`;
+═══ EXECUTABLE ACTIONS ═══
+You can perform real actions in the app. When you want to execute an action, include it at the END of your response in this exact format (one per line):
+[ACTION:navigate:PAGE] — go to page (home|dashboard|inbox|jobs|raw|settings)
+[ACTION:openJob:JOB_NAME] — open a specific job view
+[ACTION:assignPO:PO_NUMBER:JOB_NAME:BUILDING:FLOOR:UNIT] — assign a PO (building/floor/unit optional, use "" if unknown)
+[ACTION:setTotalBudget:JOB_NAME:AMOUNT] — set total job budget
+[ACTION:setPPBTarget:JOB_NAME:AMOUNT] — set price-per-board target
+[ACTION:syncData] — refresh data from Google Sheets
+[ACTION:addEstimateItem:JOB_NAME:ITEM_NAME:CATEGORY:QTY:PRICE] — add item to material estimate
+[ACTION:showFlaggedPOs] — navigate to activity feed and filter flagged
+
+RULES:
+- Be concise and specific with dollar amounts and quantities from the data
+- When the user asks you to do something in the app (assign, navigate, set budget), DO IT using ACTION tags
+- Multiple actions can be included — list them one per line at the end
+- If a job name is ambiguous, pick the closest match from AVAILABLE JOBS
+- Always confirm what action you took in plain language first, then include the tags`;
+}
+
+// ── AI ACTION EXECUTOR ────────────────────────────────────────
+async function executeAIAction(actionStr) {
+  const parts = actionStr.split(':');
+  const type = parts[1];
+  try {
+    if (type === 'navigate') {
+      nav(parts[2]); return '✓ Navigated to ' + parts[2];
+    }
+    if (type === 'openJob') {
+      const job = parts.slice(2).join(':');
+      nav('jobs');
+      await new Promise(r => setTimeout(r, 200));
+      openJob(job);
+      return '✓ Opened job: ' + job;
+    }
+    if (type === 'assignPO') {
+      const [,, po, job, bldg='', floor='', unit=''] = parts;
+      if (!po || !job) return '✗ Missing PO or job';
+      const match = getJobs().find(j => j.toUpperCase().includes(job.toUpperCase()) || job.toUpperCase().includes(j.replace('JOB ','').toUpperCase()));
+      if (!match) return '✗ Job not found: ' + job;
+      S.assignments[po] = { job: match, building: bldg, floor, unit, date: new Date().toISOString().split('T')[0], manual: true };
+      await saveSharedData('assignments');
+      renderActivityFeed(); updateInboxBadge();
+      return '✓ PO #' + po + ' assigned to ' + match.replace('JOB ','');
+    }
+    if (type === 'setTotalBudget') {
+      const job = parts[2], amount = parseFloat(parts[3]);
+      if (!S.matBanks) S.matBanks = {};
+      const key = job + '_manualBudget';
+      S.matBanks[key] = S.matBanks[key] || {};
+      S.matBanks[key].totalBudget = amount;
+      await saveSharedData('matBanks');
+      return '✓ Total budget for ' + job.replace('JOB ','') + ' set to $' + amount.toLocaleString();
+    }
+    if (type === 'setPPBTarget') {
+      const job = parts[2], amount = parseFloat(parts[3]);
+      if (!S.targets) S.targets = {};
+      S.targets[job] = S.targets[job] || {};
+      S.targets[job].pricePerBoard = amount;
+      await saveSharedData('targets');
+      return '✓ $/board target for ' + job.replace('JOB ','') + ' set to $' + amount;
+    }
+    if (type === 'syncData') {
+      syncData(); return '✓ Sync triggered';
+    }
+    if (type === 'addEstimateItem') {
+      const [,, job, name, cat, qty, price] = parts;
+      const items = getJobEstimate(job);
+      items.push({ cat: cat||'Other', name: name||'Custom', uom:'EA', qty: parseFloat(qty)||0, price: parseFloat(price)||0, _custom:true });
+      saveJobEstimate(job);
+      return '✓ Added "' + name + '" to ' + job.replace('JOB ','') + ' estimate';
+    }
+    if (type === 'showFlaggedPOs') {
+      nav('home'); return '✓ Showing activity feed';
+    }
+  } catch(e) { return '✗ Action failed: ' + e.message; }
+  return '✗ Unknown action: ' + type;
+}
+
+function parseAndRunAIActions(text) {
+  const actionRe = /\[ACTION:([^\]]+)\]/g;
+  const results = [];
+  let match;
+  const promises = [];
+  while ((match = actionRe.exec(text)) !== null) {
+    promises.push(executeAIAction(match[0]));
+  }
+  if (!promises.length) return Promise.resolve([]);
+  return Promise.all(promises);
+}
+
+function stripAIActions(text) {
+  return text.replace(/\[ACTION:[^\]]+\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 async function sendAI() {
@@ -3382,23 +3684,47 @@ async function sendAI() {
   const q = input.value.trim(); if (!q) return;
   input.value = '';
   addAIMsg(q, 'user');
-  addAIMsg('⏳ Thinking...', 'ai thinking');
+  addAIMsg('thinking', 'ai thinking');
   const context = buildAIContext();
   const EDGE_URL = SB_URL + '/functions/v1/ai-chat';
+
+  const handleResponse = async (rawText) => {
+    removeLastAIMsg();
+    const actionResults = await parseAndRunAIActions(rawText);
+    const displayText = stripAIActions(rawText);
+    let html = displayText.replace(/\n/g, '<br>');
+    if (actionResults.length) {
+      html += '<div style="margin-top:10px;padding:8px 10px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:8px;font-size:11px;">' +
+        actionResults.map(r => '<div style="color:' + (r.startsWith('✓')?'var(--green)':'var(--red)') + ';">' + esc(r) + '</div>').join('') + '</div>';
+    }
+    addAIMsg(html, 'ai');
+    // If an action was performed, fire sparkle near AI panel
+    if (actionResults.some(r => r.startsWith('✓'))) {
+      const fab = document.getElementById('ai-fab');
+      if (fab) { const rect = fab.getBoundingClientRect(); sparkle(rect.left, rect.top); }
+    }
+  };
+
   try {
     const res = await fetch(EDGE_URL, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'apikey':SB_KEY}, body:JSON.stringify({question:q,context}) });
     const data = await res.json();
-    removeLastAIMsg();
-    if (data.answer) { addAIMsg(data.answer, 'ai'); return; }
+    if (data.answer) { await handleResponse(data.answer); return; }
     throw new Error(data.error || 'Edge function not ready');
   } catch(e) {
     if (S.aiKey) {
       try {
-        const res2 = await fetch('https://api.anthropic.com/v1/messages', { method:'POST', headers:{'Content-Type':'application/json','x-api-key':S.aiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}, body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:800,system:context,messages:[{role:'user',content:q}]}) });
+        const res2 = await fetch('https://api.anthropic.com/v1/messages', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','x-api-key':S.aiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+          body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1200,system:context,messages:[{role:'user',content:q}]})
+        });
         const d2 = await res2.json();
-        removeLastAIMsg(); addAIMsg(d2.content?.[0]?.text||'No response', 'ai');
-      } catch(e2) { removeLastAIMsg(); addAIMsg('⚠ Error: '+e2.message, 'ai'); }
-    } else { removeLastAIMsg(); addAIMsg('Add an Anthropic API key in ⚙ Setup to enable AI. Or deploy the ai-chat Edge Function to Supabase.', 'ai'); }
+        await handleResponse(d2.content?.[0]?.text || 'No response');
+      } catch(e2) { removeLastAIMsg(); addAIMsg('⚠ Error: ' + esc(e2.message), 'ai'); }
+    } else {
+      removeLastAIMsg();
+      addAIMsg('No API key configured. Add your Anthropic key in ⚙ Setup, then I can analyze your jobs and run actions for you.', 'ai');
+    }
   }
 }
 
