@@ -42,7 +42,7 @@ a{color:var(--accent);}
 .nav-icon-btn.active{background:var(--accent);color:#fff;}
 .nav-icon-btn span.label{font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.8;}
 .nav-badge-dot{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--yellow);border:2px solid var(--surface);}
-.nav-logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#c026d3);display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:8px;overflow:hidden;cursor:pointer;}
+.nav-logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#c026d3);display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:8px;overflow:hidden;cursor:pointer;position:relative;}
 .nav-logo img{width:36px;height:36px;object-fit:cover;display:none;}
 .nav-divider{width:32px;height:1px;background:var(--border);margin:4px 0;}
 .nav-sync-btn{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:var(--ink3);transition:all .15s;border:none;background:none;margin-top:auto;}
@@ -221,6 +221,97 @@ a{color:var(--accent);}
   #sidebar{position:fixed;top:0;left:0;height:100vh;}
   #main{margin-left:var(--sidebar-w);}
 }
+
+/* ══ ENHANCED VISUAL SYSTEM ════════════════════════════════ */
+.nav-icon-btn.active{background:var(--accent);color:#fff;box-shadow:0 2px 14px rgba(255,107,53,.4);}
+#ai-fab{box-shadow:0 4px 20px rgba(255,107,53,.5),0 0 40px rgba(192,38,211,.2);}
+#ai-panel{border-color:rgba(255,107,53,.2);box-shadow:0 16px 48px rgba(255,107,53,.08);}
+.stat{transition:border-color .2s,box-shadow .2s;}
+.stat:hover{border-color:var(--border2);box-shadow:0 0 20px rgba(255,107,53,.06);}
+.stat-val{background:linear-gradient(120deg,var(--ink),var(--ink2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.stat-val[style*="color:var(--accent)"]{background:linear-gradient(120deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.stat-val[style*="color:var(--blue)"]{background:linear-gradient(120deg,var(--blue),#7BA7F9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.stat-val[style*="color:var(--green)"]{background:linear-gradient(120deg,var(--green),#6EE7B7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.card{transition:border-color .2s;}
+.ppb-card{transition:border-color .2s,box-shadow .2s;}
+.ppb-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.2);}
+.ppb-val{font-size:30px;line-height:1;}
+.floor-block{transition:box-shadow .15s;}
+.floor-block:hover{box-shadow:0 2px 12px rgba(0,0,0,.2);}
+
+/* ══ FLAG TAGS ══════════════════════════════════════════════ */
+.flag-tag{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;white-space:nowrap;}
+.flag-no-job{background:rgba(248,113,113,.12);color:var(--red);border:1px solid rgba(248,113,113,.3);}
+.flag-no-loc{background:rgba(251,191,36,.1);color:var(--yellow);border:1px solid rgba(251,191,36,.25);}
+.flag-unk-cat{background:rgba(148,163,184,.1);color:var(--ink3);border:1px solid rgba(148,163,184,.2);}
+.flag-dup{background:rgba(167,139,250,.12);color:var(--purple);border:1px solid rgba(167,139,250,.3);}
+.flag-tracked{background:rgba(52,211,153,.1);color:var(--green);border:1px solid rgba(52,211,153,.25);}
+
+/* ══ FEED ENHANCEMENTS ══════════════════════════════════════ */
+.feed-item{border-radius:4px;transition:all .12s;}
+.feed-item.has-flags{border-left:3px solid var(--yellow);padding-left:9px !important;}
+.feed-item.is-tracked{border-left:3px solid var(--green);padding-left:9px !important;}
+
+/* ══ MULTI-SELECT ACTION BAR ════════════════════════════════ */
+#ms-action-bar{display:none;background:linear-gradient(135deg,var(--surface2),var(--surface3));border:1.5px solid var(--accent);border-radius:12px;padding:12px 16px;margin-bottom:14px;gap:10px;align-items:center;flex-wrap:wrap;}
+#ms-action-bar.open{display:flex;}
+#ms-count-label{font-weight:700;font-size:13px;color:var(--accent);min-width:80px;}
+.ms-sep{width:1px;height:22px;background:var(--border);}
+
+/* ══ ENHANCED UNIT CARDS ════════════════════════════════════ */
+.unit-card{border-radius:12px;transition:all .18s ease;}
+.unit-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);}
+.unit-card.has-data{border-color:var(--blue);background:rgba(79,142,247,.06);}
+.unit-card.over-budget{border-color:var(--red);background:rgba(248,113,113,.06);}
+.unit-card.near-budget{border-color:var(--yellow);background:rgba(251,191,36,.06);}
+.unit-tag-boards{font-size:13px;font-weight:800;color:var(--blue);font-family:'Space Grotesk',sans-serif;}
+.unit-tag-spend{font-size:11px;color:var(--ink3);margin-top:3px;}
+.unit-prog{height:4px;background:var(--surface3);border-radius:4px;margin-top:6px;overflow:hidden;}
+.unit-prog-fill{height:100%;border-radius:4px;transition:width .4s;}
+
+/* ══ ESTIMATE ENHANCEMENTS ══════════════════════════════════ */
+.est-inp-str{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 7px;font-size:12px;color:var(--ink);outline:none;font-weight:500;}
+.est-inp-str:focus{border-color:var(--accent);}
+.est-inp-sel{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 6px;font-size:11px;color:var(--ink);outline:none;}
+.est-inp-sel:focus{border-color:var(--accent);}
+.est-row-total{font-weight:700;transition:color .2s;}
+
+/* ══ FORMULA CALCULATOR ═════════════════════════════════════ */
+.formula-banner{background:linear-gradient(135deg,rgba(79,142,247,.06),rgba(167,139,250,.04));border:1px solid rgba(79,142,247,.2);border-radius:14px;padding:18px 22px;margin-bottom:18px;}
+.formula-title{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--blue);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.formula-input-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;}
+.formula-inp-group{display:flex;flex-direction:column;gap:4px;}
+.formula-inp-lbl{font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;}
+.formula-result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:8px;}
+.formula-result-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;text-align:center;}
+.formula-result-val{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:var(--blue);}
+.formula-result-lbl{font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;}
+
+/* ══ MANUAL BUDGET ENTRY ════════════════════════════════════ */
+.budget-entry-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:12px;}
+.budget-entry-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;}
+.budget-entry-lbl{font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
+.budget-entry-inp{width:100%;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-size:14px;font-weight:700;color:var(--ink);outline:none;text-align:right;font-family:'Space Grotesk',sans-serif;}
+.budget-entry-inp:focus{border-color:var(--accent);}
+
+/* ══ INBOX PDF STATUS ═══════════════════════════════════════ */
+.po-status-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+.po-status-pending{background:rgba(251,191,36,.12);color:var(--yellow);border:1px solid rgba(251,191,36,.3);}
+.po-status-confirmed{background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.3);}
+.po-status-duplicate{background:rgba(248,113,113,.12);color:var(--red);border:1px solid rgba(248,113,113,.3);}
+
+/* ══ BUILDING MAP HEADER ════════════════════════════════════ */
+.bldg-header{background:linear-gradient(135deg,var(--surface2),var(--surface3));border-bottom:2px solid var(--accent);padding:18px 24px !important;}
+.bldg-title{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:800;letter-spacing:-.02em;}
+
+/* ══ FEED ITEM DOTS ═════════════════════════════════════════ */
+.feed-dot{width:10px;height:10px;border-radius:50%;margin-top:6px;flex-shrink:0;box-shadow:0 0 8px currentColor;opacity:.9;}
+
+/* ══ SCROLLBAR STYLING ══════════════════════════════════════ */
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:var(--surface);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:var(--ink3);}
 </style>
 </head>
 <body>
@@ -229,7 +320,7 @@ a{color:var(--accent);}
 
 <div id="login-screen" style="display:flex;">
   <div class="login-box">
-    <div class="login-logo" id="login-logo-box">🏗️</div>
+    <div class="login-logo" id="login-logo-box" style="position:relative;"><img alt="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:14px;position:absolute;top:0;left:0;"/>🏗️</div>
     <h2 style="font-size:22px;margin-bottom:4px;">AA Drywall Tracker</h2>
     <p style="color:var(--ink3);font-size:13px;margin-bottom:24px;">Job costing &amp; material tracking</p>
     <input id="pass-input" class="inp" type="password" placeholder="Enter passcode" onkeydown="if(event.key==='Enter')tryLogin()" style="margin-bottom:12px;text-align:center;"/>
@@ -244,7 +335,7 @@ a{color:var(--accent);}
 <!-- SIDEBAR -->
 
 <div id="sidebar">
-  <div class="nav-logo" id="nav-logo">🏗️</div>
+  <div class="nav-logo" id="nav-logo"><img alt="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:10px;position:absolute;top:0;left:0;"/>🏗️</div>
   <div class="nav-divider"></div>
   <button class="nav-icon-btn active" data-page="home" onclick="nav('home')"><span>🏗️</span><span class="label">Feed</span></button>
   <button class="nav-icon-btn" data-page="dashboard" onclick="nav('dashboard')"><span>📊</span><span class="label">Dash</span></button>
@@ -271,16 +362,18 @@ a{color:var(--accent);}
 
 <div id="page-home" class="page active">
   <div id="new-job-alert-banner" style="display:none;margin-bottom:14px;"></div>
-  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
-    <div class="drop-zone" id="pdf-drop" style="flex:1;min-width:200px;padding:16px;">
+  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+    <div class="drop-zone" id="pdf-drop" style="flex:1;min-width:200px;padding:14px;">
       <div style="font-size:13px;font-weight:600;">📄 Drop PO PDF here or <label style="color:var(--accent);cursor:pointer;">browse<input type="file" accept=".pdf" id="pdf-upload" style="display:none;" onchange="handlePDFFile(this.files[0])"/></label></div>
-      <div style="font-size:11px;color:var(--ink3);margin-top:4px;">Auto-extracts PO number, vendor, materials &amp; totals · or email to <strong>po@aadrywalltracker.com</strong></div>
+      <div style="font-size:11px;color:var(--ink3);margin-top:3px;">Auto-extracts PO#, vendor, materials &amp; totals · or email to <strong>po@aadrywalltracker.com</strong></div>
     </div>
-    <button class="btn btn-ghost" id="feed-select-po-btn" onclick="startFeedSelect('po')">☑ Multi-select POs</button>
-    <button class="btn btn-ghost" id="feed-select-bill-btn" onclick="startFeedSelect('bill')">☑ Multi-select Bills</button>
-    <button class="btn btn-ghost" id="feed-cancel-select-btn" style="display:none;" onclick="clearFeedSelection()">Cancel</button>
-    <button class="btn btn-primary" id="feed-bulk-btn" style="display:none;" onclick="openFeedBulkAssignModal()">📦 Assign Selected to Job</button>
+    <button class="btn btn-ghost" id="feed-select-po-btn" onclick="startFeedSelect('po')" style="white-space:nowrap;">☑ Select POs</button>
+    <button class="btn btn-ghost" id="feed-select-bill-btn" onclick="startFeedSelect('bill')" style="white-space:nowrap;">☑ Select Bills</button>
+    <button class="btn btn-primary" id="feed-bulk-btn" style="display:none;" onclick="openFeedBulkAssignModal()">📦 Assign to Job</button>
+    <button class="btn btn-ghost" id="feed-cancel-select-btn" style="display:none;" onclick="clearFeedSelection()">✕ Cancel</button>
   </div>
+  <!-- Multi-select action bar -->
+  <div id="ms-action-bar"></div>
   <div id="pdf-result" style="display:none;margin-bottom:16px;"></div>
   <div id="activity-feed"></div>
 </div>
@@ -1118,6 +1211,21 @@ function getFeedBillGroups() {
   return Object.values(groups);
 }
 
+// Returns array of flag objects for a PO group
+function getPOFlags(g) {
+  const flags = [];
+  const detectedJob = fuzzyDetectJob(g.job || '');
+  if (!g.job && !detectedJob) flags.push({type:'no-job', label:'No Job', cls:'flag-no-job'});
+  const assigned = S.assignments[g.po];
+  if (!assigned && !g.building && !g.floor) flags.push({type:'no-loc', label:'No Location', cls:'flag-no-loc'});
+  const hasUnknownCat = g.rows.some(r => { const c=categorize(r['MATERIAL']||''); return c==='other' && (r['MATERIAL']||'').trim(); });
+  if (hasUnknownCat) flags.push({type:'unk-cat', label:'? Category', cls:'flag-unk-cat'});
+  // Check for PO# appearing in different jobs (potential duplicate)
+  const jobsForPO = [...new Set(S.rows.filter(r => String(r['PO NUMBER']||'').trim()===g.po && (r['JOB']||'')).map(r=>r['JOB']||''))];
+  if (jobsForPO.length > 1) flags.push({type:'dup', label:'Multi-Job', cls:'flag-dup'});
+  return flags;
+}
+
 function renderActivityFeed() {
   const el = document.getElementById('activity-feed'); if (!el) return;
 
@@ -1170,15 +1278,16 @@ function renderActivityFeed() {
   const poGroups = getFeedPOGroups();
   const billGroups = getFeedBillGroups();
   const items = [];
-  poGroups.slice(0, 40).forEach(g => {
+  poGroups.slice(0, 60).forEach(g => {
     const assigned = !!S.assignments[g.po];
     const boards = g.rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
-    items.push({type:'po', id:g.po, job:g.job, vendor:g.vendor, date:g.date, total:g.total, boards, assigned, building:g.building, floor:g.floor, rows:g.rows});
+    const flags = getPOFlags(g);
+    items.push({type:'po', id:g.po, job:g.job, vendor:g.vendor, date:g.date, total:g.total, boards, assigned, building:g.building, floor:g.floor, rows:g.rows, flags});
   });
   billGroups.forEach(g => {
     const matched = !!S.billAssignments[g.inv];
     const isLabor = isLaborVendor(g.vendor);
-    items.push({type:'bill', id:g.inv, job:g.job, vendor:g.vendor, total:g.total, matched, isLabor, rows:g.rows});
+    items.push({type:'bill', id:g.inv, job:g.job, vendor:g.vendor, total:g.total, matched, isLabor, rows:g.rows, flags:[]});
   });
 
   if (!emailPOs.length && !items.length) {
@@ -1187,43 +1296,75 @@ function renderActivityFeed() {
   }
 
   const selType = S.feedSelection?.type || null;
-  let sheetHtml = '';
-  if (items.length) {
-    sheetHtml += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📊 Sheet POs</div>`;
-    items.forEach(item => {
-      const dotColor = item.type === 'po' ? (item.assigned ? 'var(--green)' : 'var(--blue)') : (item.matched ? 'var(--green)' : 'var(--yellow)');
-      const label = item.type === 'po' ? 'PO #' + item.id : 'Bill #' + item.id;
-      const status = item.type === 'po' ? (item.assigned ? '<span class="badge badge-green">Assigned</span>' : '<span class="badge badge-blue">New</span>') :
-        (item.matched ? '<span class="badge badge-green">Matched</span>' : '<span class="badge badge-yellow">Needs Match</span>');
-      const boardsBadge = item.boards > 0 ? ' <span class="badge badge-blue">' + Math.round(item.boards) + ' boards</span>' : '';
-      sheetHtml += `<div class="feed-item" data-type="${item.type}" data-id="${esc(item.id)}">
-        ${selType === item.type ? '<input type="checkbox" class="feed-cb" data-id="' + esc(item.id) + '" style="margin-right:6px;accent-color:var(--accent);cursor:pointer;" onclick="event.stopPropagation();updateFeedSelection()"/>' : ''}
-        <div class="feed-dot" style="background:${dotColor};"></div>
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <span style="font-weight:700;font-size:13px;">${label}</span>
-            ${status}${boardsBadge}
-          </div>
-          <div style="font-size:12px;color:var(--ink2);margin-top:2px;">
-            ${esc(item.vendor)}${item.job ? ' · ' + esc(item.job.replace('JOB ','')) : ''}${item.building ? ' · Bldg ' + esc(item.building) : ''}${item.floor ? ' · Fl ' + esc(item.floor) : ''}
-          </div>
-        </div>
-        <div style="text-align:right;white-space:nowrap;">
-          <div style="font-weight:700;">${fmt(item.total)}</div>
-          <div style="font-size:10px;color:var(--ink3);">${item.rows.length} lines</div>
-        </div>
-      </div>`;
-    });
+  let html = '';
+
+  // Select-all row when in selection mode
+  if (selType) {
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;margin-bottom:4px;border-bottom:1px solid var(--border);">
+      <input type="checkbox" id="feed-select-all" style="accent-color:var(--accent);cursor:pointer;" onchange="selectAllFeedItems(this.checked)"/>
+      <label for="feed-select-all" style="font-size:12px;font-weight:600;cursor:pointer;color:var(--ink3);">Select All ${selType === 'po' ? 'POs' : 'Bills'}</label>
+    </div>`;
   }
 
-  el.innerHTML = emailHtml + sheetHtml;
+  items.forEach(item => {
+    const hasFlagsClass = (item.flags||[]).length > 0 ? ' has-flags' : (item.assigned || item.matched ? ' is-tracked' : '');
+    const isEmail = item.type === 'emailpo';
+    const dotColor = isEmail ? 'var(--purple)' : item.type === 'po'
+      ? (item.assigned ? 'var(--green)' : ((item.flags||[]).length > 0 ? 'var(--yellow)' : 'var(--blue)'))
+      : (item.matched ? 'var(--green)' : 'var(--yellow)');
+    const label = isEmail ? '📧 Email PO #' + item.id : (item.type === 'po' ? 'PO #' + item.id : 'Bill #' + item.id);
 
+    let statusBadge;
+    if (isEmail) {
+      statusBadge = '<span class="badge badge-orange">Email — Review</span>';
+    } else if (item.type === 'po') {
+      if (item.assigned) statusBadge = '<span class="flag-tag flag-tracked">✓ Tracked</span>';
+      else if ((item.flags||[]).length > 0) statusBadge = '<span class="badge badge-yellow">⚠ Flagged</span>';
+      else statusBadge = '<span class="badge badge-blue">New</span>';
+    } else {
+      statusBadge = item.matched ? '<span class="flag-tag flag-tracked">✓ Matched</span>' : '<span class="badge badge-yellow">Needs Match</span>';
+    }
+
+    const boardsBadge = item.boards > 0 ? ` <span class="badge badge-blue" style="font-size:10px;">🟦 ${Math.round(item.boards)} bd</span>` : '';
+    const flagTags = !isEmail ? (item.flags||[]).map(f => `<span class="flag-tag ${f.cls}">${f.label}</span>`).join('') : '';
+
+    html += `<div class="feed-item${hasFlagsClass}" data-type="${item.type}" data-id="${esc(item.id)}">
+      ${selType === item.type ? `<input type="checkbox" class="feed-cb" data-id="${esc(item.id)}" data-type="${item.type}" style="margin-right:6px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;" onclick="event.stopPropagation();updateFeedSelection()"/>` : ''}
+      <div class="feed-dot" style="background:${dotColor};color:${dotColor};"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-weight:700;font-size:13px;">${label}</span>
+          ${statusBadge}${boardsBadge}
+          ${flagTags}
+        </div>
+        <div style="font-size:12px;color:var(--ink2);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;">
+          <span>${esc(item.vendor)}</span>
+          ${item.job ? `<span style="color:var(--ink3);">·</span><span>${esc(item.job.replace('JOB ',''))}</span>` : ''}
+          ${item.building ? `<span style="color:var(--ink3);">·</span><span>Bldg ${esc(item.building)}</span>` : ''}
+          ${item.floor ? `<span style="color:var(--ink3);">·</span><span>Fl ${esc(item.floor)}</span>` : ''}
+          ${item.date ? `<span style="color:var(--ink3);">·</span><span style="color:var(--ink3);">${esc(item.date)}</span>` : ''}
+        </div>
+      </div>
+      <div style="text-align:right;white-space:nowrap;flex-shrink:0;">
+        <div style="font-weight:700;font-size:14px;">${fmt(item.total)}</div>
+        <div style="font-size:10px;color:var(--ink3);">${item.rows.length} line${item.rows.length!==1?'s':''}</div>
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+
+  // Whole-row click handler
   el.querySelectorAll('.feed-item').forEach(div => {
     div.addEventListener('click', function(e) {
-      if (e.target.classList.contains('feed-cb') || e.target.tagName === 'BUTTON') return;
+      if (e.target.closest('.feed-cb') || e.target.id === 'feed-select-all' || e.target.tagName === 'BUTTON') return;
       const type = this.dataset.type;
       const id = this.dataset.id;
-      if (type === 'emailpo') openEmailPOReview(id);
+      if (selType === type) {
+        const cb = this.querySelector('.feed-cb');
+        if (cb) { cb.checked = !cb.checked; updateFeedSelection(); }
+        return;
+      }
+      if (type === 'emailpo') { if (typeof openEmailPOReview === 'function') openEmailPOReview(id); }
       else if (type === 'po') openPODetailModal(id);
       else if (type === 'bill') openSmartBillModal(id);
     });
@@ -1321,31 +1462,101 @@ async function confirmEmailPO(id) {
   showToast('✓ PO #' + poNum + ' verified → ' + job.replace('JOB ',''));
 }
 
+function selectAllFeedItems(checked) {
+  document.querySelectorAll('.feed-cb').forEach(cb => { cb.checked = checked; });
+  updateFeedSelection();
+}
+
 function feedSelectedIds(type) {
   return [...document.querySelectorAll('.feed-cb:checked')].map(cb => cb.dataset.id);
 }
 function clearFeedSelection() {
   S.feedSelection = null;
   const bulk = document.getElementById('feed-bulk-btn'); if (bulk) bulk.style.display = 'none';
-  const poBtn = document.getElementById('feed-select-po-btn'); if (poBtn) poBtn.style.display = 'inline-flex';
-  const billBtn = document.getElementById('feed-select-bill-btn'); if (billBtn) billBtn.style.display = 'inline-flex';
+  const poBtn = document.getElementById('feed-select-po-btn'); if (poBtn) { poBtn.style.display = 'inline-flex'; poBtn.style.background = ''; }
+  const billBtn = document.getElementById('feed-select-bill-btn'); if (billBtn) { billBtn.style.display = 'inline-flex'; billBtn.style.background = ''; }
   const cancelBtn = document.getElementById('feed-cancel-select-btn'); if (cancelBtn) cancelBtn.style.display = 'none';
+  // Hide action bar
+  const bar = document.getElementById('ms-action-bar'); if (bar) bar.classList.remove('open');
   renderActivityFeed();
 }
 function updateFeedSelection() {
-  const checked = feedSelectedIds(S.feedSelection?.type);
-  const btn = document.getElementById('feed-bulk-btn');
-  if (btn) { btn.style.display = checked.length > 0 ? 'inline-flex' : 'none'; btn.textContent = '📦 Assign ' + checked.length + ' ' + (S.feedSelection?.type === 'bill' ? 'Bill' : 'PO') + (checked.length !== 1 ? 's' : '') + ' to Job'; }
+  const type = S.feedSelection?.type;
+  const checked = feedSelectedIds(type);
+  const bulk = document.getElementById('feed-bulk-btn');
+  const bar = document.getElementById('ms-action-bar');
+  const countLbl = document.getElementById('ms-count-label');
+
+  if (checked.length > 0) {
+    if (bulk) { bulk.style.display = 'inline-flex'; bulk.textContent = '📦 Assign ' + checked.length + ' ' + (type==='bill'?'Bill':'PO') + (checked.length!==1?'s':'') + ' to Job'; }
+    if (bar) bar.classList.add('open');
+    if (countLbl) countLbl.textContent = checked.length + ' selected';
+  } else {
+    if (bulk) bulk.style.display = 'none';
+    if (bar) bar.classList.remove('open');
+  }
 }
 function startFeedSelect(type) {
   S.feedSelection = {type};
-  const poBtn = document.getElementById('feed-select-po-btn'); if (poBtn) poBtn.style.display = type === 'po' ? 'inline-flex' : 'none';
-  const billBtn = document.getElementById('feed-select-bill-btn'); if (billBtn) billBtn.style.display = type === 'bill' ? 'inline-flex' : 'none';
+  const poBtn = document.getElementById('feed-select-po-btn'); if (poBtn) { poBtn.style.display = type === 'po' ? 'inline-flex' : 'none'; if (type==='po') poBtn.style.background = 'var(--accent)'; }
+  const billBtn = document.getElementById('feed-select-bill-btn'); if (billBtn) { billBtn.style.display = type === 'bill' ? 'inline-flex' : 'none'; if (type==='bill') billBtn.style.background = 'var(--accent)'; }
   const cancelBtn = document.getElementById('feed-cancel-select-btn'); if (cancelBtn) cancelBtn.style.display = 'inline-flex';
-  if (poBtn && type === 'po') poBtn.style.background = 'var(--accent)';
-  if (billBtn && type === 'bill') billBtn.style.background = 'var(--accent)';
+  const bulk = document.getElementById('feed-bulk-btn'); if (bulk) bulk.style.display = 'none';
+  // Show action bar skeleton
+  const bar = document.getElementById('ms-action-bar');
+  if (bar) {
+    bar.innerHTML = `<span id="ms-count-label" style="font-weight:700;font-size:13px;color:var(--accent);">0 selected</span>
+      <div class="ms-sep"></div>
+      <button class="btn btn-green btn-sm" onclick="trackSelectedPOs()" title="Mark all selected as tracked to their auto-detected job">⚡ Track All</button>
+      <button class="btn btn-primary btn-sm" id="ms-assign-btn" onclick="openFeedBulkAssignModal()">📦 Assign to Job</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteSelectedAssignments()" title="Remove assignments (data stays)">🗑 Delete Assignments</button>
+      <div class="ms-sep"></div>
+      <button class="btn btn-ghost btn-sm" onclick="clearFeedSelection()">✕ Cancel</button>`;
+    bar.classList.remove('open');
+  }
   nav('home');
   renderActivityFeed();
+}
+
+async function trackSelectedPOs() {
+  const type = S.feedSelection?.type;
+  const ids = feedSelectedIds(type);
+  if (!ids.length) { showToast('Select POs first'); return; }
+  if (type !== 'po') { showToast('Track All only works for POs'); return; }
+  let tracked = 0;
+  ids.forEach(po => {
+    if (S.assignments[po]) return; // already tracked
+    const rows = S.rows.filter(r => String(r['PO NUMBER']||'').trim() === po);
+    if (!rows.length) return;
+    const job = fuzzyDetectJob(rows[0]['JOB']||'') || rows[0]['JOB'] || '';
+    const bldg = rows[0]['BUILDING'] || '';
+    const floor = rows[0]['FLOOR'] || '';
+    const unit = rows[0]['UNIT'] || '';
+    const total = rows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+    S.assignments[po] = {job, building:bldg, floor, unit, total, vendor:rows[0]['VENDOR']||'', date:rows[0]['DATE']||''};
+    tracked++;
+  });
+  await saveSharedData('assignments');
+  clearFeedSelection();
+  showToast('✓ Tracked ' + tracked + ' PO' + (tracked!==1?'s':''));
+  updateInboxBadge();
+}
+
+async function deleteSelectedAssignments() {
+  const type = S.feedSelection?.type;
+  const ids = feedSelectedIds(type);
+  if (!ids.length) { showToast('Select items first'); return; }
+  if (!confirm('Remove assignments for ' + ids.length + ' ' + (type==='bill'?'bill':'PO') + (ids.length!==1?'s':'') + '?\n\nOriginal data stays — only tracking is removed.')) return;
+  if (type === 'po') {
+    ids.forEach(po => { delete S.assignments[po]; });
+    await saveSharedData('assignments');
+  } else {
+    ids.forEach(inv => { delete S.billAssignments[inv]; delete S.actuals?.[inv]; });
+    await saveSharedData('billAssignments');
+  }
+  clearFeedSelection();
+  updateInboxBadge();
+  showToast('✓ Removed ' + ids.length + ' assignment' + (ids.length!==1?'s':''));
 }
 
 // PO detail modal
@@ -1385,15 +1596,23 @@ function openPODetailModal(poNum) {
     '<button class="btn btn-ghost" onclick="closeModal(\'po-modal\')">Cancel</button><button class="btn btn-primary" onclick="quickAssignPO(\'' + jsesc(poNum) + '\')">✓ Assign</button>';
   document.getElementById('po-modal').classList.add('open');
 }
-function quickAssignPO(po) {
+async function quickAssignPO(po) {
+  const job = document.getElementById('qa-job')?.value||'';
+  const rows = S.rows.filter(r => String(r['PO NUMBER']||'').trim() === po);
+  const total = rows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+  const vendor = rows[0]?.['VENDOR'] || '';
   S.assignments[po] = {
-    job: document.getElementById('qa-job')?.value||'',
+    job,
     building: document.getElementById('qa-bldg')?.value||'',
     floor: document.getElementById('qa-floor')?.value||'',
-    unit: document.getElementById('qa-unit')?.value||''
+    unit: document.getElementById('qa-unit')?.value||'',
+    total, vendor
   };
-  saveSharedData('assignments');
-  closeModal('po-modal'); renderActivityFeed(); showToast('✓ PO #' + po + ' assigned');
+  await saveSharedData('assignments');
+  closeModal('po-modal');
+  renderActivityFeed();
+  updateInboxBadge();
+  showToast('✓ PO #' + po + ' → ' + job.replace('JOB ',''));
 }
 
 // Bulk assign
@@ -1408,10 +1627,11 @@ function renderBulkAssignBody(type, ids) {
 }
 function openFeedBulkAssignModal() {
   const type = S.feedSelection?.type; const ids = feedSelectedIds(type);
-  if (!type || !ids.length) { showToast('Select items first'); return; }
-  document.getElementById('po-modal-title').textContent = 'Bulk Assign ' + (type==='bill'?'Bills':'POs');
+  if (!type || !ids.length) { showToast('Select items first — check boxes to the left of each row'); return; }
+  const jobs = getJobs();
+  document.getElementById('po-modal-title').textContent = '📦 Bulk Assign ' + ids.length + ' ' + (type==='bill'?'Bill':'PO') + (ids.length!==1?'s':'');
   document.getElementById('po-modal-body').innerHTML = renderBulkAssignBody(type, ids);
-  document.getElementById('po-modal-footer').innerHTML = '<button class="btn btn-ghost" onclick="closeModal(\'po-modal\')">Cancel</button><button class="btn btn-primary" onclick="applyFeedBulkAssign()">Save</button>';
+  document.getElementById('po-modal-footer').innerHTML = '<button class="btn btn-ghost" onclick="closeModal(\'po-modal\')">Cancel</button><button class="btn btn-primary" onclick="applyFeedBulkAssign()">💾 Save Assignments</button>';
   document.getElementById('po-modal').classList.add('open');
 }
 async function applyFeedBulkAssign() {
@@ -1753,6 +1973,14 @@ function renderMapMaterial(job, el) {
         const uSpend = uRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
         html += buildUnitCard(job, fl.floor, fl.bldg, u.unit, uBoards, parseFloat(u.budgetBoards||0), uSpend, false);
       });
+      // Check for PO data units NOT in structure
+      const missing = detectMissingUnits(job, fl.floor, fl.bldg);
+      if (missing.length > 0) {
+        html += `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:8px;font-size:11px;color:var(--yellow);width:100%;box-sizing:border-box;">
+          ⚠ PO data has unit${missing.length>1?'s':''} not in structure: <strong>${missing.slice(0,5).join(', ')}${missing.length>5?'…':''}</strong>
+          <button class="btn btn-sm" style="margin-left:auto;background:rgba(251,191,36,.15);color:var(--yellow);border:1px solid rgba(251,191,36,.3);padding:3px 8px;font-size:10px;" onclick="autoAddMissingUnits('${jsesc(job)}','${fl.floor}','${jsesc(fl.bldg||'')}')">+ Add All</button>
+        </div>`;
+      }
       html += '</div></div></div>';
     });
     html += '</div></div>';
@@ -1762,11 +1990,59 @@ function renderMapMaterial(job, el) {
 
 function buildUnitCard(job, floor, bldg, unit, boards, budBoards, spend, isGen) {
   const cls = boards > 0 ? (budBoards > 0 && boards > budBoards ? 'over-budget' : budBoards > 0 && boards > budBoards*0.85 ? 'near-budget' : 'has-data') : (spend > 0 ? 'has-data' : 'no-data');
+  const pct = budBoards > 0 && boards > 0 ? Math.min((boards/budBoards)*100, 100) : 0;
+  const barCol = pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--yellow)' : 'var(--green)';
   return `<div class="unit-card ${cls}" onclick="openUnitDetail('${jsesc(job)}','${floor}','${jsesc(unit)}','${jsesc(bldg||'')}')">
-    <div class="unit-num">${isGen ? '📦 General' : unit}</div>
-    ${boards > 0 ? '<div class="unit-boards">' + Math.round(boards) + ' boards' + (budBoards > 0 ? ' / ' + Math.round(budBoards) : '') + '</div>' : ''}
-    ${spend > 0 ? '<div class="unit-spend">' + fmt(spend) + '</div>' : '<div class="unit-spend" style="color:var(--ink3);">No data</div>'}
+    <div class="unit-num" style="font-size:14px;font-weight:700;margin-bottom:4px;">${isGen ? '📦 General' : unit}</div>
+    ${boards > 0 ? `<div class="unit-tag-boards">${Math.round(boards)}${budBoards > 0 ? '<span style="font-size:10px;font-weight:500;color:var(--ink3);">/' + Math.round(budBoards) + '</span>' : ''} <span style="font-size:10px;font-weight:500;">bd</span></div>` : ''}
+    ${spend > 0 ? `<div class="unit-tag-spend">${fmt(spend)}</div>` : '<div class="unit-tag-spend">No data</div>'}
+    ${pct > 0 ? `<div class="unit-prog"><div class="unit-prog-fill" style="width:${pct.toFixed(0)}%;background:${barCol};"></div></div>` : ''}
   </div>`;
+}
+
+// Auto-detect units present in PO data but missing from job structure
+function detectMissingUnits(job, floor, bldg) {
+  const struct = S.jobStructure?.[job];
+  if (!struct?.floors) return [];
+  const floorObj = struct.floors.find(f => String(f.floor)===String(floor) && (f.bldg||'')===(bldg||''));
+  if (!floorObj) return [];
+  const knownUnits = new Set((floorObj.units||[]).map(u => String(u.unit)));
+  const poUnits = S.rows
+    .filter(r => (r['JOB']||r['Job']||'')===job && String(r['FLOOR']||'').trim()===String(floor) && (!bldg || String(r['BUILDING']||'').trim()===bldg))
+    .map(r => String(r['UNIT']||'').trim())
+    .filter(u => u && u !== 'N/A' && !knownUnits.has(u));
+  return [...new Set(poUnits)];
+}
+
+async function addMissingUnit(job, floor, bldg, unit) {
+  if (!S.jobStructure) S.jobStructure = {};
+  if (!S.jobStructure[job]) S.jobStructure[job] = {floors:[]};
+  const fl = S.jobStructure[job].floors.find(f => String(f.floor)===String(floor) && (f.bldg||'')===(bldg||''));
+  if (!fl) return;
+  if (!fl.units) fl.units = [];
+  if (fl.units.some(u => String(u.unit)===unit)) return;
+  fl.units.push({unit, budgetBoards:0});
+  fl.units.sort((a,b) => parseInt(a.unit)-parseInt(b.unit));
+  await saveSharedData('jobStructure');
+  showToast('✓ Unit ' + unit + ' added to Floor ' + floor);
+  renderJobMap(job);
+}
+
+async function autoAddMissingUnits(job, floor, bldg) {
+  const missing = detectMissingUnits(job, floor, bldg);
+  if (!missing.length) return;
+  if (!S.jobStructure) S.jobStructure = {};
+  if (!S.jobStructure[job]) S.jobStructure[job] = {floors:[]};
+  const fl = S.jobStructure[job].floors.find(f => String(f.floor)===String(floor) && (f.bldg||'')===(bldg||''));
+  if (!fl) return;
+  if (!fl.units) fl.units = [];
+  missing.forEach(unit => {
+    if (!fl.units.some(u => String(u.unit)===unit)) fl.units.push({unit, budgetBoards:0});
+  });
+  fl.units.sort((a,b) => parseInt(a.unit)-parseInt(b.unit));
+  await saveSharedData('jobStructure');
+  showToast('✓ Added ' + missing.length + ' unit' + (missing.length!==1?'s':'') + ' to Floor ' + floor);
+  renderJobMap(job);
 }
 
 function renderAutoFloors(job, rows, parentEl) {
@@ -1880,42 +2156,84 @@ function openUnitDetail(job, floor, unit, bldg) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// ESTIMATE TAB (FIX #5: Optional floor-level breakdown)
+// ESTIMATE TAB
 // ═══════════════════════════════════════════════════════════
 function renderEstimateTab(job) {
   const el = document.getElementById('jobs-tab-estimate'); if (!el) return;
   const items = getJobEstimate(job);
   const rows = S.rows.filter(r => (r['JOB']||'') === job);
-  let html = '<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Line</button></div></div><div class="card-body" style="overflow-x:auto;">';
-  html += '<table class="tbl"><thead><tr><th>Cat</th><th>Material</th><th>Use</th><th>UOM</th><th class="tbl-r">Price</th><th class="tbl-r" style="min-width:80px;">Qty</th><th class="tbl-r">Total</th><th class="tbl-r">Ordered</th><th></th></tr></thead><tbody>';
+
+  // Per-unit formula calculator at top
+  const struct = S.jobStructure?.[job];
+  const totalUnits = struct?.floors ? struct.floors.reduce((s,fl) => s + (fl.units||[]).length, 0) : 0;
+  const unitsPerFloor = struct?.floors?.length > 0 ? Math.round(totalUnits / struct.floors.length) : 0;
+  const formulaKey = job + '_formula';
+  const fv = S.matBanks?.[formulaKey] || {};
+  let formulaHtml = `<div class="formula-banner">
+    <div class="formula-title">📐 Per-Unit Cost Estimator
+      <span style="font-size:10px;font-weight:500;color:var(--ink3);">Divide total material by units, multiply per building to rough-estimate each floor</span>
+    </div>
+    <div class="formula-input-row">
+      <div class="formula-inp-group"><div class="formula-inp-lbl">Total Units in Job</div><input type="number" class="inp inp-sm" style="width:100px;" id="fu-total-units" value="${fv.totalUnits||totalUnits||''}" placeholder="${totalUnits||'e.g. 200'}" oninput="updateFormulaCalc()"/></div>
+      <div class="formula-inp-group"><div class="formula-inp-lbl">Units Per Floor</div><input type="number" class="inp inp-sm" style="width:100px;" id="fu-per-floor" value="${fv.unitsPerFloor||unitsPerFloor||''}" placeholder="${unitsPerFloor||'e.g. 16'}" oninput="updateFormulaCalc()"/></div>
+      <div class="formula-inp-group"><div class="formula-inp-lbl">Floors Per Building</div><input type="number" class="inp inp-sm" style="width:100px;" id="fu-floors-bldg" value="${fv.floorsPerBldg||''}" placeholder="e.g. 4" oninput="updateFormulaCalc()"/></div>
+      <div class="formula-inp-group"><div class="formula-inp-lbl">Total Material $</div><input type="number" class="inp inp-sm" style="width:120px;" id="fu-mat-total" value="${fv.matTotal||''}" placeholder="auto-calc" oninput="updateFormulaCalc()"/></div>
+    </div>
+    <div class="formula-result-grid" id="formula-results">
+      <div class="formula-result-card"><div class="formula-result-val" style="color:var(--ink3);">—</div><div class="formula-result-lbl">Cost / Unit</div></div>
+      <div class="formula-result-card"><div class="formula-result-val" style="color:var(--ink3);">—</div><div class="formula-result-lbl">Cost / Floor</div></div>
+      <div class="formula-result-card"><div class="formula-result-val" style="color:var(--ink3);">—</div><div class="formula-result-lbl">Cost / Building</div></div>
+      <div class="formula-result-card"><div class="formula-result-val" style="color:var(--ink3);">—</div><div class="formula-result-lbl">% of Total/Unit</div></div>
+    </div>
+  </div>`;
+
+  let html = formulaHtml;
+  html += '<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Custom Line</button></div></div><div class="card-body" style="overflow-x:auto;">';
+  html += '<table class="tbl"><thead><tr><th>Cat</th><th>Material</th><th>Use</th><th>UOM</th><th class="tbl-r">Price</th><th class="tbl-r" style="min-width:80px;">Qty</th><th class="tbl-r" style="min-width:80px;">Total</th><th class="tbl-r">Ordered %</th><th></th></tr></thead><tbody>';
   let lastCat = '', grandTotal = 0;
+  const estCats = ['Metal 20GA','Metal 25GA','Wood','Drywall','Finish','Fasteners','Other'];
   items.forEach((it, i) => {
-    if (it.cat !== lastCat) { lastCat = it.cat; html += '<tr class="est-cat-hdr"><td colspan="9" style="background:' + (CAT_COLORS[it.cat]||'var(--surface3)') + ';color:' + (CAT_TEXT[it.cat]||'var(--ink2)') + ';">' + esc(it.cat) + '</td></tr>'; }
+    const isCustom = !ESTIMATE_TEMPLATE.find(t => t.name === it.name);
+    if (it.cat !== lastCat) {
+      lastCat = it.cat;
+      html += '<tr class="est-cat-hdr"><td colspan="9" style="background:' + (CAT_COLORS[it.cat]||'var(--surface3)') + ';color:' + (CAT_TEXT[it.cat]||'var(--ink2)') + ';">' + esc(it.cat) + '</td></tr>';
+    }
     const lineTotal = (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
     grandTotal += lineTotal;
-    const ordered = rows.filter(r => (r['MATERIAL']||'').toUpperCase().includes(it.name.toUpperCase().substring(0,8))).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+    const ordered = rows.filter(r => (r['MATERIAL']||'').toUpperCase().includes((it.name||'').toUpperCase().substring(0,8))).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
     const pct = it.qty > 0 && ordered > 0 ? Math.round(ordered / it.qty * 100) : 0;
     const pctColor = pct > 100 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : pct > 0 ? 'var(--green)' : 'var(--ink3)';
     const tmpl = ESTIMATE_TEMPLATE.find(t => t.name === it.name);
+
+    const nameCell = isCustom
+      ? `<input class="est-inp-str" value="${esc(it.name)}" style="width:160px;" oninput="updateEstStr(${i},'name',this.value)" placeholder="Item name"/>`
+      : `<span style="font-weight:500;">${esc(it.name)}</span>`;
+    const catCellSelect = isCustom
+      ? `<select class="est-inp-sel" onchange="updateEstStr(${i},'cat',this.value)">${estCats.map(c=>`<option value="${c}"${c===it.cat?' selected':''}>${c}</option>`).join('')}</select>`
+      : `<span style="font-size:10px;color:var(--ink3);">${esc(it.cat)}</span>`;
+    const uomCell = isCustom
+      ? `<select class="est-inp-sel" onchange="updateEstStr(${i},'uom',this.value)"><option${it.uom==='EA'?' selected':''}>EA</option><option${it.uom==='BD'?' selected':''}>BD</option><option${it.uom==='BKT'?' selected':''}>BKT</option><option${it.uom==='ROLL'?' selected':''}>ROLL</option><option${it.uom==='BX'?' selected':''}>BX</option><option${it.uom==='TUBE'?' selected':''}>TUBE</option><option${it.uom==='BAG'?' selected':''}>BAG</option></select>`
+      : `<span>${esc(it.uom||'EA')}</span>`;
+
     html += `<tr>
-      <td style="font-size:10px;color:var(--ink3);">${esc(it.cat)}</td>
-      <td style="font-weight:500;">${esc(it.name)}</td>
-      <td style="font-size:11px;color:var(--ink3);">${esc(tmpl?.use||'')}</td>
-      <td>${esc(it.uom||'EA')}</td>
-      <td class="tbl-r"><input class="est-inp" type="number" style="width:70px;text-align:right;" value="${it.price||''}" onchange="updateEst(${i},'price',this.value)"/></td>
-      <td class="tbl-r"><input class="est-inp" type="number" style="width:80px;text-align:right;" value="${it.qty||''}" onchange="updateEst(${i},'qty',this.value)" placeholder="${tmpl?.hint||''}"/></td>
-      <td class="tbl-r" style="font-weight:700;">${lineTotal>0?fmt(lineTotal):'—'}</td>
-      <td class="tbl-r" style="color:${pctColor};">${ordered>0?Math.round(ordered)+' ('+pct+'%)':'—'}</td>
-      <td><button class="est-rem" onclick="removeEstItem(${i})">✕</button></td>
+      <td style="font-size:10px;">${catCellSelect}</td>
+      <td style="font-weight:500;max-width:200px;">${nameCell}</td>
+      <td style="font-size:11px;color:var(--ink3);white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;">${esc(tmpl?.use||'')}</td>
+      <td>${uomCell}</td>
+      <td class="tbl-r"><input class="est-inp" type="number" style="width:70px;text-align:right;" value="${it.price||''}" oninput="updateEst(${i},'price',this.value)"/></td>
+      <td class="tbl-r"><input class="est-inp" type="number" style="width:80px;text-align:right;" value="${it.qty||''}" oninput="updateEst(${i},'qty',this.value)" placeholder="${tmpl?.hint||'qty'}"/></td>
+      <td class="tbl-r est-row-total" id="est-rt-${i}" style="font-weight:700;color:${lineTotal>0?'var(--ink)':'var(--ink3)'};">${lineTotal>0?fmt(lineTotal):'—'}</td>
+      <td class="tbl-r" style="color:${pctColor};">${ordered>0?Math.round(ordered)+'<span style="font-size:9px;"> ('+pct+'%)</span>':'—'}</td>
+      <td><button class="est-rem" onclick="removeEstItem(${i})" title="Remove">✕</button></td>
     </tr>`;
   });
   html += '</tbody></table>';
-  html += '<div style="text-align:right;margin-top:10px;font-family:\'Space Grotesk\',sans-serif;font-size:18px;font-weight:700;">Grand Total: <span id="est-grand-total" style="color:var(--accent);">' + fmt(grandTotal) + '</span></div>';
+  html += '<div style="display:flex;justify-content:flex-end;align-items:center;gap:16px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);"><span style="font-size:12px;color:var(--ink3);">' + items.length + ' items</span><div style="font-family:\'Space Grotesk\',sans-serif;font-size:20px;font-weight:700;">Grand Total: <span id="est-grand-total" style="color:var(--accent);">' + fmt(grandTotal) + '</span></div></div>';
   html += '</div></div>';
 
-  // FIX #5: Optional floor-level breakdown (collapsible)
-  html += `<details style="margin-bottom:16px;"><summary style="cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;padding:10px 0;">📐 Floor-Level Scope Planner (optional)</summary>
-    <div style="margin-top:10px;">
+  // Floor-level scope planner
+  html += `<details style="margin-bottom:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden;"><summary style="cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;padding:12px 16px;background:var(--surface2);display:flex;align-items:center;gap:8px;">📐 Floor-Level Scope Planner <span style="font-size:11px;font-weight:400;color:var(--ink3);">(assign qty per floor/building)</span></summary>
+    <div style="padding:14px 16px;">
       <div style="display:flex;gap:8px;margin-bottom:12px;">
         <button class="btn btn-ghost btn-sm" onclick="renderScopePlanner('${jsesc(job)}','building')">By Building</button>
         <button class="btn btn-ghost btn-sm" onclick="renderScopePlanner('${jsesc(job)}','floor')">By Floor</button>
@@ -1925,16 +2243,79 @@ function renderEstimateTab(job) {
     </div></details>`;
 
   // Floor budgets
-  html += '<details><summary style="cursor:pointer;font-family:\'Space Grotesk\',sans-serif;font-size:14px;font-weight:600;padding:10px 0;">💰 Floor Board Budgets</summary><div id="floor-budget-section" style="margin-top:10px;"></div></details>';
+  html += `<details style="border:1px solid var(--border);border-radius:10px;overflow:hidden;"><summary style="cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;padding:12px 16px;background:var(--surface2);">💰 Floor Board Budgets</summary><div style="padding:14px 16px;" id="floor-budget-section"></div></details>`;
 
   el.innerHTML = html;
   renderFloorBudgetSection(job);
+  // Trigger formula update to populate results if values exist
+  setTimeout(() => updateFormulaCalc(), 50);
 }
+
+function updateFormulaCalc() {
+  const totalUnitsEl = document.getElementById('fu-total-units');
+  const perFloorEl = document.getElementById('fu-per-floor');
+  const floorsBldgEl = document.getElementById('fu-floors-bldg');
+  const matTotalEl = document.getElementById('fu-mat-total');
+  const resultsEl = document.getElementById('formula-results');
+  if (!resultsEl) return;
+
+  // Auto-calc mat total from estimate if blank
+  const items = getJobEstimate(_currentJob);
+  const calcMatTotal = items.reduce((s,it) => s + (parseFloat(it.qty)||0)*(parseFloat(it.price)||0), 0);
+
+  const totalUnits = parseFloat(totalUnitsEl?.value) || 0;
+  const perFloor = parseFloat(perFloorEl?.value) || 0;
+  const floorsBldg = parseFloat(floorsBldgEl?.value) || 0;
+  const matTotal = parseFloat(matTotalEl?.value) || calcMatTotal;
+
+  if (matTotalEl && !matTotalEl.value && calcMatTotal > 0) matTotalEl.placeholder = '$' + calcMatTotal.toFixed(0) + ' (from estimate)';
+
+  const costPerUnit = totalUnits > 0 ? matTotal / totalUnits : 0;
+  const costPerFloor = perFloor > 0 ? costPerUnit * perFloor : 0;
+  const costPerBldg = floorsBldg > 0 && costPerFloor > 0 ? costPerFloor * floorsBldg : 0;
+  const pctOfTotal = totalUnits > 0 && costPerUnit > 0 ? ((costPerUnit / matTotal) * 100) : 0;
+
+  resultsEl.innerHTML = `
+    <div class="formula-result-card"><div class="formula-result-val">${costPerUnit > 0 ? fmt(costPerUnit) : '—'}</div><div class="formula-result-lbl">Cost / Unit</div></div>
+    <div class="formula-result-card"><div class="formula-result-val" style="color:var(--green);">${costPerFloor > 0 ? fmt(costPerFloor) : '—'}</div><div class="formula-result-lbl">Cost / Floor (${perFloor||'?'} units)</div></div>
+    <div class="formula-result-card"><div class="formula-result-val" style="color:var(--purple);">${costPerBldg > 0 ? fmt(costPerBldg) : '—'}</div><div class="formula-result-lbl">Cost / Building (${floorsBldg||'?'} floors)</div></div>
+    <div class="formula-result-card"><div class="formula-result-val" style="color:var(--accent);">${fmt(matTotal)}</div><div class="formula-result-lbl">Total Estimate</div></div>`;
+
+  // Persist formula values
+  if (_currentJob) {
+    if (!S.matBanks) S.matBanks = {};
+    S.matBanks[_currentJob + '_formula'] = {
+      totalUnits: parseFloat(totalUnitsEl?.value)||0,
+      unitsPerFloor: parseFloat(perFloorEl?.value)||0,
+      floorsPerBldg: parseFloat(floorsBldgEl?.value)||0,
+      matTotal: parseFloat(matTotalEl?.value)||0,
+    };
+    saveSharedData('matBanks');
+  }
+}
+
 function updateEst(i, field, val) {
   const items = getJobEstimate(_currentJob);
+  if (!items[i]) return;
   items[i][field] = parseFloat(val) || 0;
   saveJobEstimate(_currentJob);
+  // Update this row's total cell immediately
+  const lineTotal = (parseFloat(items[i].qty)||0) * (parseFloat(items[i].price)||0);
+  const rowEl = document.getElementById('est-rt-' + i);
+  if (rowEl) {
+    rowEl.textContent = lineTotal > 0 ? fmt(lineTotal) : '—';
+    rowEl.style.color = lineTotal > 0 ? 'var(--ink)' : 'var(--ink3)';
+  }
   updateGrandTotal();
+  // Also refresh formula calc if open
+  updateFormulaCalc();
+}
+function updateEstStr(i, field, val) {
+  const items = getJobEstimate(_currentJob);
+  if (!items[i]) return;
+  items[i][field] = val;
+  saveJobEstimate(_currentJob);
+  if (field === 'cat') renderEstimateTab(_currentJob); // re-render for category header regroup
 }
 function saveJobEstimate(job) { saveSharedData('matBanks'); }
 function updateGrandTotal() {
@@ -1950,9 +2331,11 @@ function removeEstItem(i) {
 }
 function addEstLine() {
   const items = getJobEstimate(_currentJob);
-  items.push({cat:'Other', name:'New Item', uom:'EA', qty:0, price:0});
+  items.push({cat:'Other', name:'Custom Item', uom:'EA', qty:0, price:0, _custom:true});
   saveJobEstimate(_currentJob);
   renderEstimateTab(_currentJob);
+  // Scroll to bottom of table
+  setTimeout(() => { const tbl = document.querySelector('#jobs-tab-estimate .tbl'); if (tbl) tbl.scrollIntoView({behavior:'smooth',block:'end'}); }, 100);
 }
 function renderFloorBudgetSection(job) {
   const el = document.getElementById('floor-budget-section'); if (!el) return;
@@ -2163,7 +2546,82 @@ function renderJobSummaryTab(job) {
           ${LABOR_CATS.map(c => { const billed = billAssigns.filter(ba => ba.category === c).reduce((s,ba) => s+parseFloat(ba.total||0), 0); return billed > 0 ? `<div>${c}: <strong>${fmt(billed)}</strong></div>` : ''; }).filter(Boolean).join('') || '<div style="color:var(--ink3);">No labor billed yet</div>'}
         </div>
       </div></div>
-    </div>`;
+    </div>
+
+    ${renderManualBudgetSection(job)}`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// MANUAL BUDGET ENTRY (backfill labor & total job budget)
+// ═══════════════════════════════════════════════════════════
+function renderManualBudgetSection(job) {
+  const mb = S.matBanks?.[job + '_manualBudget'] || {};
+  const totalJobBudget = mb.totalBudget || 0;
+  const notes = mb.notes || '';
+  const laborEntries = mb.labor || {};
+  return `
+  <div class="card" style="margin-top:16px;border-color:rgba(79,142,247,.2);">
+    <div class="card-hdr" style="background:linear-gradient(135deg,rgba(79,142,247,.06),transparent);">
+      <div>
+        <span class="card-title">💰 Manual Budget &amp; Labor Backfill</span>
+        <div style="font-size:11px;color:var(--ink3);margin-top:2px;">Manually enter labor costs &amp; total job budget — no bill data required</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveManualLaborBudget('${jsesc(job)}')">💾 Save</button>
+    </div>
+    <div class="card-body">
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Total Job Budget</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <input type="number" id="mb-total-budget" class="inp inp-sm" style="max-width:180px;" value="${totalJobBudget||''}" placeholder="e.g. 850000" step="1000"/>
+          <span style="font-size:12px;color:var(--ink3);">Set the full job budget (material + labor + everything)</span>
+        </div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Labor Budget by Category</div>
+        <div class="budget-entry-grid">
+          ${LABOR_CATS.map(cat => `<div class="budget-entry-card">
+            <div class="budget-entry-lbl">${cat}</div>
+            <input type="number" class="budget-entry-inp" id="mb-labor-${cat.replace(/\s/g,'_')}" value="${laborEntries[cat]||''}" placeholder="$0" step="100" oninput="updateManualLaborDisplay()"/>
+          </div>`).join('')}
+          <div class="budget-entry-card" style="grid-column:span 2;">
+            <div class="budget-entry-lbl">Total Labor</div>
+            <div id="mb-labor-total" class="budget-entry-inp" style="background:var(--surface);border-color:var(--accent);pointer-events:none;color:var(--accent);">—</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Notes</div>
+        <textarea id="mb-notes" class="inp" style="height:60px;resize:vertical;font-size:12px;" placeholder="e.g. Framing complete, hanging 60%, punch Q3 2025...">${esc(notes)}</textarea>
+      </div>
+      ${totalJobBudget > 0 ? `<div style="margin-top:12px;padding:10px 14px;background:var(--surface2);border-radius:8px;font-size:12px;color:var(--ink3);">
+        <strong style="color:var(--ink);">Budget set:</strong> ${fmt(totalJobBudget)} total · Labor budget: ${fmt(LABOR_CATS.reduce((s,c)=>s+(parseFloat(laborEntries[c]||0)),0))}
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+
+function updateManualLaborDisplay() {
+  const total = LABOR_CATS.reduce((s,cat) => {
+    const v = parseFloat(document.getElementById('mb-labor-' + cat.replace(/\s/g,'_'))?.value || 0);
+    return s + v;
+  }, 0);
+  const el = document.getElementById('mb-labor-total');
+  if (el) el.textContent = total > 0 ? fmt(total) : '—';
+}
+
+async function saveManualLaborBudget(job) {
+  if (!S.matBanks) S.matBanks = {};
+  const labor = {};
+  LABOR_CATS.forEach(cat => {
+    const v = parseFloat(document.getElementById('mb-labor-' + cat.replace(/\s/g,'_'))?.value || 0);
+    if (v > 0) labor[cat] = v;
+  });
+  const totalBudget = parseFloat(document.getElementById('mb-total-budget')?.value || 0);
+  const notes = document.getElementById('mb-notes')?.value || '';
+  S.matBanks[job + '_manualBudget'] = { totalBudget, labor, notes, savedAt: new Date().toISOString() };
+  await saveSharedData('matBanks');
+  showToast('✓ Budget saved for ' + job.replace('JOB ',''));
+  renderJobSummaryTab(job);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2451,7 +2909,7 @@ async function confirmNewJob(rawName) {
   if (sel) sel.value = name;
   showToast('✓ Job "' + name + '" created — you can now confirm the PO');
 }
-function confirmPDFPO(po, savedId) {
+async function confirmPDFPO(po, savedId) {
   if (!po) return;
   const job = document.getElementById('pdf-job')?.value;
   const bldg = document.getElementById('pdf-bldg')?.value || po.building || '';
@@ -2461,13 +2919,18 @@ function confirmPDFPO(po, savedId) {
   if (!job) { showToast('Please select a job'); return; }
   if (!S.assignments) S.assignments = {};
   S.assignments[poNum] = {job, building:bldg, floor, unit, manual:true, lines:po.lines, total:po.total, vendor:po.vendor, date:new Date().toISOString().split('T')[0]};
-  saveSharedData('assignments').then(async () => {
-    if (savedId) {
-      await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + savedId, { method:'PATCH', headers:{'apikey':SB_KEY,'Content-Type':'application/json'}, body:JSON.stringify({status:'confirmed',job_name:job}) });
-    }
-    showToast('✓ PO #' + poNum + ' added to ' + job.replace('JOB ',''));
-    document.getElementById('pdf-result').style.display = 'none';
-  });
+  await saveSharedData('assignments');
+  if (savedId) {
+    try { await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + savedId, { method:'PATCH', headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'}, body:JSON.stringify({status:'confirmed',job_name:job}) }); } catch(e) {}
+  }
+  showToast('✓ PO #' + poNum + ' confirmed → ' + job.replace('JOB ',''));
+  document.getElementById('pdf-result').style.display = 'none';
+  // Refresh the feed and inbox without full page reload
+  renderActivityFeed();
+  updateInboxBadge();
+  // If inbox PDFs tab is open, reload it
+  const pdfPanel = document.getElementById('inbox-tab-pdfs');
+  if (pdfPanel?.classList.contains('active')) loadPendingPOs();
 }
 async function loadPendingPOs() {
   const el = document.getElementById('pending-pos-list'); if (!el) return;
@@ -2860,17 +3323,67 @@ function removeLastAIMsg() {
   const last = msgs.querySelector('.ai-msg:last-child');
   if (last) last.remove();
 }
+function buildAIContext() {
+  const jobs = getJobs();
+  const totalSpend = S.rows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
+  const totalBoards = S.rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
+  const unmatchedBills = S.bills.filter(b => { const inv=String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim(); return inv && !S.billAssignments[inv]; }).length;
+  const unassignedPOs = getFeedPOGroups().filter(g => !S.assignments[g.po]).length;
+
+  // Per-job breakdown with estimates and structure
+  const jobDetails = jobs.map(j => {
+    const jr = S.rows.filter(r => (r['JOB']||r['Job']||'')===j);
+    const spend = jr.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
+    const boards = jr.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
+    const laborBilled = Object.values(S.billAssignments||{}).filter(ba => ba.job===j && LABOR_CATS.some(lc=>(ba.category||'').includes(lc))).reduce((s,ba) => s+parseFloat(ba.total||0), 0);
+    const estItems = getJobEstimate(j);
+    const estTotal = estItems.reduce((s,it) => s+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0), 0);
+    const struct = S.jobStructure?.[j];
+    const totalUnits = struct?.floors ? struct.floors.reduce((s,fl) => s+(fl.units||[]).length, 0) : 0;
+    const target = parseFloat(S.targets?.[j]?.pricePerBoard||0);
+    const ppb = boards > 0 ? (spend+laborBilled)/boards : 0;
+    const mb = S.matBanks?.[j+'_manualBudget'] || {};
+    return `${j}: material_spend=$${spend.toFixed(0)}, boards=${Math.round(boards)}, labor_billed=$${laborBilled.toFixed(0)}, estimate=$${estTotal.toFixed(0)}, units=${totalUnits}, $/board=${ppb>0?'$'+ppb.toFixed(0):'?'}, target=${target?'$'+target:'not set'}, total_budget=${mb.totalBudget?'$'+mb.totalBudget:'not set'}`;
+  }).join('\n');
+
+  // Material category breakdown
+  const catTotals = {};
+  S.rows.forEach(r => { const c=categorize(r['MATERIAL']||''); catTotals[c]=(catTotals[c]||0)+parseFloat(r['LINE TOTAL']||0); });
+  const catBreakdown = Object.entries(catTotals).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k}: $${v.toFixed(0)}`).join(', ');
+
+  // Flagged POs
+  const flaggedPOs = getFeedPOGroups().filter(g => getPOFlags(g).length > 0).slice(0,5).map(g => `PO#${g.po}(${getPOFlags(g).map(f=>f.label).join('+')})`).join(', ');
+
+  // Current job context
+  const curJobCtx = _currentJob ? (() => {
+    const struct = S.jobStructure?.[_currentJob];
+    const totalUnits = struct?.floors ? struct.floors.reduce((s,fl) => s+(fl.units||[]).length, 0) : 0;
+    const floors = struct?.floors?.length || 0;
+    return `CURRENT JOB: ${_currentJob}, ${floors} floors, ${totalUnits} units`;
+  })() : '';
+
+  return `You are an expert AI assistant for A.A. DRYWALL FINISH PAINT LLC, a drywall framing, hanging, and finish paint contractor. You track material costs, labor, POs, and job budgets. Be concise but specific with numbers. Use the data below to answer accurately.
+
+TODAY: ${new Date().toLocaleDateString()}
+COMPANY TOTALS: spend=$${totalSpend.toFixed(0)}, boards=${Math.round(totalBoards)}, unmatched_bills=${unmatchedBills}, unassigned_POs=${unassignedPOs}
+MATERIAL CATEGORIES: ${catBreakdown}
+
+JOB DETAILS:
+${jobDetails}
+
+${flaggedPOs ? 'FLAGGED POs: ' + flaggedPOs : ''}
+${curJobCtx}
+
+You can help with: cost analysis, per-unit estimates, budget tracking, material ordering patterns, labor cost questions, job comparisons, and identifying anomalies.`;
+}
+
 async function sendAI() {
   const input = document.getElementById('ai-input');
   const q = input.value.trim(); if (!q) return;
   input.value = '';
   addAIMsg(q, 'user');
-  addAIMsg('Thinking...', 'ai thinking');
-  const jobs = getJobs();
-  const totalSpend = S.rows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
-  const totalBoards = S.rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
-  const jobBreakdown = jobs.map(j => { const jr=S.rows.filter(r=>(r['JOB']||'')===j); const spend=jr.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0); const boards=jr.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0); return j+': $'+spend.toFixed(0)+', '+Math.round(boards)+' boards'; }).join('\n');
-  const context = 'You are an AI for A.A. DRYWALL FINISH PAINT LLC. Answer concisely.\n\nJOBS:\n' + jobBreakdown + '\n\nTOTALS: Spend=$'+totalSpend.toFixed(0)+' Boards='+Math.round(totalBoards)+' Bills='+S.bills.length;
+  addAIMsg('⏳ Thinking...', 'ai thinking');
+  const context = buildAIContext();
   const EDGE_URL = SB_URL + '/functions/v1/ai-chat';
   try {
     const res = await fetch(EDGE_URL, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'apikey':SB_KEY}, body:JSON.stringify({question:q,context}) });
@@ -2881,11 +3394,11 @@ async function sendAI() {
   } catch(e) {
     if (S.aiKey) {
       try {
-        const res2 = await fetch('https://api.anthropic.com/v1/messages', { method:'POST', headers:{'Content-Type':'application/json','x-api-key':S.aiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}, body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,system:context,messages:[{role:'user',content:q}]}) });
+        const res2 = await fetch('https://api.anthropic.com/v1/messages', { method:'POST', headers:{'Content-Type':'application/json','x-api-key':S.aiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}, body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:800,system:context,messages:[{role:'user',content:q}]}) });
         const d2 = await res2.json();
         removeLastAIMsg(); addAIMsg(d2.content?.[0]?.text||'No response', 'ai');
-      } catch(e2) { removeLastAIMsg(); addAIMsg('Error: '+e2.message, 'ai'); }
-    } else { removeLastAIMsg(); addAIMsg('Deploy ai-chat Edge Function or add API key in Settings.', 'ai'); }
+      } catch(e2) { removeLastAIMsg(); addAIMsg('⚠ Error: '+e2.message, 'ai'); }
+    } else { removeLastAIMsg(); addAIMsg('Add an Anthropic API key in ⚙ Setup to enable AI. Or deploy the ai-chat Edge Function to Supabase.', 'ai'); }
   }
 }
 
