@@ -1981,20 +1981,45 @@ function renderScopePlanner(job, mode) {
   const floors = struct.floors || [];
   const buildings = [...new Set(floors.map(f => String(f.bldg||'').trim()).filter(Boolean))];
   let html = '';
+
   const renderTable = (scopeKey, label) => {
     const sd = scopeData[scopeKey] || (scopeData[scopeKey] = {});
     const jJob = jsesc(job), jKey = jsesc(scopeKey);
-    const pickerId = 'spick_' + scopeKey.replace(/[^a-z0-9]/gi,'_');
+    const pid = 'spick_' + scopeKey.replace(/[^a-z0-9]/gi,'_');
     const otherFloors = floors.map(f => { const k='floor:'+(f.bldg||'')+':'+f.floor; return k!==scopeKey?{k,lbl:(f.bldg?'Bldg '+f.bldg+' · ':'')+'Floor '+f.floor}:null; }).filter(Boolean);
-    const pickerHtml = `<div id="${pickerId}" style="display:none;margin-top:8px;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;min-width:200px;">`
-      + `<div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;">Copy to:</div>`
-      + otherFloors.map(fl=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px;cursor:pointer;"><input type="checkbox" value="${esc(fl.k)}" style="accent-color:var(--accent);"/> ${esc(fl.lbl)}</label>`).join('')
-      + `<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn btn-primary btn-sm" onclick="applySelectiveCopy('${jJob}','${jKey}','${pickerId}')">Copy</button><button class="btn btn-ghost btn-sm" onclick="document.getElementById('${pickerId}').style.display='none'">Cancel</button></div></div>`;
-    const copyBtns = `<div style="margin-bottom:8px;display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" onclick="copyScopeToAll('${jJob}','${jKey}')">📋 All floors</button><button class="btn btn-ghost btn-sm" onclick="var p=document.getElementById('${pickerId}');p.style.display=p.style.display==='none'?'block':'none'">📋 Select floors…</button></div>${pickerHtml}`;
-    return `<details open style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;"><summary style="cursor:pointer;padding:10px 12px;font-weight:700;">${esc(label)}</summary><div style="padding:10px 12px;overflow-x:auto;">${copyBtns}<table class="tbl" style="min-width:520px;"><thead><tr><th>Material</th><th>UOM</th><th class="tbl-r">Qty</th></tr></thead><tbody>${items.map((it,i) => '<tr><td>'+esc(it.name)+'</td><td style="color:var(--ink3);">'+esc(it.uom||'EA')+'</td><td class="tbl-r"><input type="number" class="est-inp" style="width:90px;text-align:right;" value="'+(sd[it.name]||'')+'" oninput="updateScopeQty(\''+jsesc(job)+'\',\''+jsesc(scopeKey)+'\',\''+jsesc(it.name)+'\',this.value)"></td></tr>').join('')}</tbody></table></div></details>`;
+
+    const picker = `<div id="${pid}" style="display:none;position:absolute;left:0;top:calc(100% + 4px);z-index:60;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;min-width:230px;box-shadow:0 12px 40px rgba(0,0,0,.5);">`
+      + `<div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Copy quantities to:</div>`
+      + `<label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid var(--border);cursor:pointer;"><input type="checkbox" style="accent-color:var(--accent);" onchange="this.closest('[id]').querySelectorAll('[data-fl]').forEach(c=>c.checked=this.checked)"/> Select all</label>`
+      + otherFloors.map(fl=>`<label style="display:flex;align-items:center;gap:7px;font-size:12px;margin-bottom:5px;cursor:pointer;"><input type="checkbox" data-fl="1" value="${esc(fl.k)}" style="accent-color:var(--accent);"/> ${esc(fl.lbl)}</label>`).join('')
+      + `<div style="margin-top:10px;display:flex;gap:6px;"><button class="btn btn-primary btn-sm" onclick="applySelectiveCopy('${jJob}','${jKey}','${pid}')">Copy</button><button class="btn btn-ghost btn-sm" onclick="document.getElementById('${pid}').style.display='none'">Cancel</button></div></div>`;
+
+    let floorBudget = 0;
+    const tRows = items.map(it => {
+      const price = parseFloat(it.price)||0;
+      const qty = parseFloat(sd[it.name]||0);
+      const cost = qty * price;
+      floorBudget += cost;
+      return `<tr><td style="font-size:12px;">${esc(it.name)}</td>`
+        + `<td style="color:var(--ink3);font-size:11px;">${esc(it.uom||'EA')}</td>`
+        + `<td class="tbl-r"><input type="number" class="est-inp" style="width:80px;text-align:right;" value="${qty||''}" oninput="updateScopeQty('${jJob}','${jKey}','${jsesc(it.name)}',this.value)"></td>`
+        + `<td class="tbl-r" style="color:var(--ink3);font-size:11px;">${price>0?fmt(price):'—'}</td>`
+        + `<td class="tbl-r" style="font-weight:600;color:${cost>0?'var(--ink)':'var(--ink3)'};">${cost>0?fmt(cost):'—'}</td></tr>`;
+    }).join('');
+    const totRow = `<tr style="border-top:2px solid var(--border2);"><td colspan="2" style="font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink3);">Floor Total</td><td></td><td></td><td class="tbl-r" style="font-weight:800;font-size:15px;color:var(--accent);">${floorBudget>0?fmt(floorBudget):'—'}</td></tr>`;
+
+    return `<details open style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;">`
+      + `<summary style="cursor:pointer;padding:10px 14px;font-weight:700;list-style:none;display:flex;align-items:center;justify-content:space-between;">`
+      + `<span>${esc(label)}</span><span style="font-size:13px;color:var(--accent);">${floorBudget>0?fmt(floorBudget):''}</span></summary>`
+      + `<div style="padding:10px 14px;overflow-x:auto;">`
+      + `<div style="position:relative;display:inline-block;margin-bottom:10px;"><button class="btn btn-ghost btn-sm" onclick="var p=document.getElementById('${pid}');p.style.display=p.style.display==='none'?'block':'none'">📋 Copy to other…</button>${picker}</div>`
+      + `<table class="tbl" style="min-width:560px;"><thead><tr><th>Material</th><th>UOM</th><th class="tbl-r">Qty</th><th class="tbl-r">Unit $</th><th class="tbl-r">Cost</th></tr></thead>`
+      + `<tbody>${tRows}${totRow}</tbody></table></div></details>`;
   };
+
   if (mode === 'building' || mode === 'both') buildings.forEach(b => { html += renderTable('bldg:'+b, 'Building '+b); });
   if (mode === 'floor' || mode === 'both') floors.forEach(f => { html += renderTable('floor:'+(f.bldg||'')+':'+f.floor, (f.bldg?'Building '+f.bldg+' · ':'')+'Floor '+f.floor); });
+  html += buildScopeSummary(job, scopeData, floors, items);
   wrap.innerHTML = html || '<div class="no-data">No structures yet.</div>';
 }
 function updateScopeQty(job, scopeKey, matName, val) {
@@ -2003,29 +2028,63 @@ function updateScopeQty(job, scopeKey, matName, val) {
   sd[matName] = parseFloat(val) || 0;
   saveSharedData('matBanks');
 }
+function applySelectiveCopy(job, fromKey, pid) {
+  const picker = document.getElementById(pid); if (!picker) return;
+  const checked = Array.from(picker.querySelectorAll('input[data-fl]:checked')).map(cb => cb.value);
+  if (!checked.length) { showToast('Select at least one floor first', true); return; }
+  const scopeData = S.matBanks[job+'_scopes'] || (S.matBanks[job+'_scopes'] = {});
+  const fromData = Object.assign({}, scopeData[fromKey] || {});
+  checked.forEach(k => { scopeData[k] = Object.assign({}, fromData); });
+  saveSharedData('matBanks');
+  renderScopePlanner(job, _scopePlannerMode);
+  showToast('✓ Copied to ' + checked.length + ' floor' + (checked.length > 1 ? 's' : ''));
+}
 function copyScopeToAll(job, fromKey) {
   const scopeData = S.matBanks[job+'_scopes'] || (S.matBanks[job+'_scopes'] = {});
   const fromData = Object.assign({}, scopeData[fromKey] || {});
-  const struct = S.jobStructure?.[job];
-  if (!struct?.floors?.length) return;
-  struct.floors.forEach(f => {
-    const toKey = 'floor:'+(f.bldg||'')+':'+f.floor;
-    if (toKey !== fromKey) scopeData[toKey] = Object.assign({}, fromData);
-  });
+  const struct = S.jobStructure?.[job]; if (!struct?.floors?.length) return;
+  struct.floors.forEach(f => { const k='floor:'+(f.bldg||'')+':'+f.floor; if (k!==fromKey) scopeData[k]=Object.assign({},fromData); });
   saveSharedData('matBanks');
   renderScopePlanner(job, _scopePlannerMode);
   showToast('✓ Copied to all floors');
 }
-function applySelectiveCopy(job, fromKey, pickerId) {
-  const picker = document.getElementById(pickerId); if (!picker) return;
-  const checked = Array.from(picker.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
-  if (!checked.length) { showToast('Select at least one floor first', true); return; }
-  const scopeData = S.matBanks[job+'_scopes'] || (S.matBanks[job+'_scopes'] = {});
-  const fromData = Object.assign({}, scopeData[fromKey] || {});
-  checked.forEach(toKey => { scopeData[toKey] = Object.assign({}, fromData); });
-  saveSharedData('matBanks');
-  renderScopePlanner(job, _scopePlannerMode);
-  showToast('✓ Copied to ' + checked.length + ' floor' + (checked.length > 1 ? 's' : ''));
+function buildScopeSummary(job, scopeData, floors, items) {
+  const rows = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  const floorData = floors.map(f => {
+    const sd = scopeData['floor:'+(f.bldg||'')+':'+f.floor] || {};
+    const budgeted = items.reduce((s,it) => s + (parseFloat(sd[it.name]||0))*(parseFloat(it.price)||0), 0);
+    const totalQty = items.reduce((s,it) => s + (parseFloat(sd[it.name]||0)), 0);
+    const flRows = rows.filter(r => {
+      const rfl=String(r['FLOOR']||'').trim(), rb=String(r['BUILDING']||'').trim();
+      if (rfl !== String(f.floor)) return false;
+      if (f.bldg && rb && rb !== String(f.bldg)) return false;
+      return true;
+    });
+    const ordered = flRows.reduce((s,r) => s+(parseFloat(r['LINE TOTAL']||0)||0), 0);
+    const variance = budgeted - ordered;
+    const pct = budgeted > 0 ? Math.min(Math.round(ordered/budgeted*100), 999) : 0;
+    return { label:(f.bldg?'Bldg '+f.bldg+' · ':'')+'Floor '+f.floor, budgeted, totalQty, ordered, variance, pct };
+  });
+  if (!floorData.some(f => f.budgeted > 0)) return '';
+  const grandB = floorData.reduce((s,f)=>s+f.budgeted,0);
+  const grandO = floorData.reduce((s,f)=>s+f.ordered,0);
+  const grandV = grandB - grandO;
+  const summaryRows = floorData.map(f => {
+    const pc = f.pct > 100 ? 'var(--red)' : f.pct > 80 ? 'var(--yellow)' : f.pct > 0 ? 'var(--green)' : 'var(--ink3)';
+    return `<tr>`
+      + `<td style="font-weight:600;">${esc(f.label)}</td>`
+      + `<td class="tbl-r" style="color:var(--ink3);">${f.totalQty>0?f.totalQty.toLocaleString():'—'}</td>`
+      + `<td class="tbl-r" style="color:var(--accent);">${f.budgeted>0?fmt(f.budgeted):'—'}</td>`
+      + `<td class="tbl-r">${f.ordered>0?fmt(f.ordered):'—'}</td>`
+      + `<td class="tbl-r" style="color:${f.budgeted>0?(f.variance>=0?'var(--green)':'var(--red)'):'var(--ink3)'};">${f.budgeted>0?(f.variance>=0?'+':'')+fmt(f.variance):'—'}</td>`
+      + `<td class="tbl-r"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;"><div style="width:64px;height:6px;background:var(--surface3);border-radius:3px;"><div style="height:6px;border-radius:3px;background:${pc};width:${Math.min(100,f.pct)}%;"></div></div><span style="font-size:11px;color:${pc};min-width:30px;">${f.pct}%</span></div></td>`
+      + `</tr>`;
+  }).join('');
+  return `<div class="card" style="margin-top:16px;"><div class="card-hdr" style="justify-content:space-between;"><span class="card-title">📊 Scope Budget Tracker</span><span style="font-size:13px;font-weight:700;color:var(--accent);">${fmt(grandB)} estimated</span></div>`
+    + `<div class="card-body" style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Floor</th><th class="tbl-r">Items</th><th class="tbl-r">Budgeted</th><th class="tbl-r">Ordered</th><th class="tbl-r">Remaining</th><th class="tbl-r">Progress</th></tr></thead><tbody>`
+    + summaryRows
+    + `<tr style="border-top:2px solid var(--border2);font-weight:700;"><td>ALL FLOORS</td><td></td><td class="tbl-r" style="color:var(--accent);">${fmt(grandB)}</td><td class="tbl-r">${grandO>0?fmt(grandO):'—'}</td><td class="tbl-r" style="color:${grandV>=0?'var(--green)':'var(--red)'};">${grandB>0?(grandV>=0?'+':'')+fmt(grandV):'—'}</td><td></td></tr>`
+    + `</tbody></table></div></div>`;
 }
 
 // ═══════════════════════════════════════════════════════════
