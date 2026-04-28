@@ -229,7 +229,7 @@ a{color:var(--accent);}
 
 <div id="login-screen" style="display:flex;">
   <div class="login-box">
-    <div class="login-logo" id="login-logo-box">🏗️</div>
+    <div class="login-logo" id="login-logo-box">🏗️<img src="" alt="" style="display:none;width:64px;height:64px;object-fit:cover;"/></div>
     <h2 style="font-size:22px;margin-bottom:4px;">AA Drywall Tracker</h2>
     <p style="color:var(--ink3);font-size:13px;margin-bottom:24px;">Job costing &amp; material tracking</p>
     <input id="pass-input" class="inp" type="password" placeholder="Enter passcode" onkeydown="if(event.key==='Enter')tryLogin()" style="margin-bottom:12px;text-align:center;"/>
@@ -244,7 +244,7 @@ a{color:var(--accent);}
 <!-- SIDEBAR -->
 
 <div id="sidebar">
-  <div class="nav-logo" id="nav-logo">🏗️</div>
+  <div class="nav-logo" id="nav-logo">🏗️<img src="" alt="" style="display:none;width:36px;height:36px;object-fit:cover;"/></div>
   <div class="nav-divider"></div>
   <button class="nav-icon-btn active" data-page="home" onclick="nav('home')"><span>🏗️</span><span class="label">Feed</span></button>
   <button class="nav-icon-btn" data-page="dashboard" onclick="nav('dashboard')"><span>📊</span><span class="label">Dash</span></button>
@@ -747,14 +747,12 @@ async function sbGet(key) {
   } catch(e) { console.warn('sbGet error:', e); return null; }
 }
 async function sbSet(key, value) {
-  try {
-    const res = await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
-      method: 'POST',
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
-      body: JSON.stringify({ key, value })
-    });
-    if (!res.ok) { const err = await res.text(); console.warn('sbSet error:', res.status, err); }
-  } catch(e) { console.warn('sbSet error:', e); }
+  const res = await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
+    method: 'POST',
+    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify({ key, value })
+  });
+  if (!res.ok) { const err = await res.text(); throw new Error('Save HTTP ' + res.status + ': ' + err); }
 }
 async function saveSharedData(key) {
   const val = S[key];
@@ -1888,6 +1886,7 @@ function renderEstimateTab(job) {
   const rows = S.rows.filter(r => (r['JOB']||'') === job);
   let html = '<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Line</button></div></div><div class="card-body" style="overflow-x:auto;">';
   html += '<table class="tbl"><thead><tr><th>Cat</th><th>Material</th><th>Use</th><th>UOM</th><th class="tbl-r">Price</th><th class="tbl-r" style="min-width:80px;">Qty</th><th class="tbl-r">Total</th><th class="tbl-r">Ordered</th><th></th></tr></thead><tbody>';
+  const EST_CATS = Object.keys(CAT_COLORS).concat(['Other']);
   let lastCat = '', grandTotal = 0;
   items.forEach((it, i) => {
     if (it.cat !== lastCat) { lastCat = it.cat; html += '<tr class="est-cat-hdr"><td colspan="9" style="background:' + (CAT_COLORS[it.cat]||'var(--surface3)') + ';color:' + (CAT_TEXT[it.cat]||'var(--ink2)') + ';">' + esc(it.cat) + '</td></tr>'; }
@@ -1897,13 +1896,14 @@ function renderEstimateTab(job) {
     const pct = it.qty > 0 && ordered > 0 ? Math.round(ordered / it.qty * 100) : 0;
     const pctColor = pct > 100 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : pct > 0 ? 'var(--green)' : 'var(--ink3)';
     const tmpl = ESTIMATE_TEMPLATE.find(t => t.name === it.name);
+    const catOpts = EST_CATS.map(c => `<option value="${esc(c)}"${c===it.cat?' selected':''}>${esc(c)}</option>`).join('');
     html += `<tr>
-      <td style="font-size:10px;color:var(--ink3);">${esc(it.cat)}</td>
-      <td style="font-weight:500;">${esc(it.name)}</td>
-      <td style="font-size:11px;color:var(--ink3);">${esc(tmpl?.use||'')}</td>
-      <td>${esc(it.uom||'EA')}</td>
-      <td class="tbl-r"><input class="est-inp" type="number" style="width:70px;text-align:right;" value="${it.price||''}" onchange="updateEst(${i},'price',this.value)"/></td>
-      <td class="tbl-r"><input class="est-inp" type="number" style="width:80px;text-align:right;" value="${it.qty||''}" onchange="updateEst(${i},'qty',this.value)" placeholder="${tmpl?.hint||''}"/></td>
+      <td><select class="est-inp" style="width:110px;font-size:10px;padding:3px 4px;" onchange="updateEst(${i},'cat',this.value,true)">${catOpts}</select></td>
+      <td><input class="est-inp" type="text" style="width:160px;font-size:12px;" value="${esc(it.name)}" onchange="updateEst(${i},'name',this.value)"/></td>
+      <td style="font-size:11px;color:var(--ink3);">${esc(tmpl?.use||it.use||'')}</td>
+      <td><input class="est-inp" type="text" style="width:52px;font-size:12px;" value="${esc(it.uom||'EA')}" onchange="updateEst(${i},'uom',this.value)"/></td>
+      <td class="tbl-r"><input class="est-inp" type="number" style="width:70px;text-align:right;" value="${it.price!=null&&it.price!==''?it.price:''}" onchange="updateEst(${i},'price',this.value)"/></td>
+      <td class="tbl-r"><input class="est-inp" type="number" style="width:80px;text-align:right;" value="${it.qty!=null&&it.qty!==0?it.qty:''}" onchange="updateEst(${i},'qty',this.value)" placeholder="${esc(tmpl?.hint||'')}"/></td>
       <td class="tbl-r" style="font-weight:700;">${lineTotal>0?fmt(lineTotal):'—'}</td>
       <td class="tbl-r" style="color:${pctColor};">${ordered>0?Math.round(ordered)+' ('+pct+'%)':'—'}</td>
       <td><button class="est-rem" onclick="removeEstItem(${i})">✕</button></td>
@@ -1930,11 +1930,16 @@ function renderEstimateTab(job) {
   el.innerHTML = html;
   renderFloorBudgetSection(job);
 }
-function updateEst(i, field, val) {
+function updateEst(i, field, val, rerender) {
   const items = getJobEstimate(_currentJob);
-  items[i][field] = parseFloat(val) || 0;
+  if (field === 'qty' || field === 'price') {
+    items[i][field] = val === '' ? 0 : (parseFloat(val) || 0);
+  } else {
+    items[i][field] = val;
+  }
   saveJobEstimate(_currentJob);
-  updateGrandTotal();
+  if (rerender) renderEstimateTab(_currentJob);
+  else updateGrandTotal();
 }
 function saveJobEstimate(job) { saveSharedData('matBanks'); }
 function updateGrandTotal() {
