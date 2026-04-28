@@ -439,7 +439,7 @@ const JOB_ALIASES = {
   'LUDLAM': 'LUDLAM',
 };
 
-let _currentJob = '', _jobMapView = 'material', _editStruct = {floors:[]};
+let _currentJob = '', _jobMapView = 'material', _editStruct = {floors:[]}, _scopePlannerMode = 'floor';
 let _chartJobSpend = null, _chartMatCats = null;
 
 const ESTIMATE_TEMPLATE = [
@@ -1975,6 +1975,7 @@ function updateFloorBudgetItem(job, fi, val) {
 function renderScopePlanner(job, mode) {
   const wrap = document.getElementById('scope-planner-wrap'); if (!wrap) return;
   const struct = S.jobStructure?.[job]; if (!struct?.floors?.length) { wrap.innerHTML = '<div class="no-data">Set up floors first.</div>'; return; }
+  _scopePlannerMode = mode;
   const items = getJobEstimate(job);
   const scopeData = S.matBanks[job+'_scopes'] || (S.matBanks[job+'_scopes'] = {});
   const floors = struct.floors || [];
@@ -1982,7 +1983,9 @@ function renderScopePlanner(job, mode) {
   let html = '';
   const renderTable = (scopeKey, label) => {
     const sd = scopeData[scopeKey] || (scopeData[scopeKey] = {});
-    return `<details open style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;"><summary style="cursor:pointer;padding:10px 12px;font-weight:700;">${esc(label)}</summary><div style="padding:10px 12px;overflow-x:auto;"><table class="tbl" style="min-width:520px;"><thead><tr><th>Material</th><th>UOM</th><th class="tbl-r">Qty</th></tr></thead><tbody>${items.map((it,i) => '<tr><td>'+esc(it.name)+'</td><td style="color:var(--ink3);">'+esc(it.uom||'EA')+'</td><td class="tbl-r"><input type="number" class="est-inp" style="width:90px;text-align:right;" value="'+(sd[it.name]||'')+'" oninput="updateScopeQty(\''+jsesc(job)+'\',\''+jsesc(scopeKey)+'\',\''+jsesc(it.name)+'\',this.value)"></td></tr>').join('')}</tbody></table></div></details>`;
+    const jJob = jsesc(job), jKey = jsesc(scopeKey);
+    const copyBtn = `<div style="margin-bottom:8px;text-align:right;"><button class="btn btn-ghost btn-sm" onclick="copyScopeToAll('${jJob}','${jKey}')">📋 Copy to all floors</button></div>`;
+    return `<details open style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;"><summary style="cursor:pointer;padding:10px 12px;font-weight:700;">${esc(label)}</summary><div style="padding:10px 12px;overflow-x:auto;">${copyBtn}<table class="tbl" style="min-width:520px;"><thead><tr><th>Material</th><th>UOM</th><th class="tbl-r">Qty</th></tr></thead><tbody>${items.map((it,i) => '<tr><td>'+esc(it.name)+'</td><td style="color:var(--ink3);">'+esc(it.uom||'EA')+'</td><td class="tbl-r"><input type="number" class="est-inp" style="width:90px;text-align:right;" value="'+(sd[it.name]||'')+'" oninput="updateScopeQty(\''+jsesc(job)+'\',\''+jsesc(scopeKey)+'\',\''+jsesc(it.name)+'\',this.value)"></td></tr>').join('')}</tbody></table></div></details>`;
   };
   if (mode === 'building' || mode === 'both') buildings.forEach(b => { html += renderTable('bldg:'+b, 'Building '+b); });
   if (mode === 'floor' || mode === 'both') floors.forEach(f => { html += renderTable('floor:'+(f.bldg||'')+':'+f.floor, (f.bldg?'Building '+f.bldg+' · ':'')+'Floor '+f.floor); });
@@ -1993,6 +1996,19 @@ function updateScopeQty(job, scopeKey, matName, val) {
   const sd = scopeData[scopeKey] || (scopeData[scopeKey] = {});
   sd[matName] = parseFloat(val) || 0;
   saveSharedData('matBanks');
+}
+function copyScopeToAll(job, fromKey) {
+  const scopeData = S.matBanks[job+'_scopes'] || (S.matBanks[job+'_scopes'] = {});
+  const fromData = Object.assign({}, scopeData[fromKey] || {});
+  const struct = S.jobStructure?.[job];
+  if (!struct?.floors?.length) return;
+  struct.floors.forEach(f => {
+    const toKey = 'floor:'+(f.bldg||'')+':'+f.floor;
+    if (toKey !== fromKey) scopeData[toKey] = Object.assign({}, fromData);
+  });
+  saveSharedData('matBanks');
+  renderScopePlanner(job, _scopePlannerMode);
+  showToast('✓ Copied to all floors');
 }
 
 // ═══════════════════════════════════════════════════════════
