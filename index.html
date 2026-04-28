@@ -2075,55 +2075,142 @@ function openUnitDetail(job, floor, unit, bldg) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// ESTIMATE TAB (FIX #5: Optional floor-level breakdown)
+// ESTIMATE TAB — floor-by-floor quantities with copy
 // ═══════════════════════════════════════════════════════════
 function renderEstimateTab(job) {
   const el = document.getElementById('jobs-tab-estimate'); if (!el) return;
   const items = getJobEstimate(job);
-  const rows = S.rows.filter(r => (r['JOB']||'') === job);
-  let html = '<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Line</button></div></div><div class="card-body" style="overflow-x:auto;">';
-  html += '<table class="tbl"><thead><tr><th>Cat</th><th>Material</th><th>Use</th><th>UOM</th><th class="tbl-r">Price</th><th class="tbl-r" style="min-width:80px;">Qty</th><th class="tbl-r">Total</th><th class="tbl-r">Ordered</th><th></th></tr></thead><tbody>';
-  let lastCat = '', grandTotal = 0;
+  const struct = S.jobStructure?.[job];
+  const floors = struct?.floors || [];
+  const sheetRows = S.rows.filter(r => (r['JOB']||'') === job);
+  const totalBudget = items.reduce((s,it) => s + (parseFloat(it.qty)||0)*(parseFloat(it.price)||0), 0);
+
+  // — Unit Prices card (collapsible) —
+  let html = `<details id="est-prices-details" style="margin-bottom:14px;">
+  <summary style="cursor:pointer;padding:12px 16px;background:var(--surface2);border-radius:10px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);">
+    <span>💰 Unit Prices</span>
+    <span style="display:flex;gap:12px;align-items:center;">
+      <span style="font-size:11px;color:var(--ink3);">Est. budget</span>
+      <span style="font-weight:700;color:var(--accent);" id="est-grand-total">${fmt(totalBudget)}</span>
+    </span>
+  </summary>
+  <div style="border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">
+    <div style="padding:8px 12px;background:var(--surface3);border-bottom:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Material</button>
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="tbl" style="border-radius:0;"><thead><tr>
+      <th>Material</th><th>UOM</th>
+      <th class="tbl-r" style="min-width:80px;">Unit Price</th>
+      <th class="tbl-r" style="min-width:80px;">Budget Qty</th>
+      <th class="tbl-r">Est. Total</th>
+      <th class="tbl-r">Ordered</th>
+      <th></th>
+    </tr></thead><tbody>`;
+  let lastCat = '';
   items.forEach((it, i) => {
-    if (it.cat !== lastCat) { lastCat = it.cat; html += '<tr class="est-cat-hdr"><td colspan="9" style="background:' + (CAT_COLORS[it.cat]||'var(--surface3)') + ';color:' + (CAT_TEXT[it.cat]||'var(--ink2)') + ';">' + esc(it.cat) + '</td></tr>'; }
+    if (it.cat !== lastCat) {
+      lastCat = it.cat;
+      html += `<tr><td colspan="7" style="background:${CAT_COLORS[it.cat]||'var(--surface3)'};color:${CAT_TEXT[it.cat]||'var(--ink2)'};font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:5px 10px;">${esc(it.cat)}</td></tr>`;
+    }
     const lineTotal = (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
-    grandTotal += lineTotal;
-    const ordered = rows.filter(r => (r['MATERIAL']||'').toUpperCase().includes(it.name.toUpperCase().substring(0,8))).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+    const ordered = sheetRows.filter(r => (r['MATERIAL']||'').toUpperCase().includes((it.name||'').toUpperCase().substring(0,8))).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
     const pct = it.qty > 0 && ordered > 0 ? Math.round(ordered / it.qty * 100) : 0;
     const pctColor = pct > 100 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : pct > 0 ? 'var(--green)' : 'var(--ink3)';
-    const tmpl = ESTIMATE_TEMPLATE.find(t => t.name === it.name);
     html += `<tr>
-      <td style="font-size:10px;color:var(--ink3);">${esc(it.cat)}</td>
       <td style="font-weight:500;">${esc(it.name)}</td>
-      <td style="font-size:11px;color:var(--ink3);">${esc(tmpl?.use||'')}</td>
-      <td>${esc(it.uom||'EA')}</td>
+      <td style="font-size:10px;color:var(--ink3);">${esc(it.uom||'EA')}</td>
       <td class="tbl-r"><input class="est-inp" type="number" style="width:70px;text-align:right;" value="${it.price||''}" onchange="updateEst(${i},'price',this.value)"/></td>
-      <td class="tbl-r"><input class="est-inp" type="number" style="width:80px;text-align:right;" value="${it.qty||''}" onchange="updateEst(${i},'qty',this.value)" placeholder="${tmpl?.hint||''}"/></td>
+      <td class="tbl-r"><input class="est-inp" type="number" style="width:70px;text-align:right;" value="${it.qty||''}" onchange="updateEst(${i},'qty',this.value)"/></td>
       <td class="tbl-r" style="font-weight:700;">${lineTotal>0?fmt(lineTotal):'—'}</td>
       <td class="tbl-r" style="color:${pctColor};">${ordered>0?Math.round(ordered)+' ('+pct+'%)':'—'}</td>
       <td><button class="est-rem" onclick="removeEstItem(${i})">✕</button></td>
     </tr>`;
   });
-  html += '</tbody></table>';
-  html += '<div style="text-align:right;margin-top:10px;font-family:\'Space Grotesk\',sans-serif;font-size:18px;font-weight:700;">Grand Total: <span id="est-grand-total" style="color:var(--accent);">' + fmt(grandTotal) + '</span></div>';
-  html += '</div></div>';
+  html += `</tbody></table></div></div></details>`;
 
-  // FIX #5: Optional floor-level breakdown (collapsible)
-  html += `<details style="margin-bottom:16px;"><summary style="cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;padding:10px 0;">📐 Floor-Level Scope Planner (optional)</summary>
-    <div style="margin-top:10px;">
-      <div style="display:flex;gap:8px;margin-bottom:12px;">
-        <button class="btn btn-ghost btn-sm" onclick="renderScopePlanner('${jsesc(job)}','building')">By Building</button>
-        <button class="btn btn-ghost btn-sm" onclick="renderScopePlanner('${jsesc(job)}','floor')">By Floor</button>
-        <button class="btn btn-ghost btn-sm" onclick="renderScopePlanner('${jsesc(job)}','both')">Both</button>
-      </div>
-      <div id="scope-planner-wrap"></div>
-    </div></details>`;
+  // — Floor Quantities grid —
+  if (!floors.length) {
+    html += `<div class="card"><div class="card-body">
+      <div class="alert alert-y" style="margin:0;">No floors set up yet — go to <strong>Setup → Job Structure</strong> to add floors first, then come back to enter quantities per floor.</div>
+    </div></div>`;
+  } else {
+    const scopeData = S.matBanks[job+'_scopes'] || (S.matBanks[job+'_scopes'] = {});
+    const copyFrom = S._copyFromKey || null;
 
-  // Floor budgets
-  html += '<details><summary style="cursor:pointer;font-family:\'Space Grotesk\',sans-serif;font-size:14px;font-weight:600;padding:10px 0;">💰 Floor Board Budgets</summary><div id="floor-budget-section" style="margin-top:10px;"></div></details>';
+    html += `<div class="card"><div class="card-hdr" style="flex-wrap:wrap;gap:6px;">
+      <span class="card-title">📐 Floor-by-Floor Quantities</span>
+      <span style="font-size:11px;color:var(--ink3);">Click <strong>Copy ↓</strong> on a floor to copy its quantities to other floors</span>
+    </div>`;
+
+    // Copy selection panel
+    if (copyFrom) {
+      const fromFloor = floors.find(f => ('floor:'+(f.bldg||'')+':'+f.floor) === copyFrom);
+      const fromLabel = fromFloor ? (fromFloor.bldg ? 'Bldg '+fromFloor.bldg+' · Fl '+fromFloor.floor : 'Floor '+fromFloor.floor) : copyFrom;
+      html += `<div style="background:rgba(99,102,241,.08);border-top:1px solid rgba(99,102,241,.25);border-bottom:1px solid rgba(99,102,241,.25);padding:14px 16px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Copy <span style="color:var(--accent);">${esc(fromLabel)}</span> quantities to:</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">`;
+      floors.forEach(f => {
+        const key = 'floor:'+(f.bldg||'')+':'+f.floor;
+        if (key === copyFrom) return;
+        const lbl = f.bldg ? 'Bldg '+f.bldg+' Fl '+f.floor : 'Floor '+f.floor;
+        html += `<label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:var(--surface2);padding:6px 10px;border-radius:6px;font-size:12px;font-weight:500;border:1px solid var(--border);">
+          <input type="checkbox" class="copy-target" data-key="${esc(key)}" checked style="width:13px;height:13px;accent-color:var(--accent);"> ${esc(lbl)}
+        </label>`;
+      });
+      html += `</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm" onclick="applyCopyFloor('${jsesc(job)}','${jsesc(copyFrom)}')">✓ Apply Copy</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelCopyFloor('${jsesc(job)}')">Cancel</button>
+        </div>
+      </div>`;
+    }
+
+    // Grid table — materials as rows, floors as columns
+    const colCount = floors.length + 3; // sticky name + UOM + N floors + Total
+    html += `<div style="overflow-x:auto;"><table class="tbl" style="border-radius:0;">
+      <thead><tr>
+        <th style="position:sticky;left:0;background:var(--surface2);z-index:3;min-width:160px;border-right:2px solid var(--border);">Material</th>
+        <th style="min-width:46px;background:var(--surface2);">UOM</th>`;
+    floors.forEach(f => {
+      const key = 'floor:'+(f.bldg||'')+':'+f.floor;
+      const lbl = f.bldg ? 'Bldg&nbsp;'+f.bldg+'<br>Fl&nbsp;'+f.floor : 'Floor&nbsp;'+f.floor;
+      const isFrom = copyFrom === key;
+      html += `<th style="min-width:88px;text-align:center;vertical-align:top;padding:6px 4px;${isFrom?'background:rgba(99,102,241,.12);':''}">
+        <div style="font-size:11px;font-weight:600;line-height:1.4;">${lbl}</div>
+        <button style="margin-top:4px;font-size:9px;padding:2px 7px;border-radius:4px;border:1px solid ${isFrom?'var(--accent)':'var(--border)'};background:${isFrom?'var(--accent)':'transparent'};color:${isFrom?'#fff':'var(--ink3)'};cursor:pointer;font-family:inherit;font-weight:600;" onclick="toggleCopyUI('${jsesc(job)}','${jsesc(key)}')">${isFrom?'✓ Copying':'Copy ↓'}</button>
+      </th>`;
+    });
+    html += `<th style="min-width:70px;text-align:right;background:var(--surface2);border-left:2px solid var(--border);">Total</th>
+      </tr></thead><tbody>`;
+
+    let lastCat2 = '';
+    items.forEach(it => {
+      const floorVals = floors.map(f => parseFloat((scopeData['floor:'+(f.bldg||'')+':'+f.floor]||{})[it.name] || 0));
+      const rowTotal = floorVals.reduce((s,v) => s+v, 0);
+      if (it.cat !== lastCat2) {
+        lastCat2 = it.cat;
+        html += `<tr><td colspan="${colCount}" style="background:${CAT_COLORS[it.cat]||'var(--surface3)'};color:${CAT_TEXT[it.cat]||'var(--ink2)'};font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:4px 10px;">${esc(it.cat)}</td></tr>`;
+      }
+      html += `<tr>
+        <td style="position:sticky;left:0;background:var(--surface1);z-index:2;font-weight:500;font-size:12px;border-right:2px solid var(--border);">${esc(it.name)}</td>
+        <td style="font-size:10px;color:var(--ink3);">${esc(it.uom||'EA')}</td>`;
+      floors.forEach((f, fi) => {
+        const key = 'floor:'+(f.bldg||'')+':'+f.floor;
+        const isFrom = copyFrom === key;
+        html += `<td style="padding:3px 4px;${isFrom?'background:rgba(99,102,241,.06);':''}">
+          <input type="number" class="est-inp" style="width:72px;text-align:right;display:block;margin:0 auto;" value="${floorVals[fi]||''}" placeholder="0"
+            oninput="updateScopeQty('${jsesc(job)}','${jsesc(key)}','${jsesc(it.name)}',this.value)">
+        </td>`;
+      });
+      html += `<td style="text-align:right;font-weight:700;font-size:13px;padding-right:12px;border-left:2px solid var(--border);">${rowTotal > 0 ? rowTotal : '<span style="color:var(--ink3);">—</span>'}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table></div></div>`;
+  }
 
   el.innerHTML = html;
-  renderFloorBudgetSection(job);
 }
 function updateEst(i, field, val) {
   const items = getJobEstimate(_currentJob);
@@ -2149,34 +2236,24 @@ function addEstLine() {
   saveJobEstimate(_currentJob);
   renderEstimateTab(_currentJob);
 }
-function renderFloorBudgetSection(job) {
-  const el = document.getElementById('floor-budget-section'); if (!el) return;
-  const struct = S.jobStructure?.[job];
-  if (!struct?.floors?.length) { el.innerHTML = '<div class="no-data">Set up floors first.</div>'; return; }
-  el.innerHTML = struct.floors.map((fl,fi) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
-    <span style="min-width:120px;font-weight:600;">Floor ${fl.floor}${fl.bldg?' · '+fl.bldg:''}</span>
-    <input type="number" class="inp inp-sm" style="width:100px;" value="${fl.budgetBoards||''}" placeholder="Boards" onchange="updateFloorBudgetItem('${jsesc(job)}',${fi},this.value)"/>
-    <span style="font-size:11px;color:var(--ink3);">boards</span>
-  </div>`).join('');
+function toggleCopyUI(job, key) {
+  S._copyFromKey = (S._copyFromKey === key) ? null : key;
+  renderEstimateTab(job);
 }
-function updateFloorBudgetItem(job, fi, val) {
-  if (S.jobStructure?.[job]?.floors?.[fi]) { S.jobStructure[job].floors[fi].budgetBoards = parseFloat(val)||0; saveSharedData('jobStructure'); }
+function cancelCopyFloor(job) {
+  S._copyFromKey = null;
+  renderEstimateTab(job);
 }
-function renderScopePlanner(job, mode) {
-  const wrap = document.getElementById('scope-planner-wrap'); if (!wrap) return;
-  const struct = S.jobStructure?.[job]; if (!struct?.floors?.length) { wrap.innerHTML = '<div class="no-data">Set up floors first.</div>'; return; }
-  const items = getJobEstimate(job);
+function applyCopyFloor(job, fromKey) {
   const scopeData = S.matBanks[job+'_scopes'] || (S.matBanks[job+'_scopes'] = {});
-  const floors = struct.floors || [];
-  const buildings = [...new Set(floors.map(f => String(f.bldg||'').trim()).filter(Boolean))];
-  let html = '';
-  const renderTable = (scopeKey, label) => {
-    const sd = scopeData[scopeKey] || (scopeData[scopeKey] = {});
-    return `<details open style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;"><summary style="cursor:pointer;padding:10px 12px;font-weight:700;">${esc(label)}</summary><div style="padding:10px 12px;overflow-x:auto;"><table class="tbl" style="min-width:520px;"><thead><tr><th>Material</th><th>UOM</th><th class="tbl-r">Qty</th></tr></thead><tbody>${items.map((it,i) => '<tr><td>'+esc(it.name)+'</td><td style="color:var(--ink3);">'+esc(it.uom||'EA')+'</td><td class="tbl-r"><input type="number" class="est-inp" style="width:90px;text-align:right;" value="'+(sd[it.name]||'')+'" oninput="updateScopeQty(\''+jsesc(job)+'\',\''+jsesc(scopeKey)+'\',\''+jsesc(it.name)+'\',this.value)"></td></tr>').join('')}</tbody></table></div></details>`;
-  };
-  if (mode === 'building' || mode === 'both') buildings.forEach(b => { html += renderTable('bldg:'+b, 'Building '+b); });
-  if (mode === 'floor' || mode === 'both') floors.forEach(f => { html += renderTable('floor:'+(f.bldg||'')+':'+f.floor, (f.bldg?'Building '+f.bldg+' · ':'')+'Floor '+f.floor); });
-  wrap.innerHTML = html || '<div class="no-data">No structures yet.</div>';
+  const fromData = Object.assign({}, scopeData[fromKey] || {});
+  const targets = document.querySelectorAll('.copy-target:checked');
+  if (!targets.length) { showToast('Select at least one target floor'); return; }
+  targets.forEach(cb => { scopeData[cb.dataset.key] = Object.assign({}, fromData); });
+  saveSharedData('matBanks');
+  S._copyFromKey = null;
+  showToast('Copied to ' + targets.length + ' floor' + (targets.length > 1 ? 's' : ''));
+  renderEstimateTab(job);
 }
 function updateScopeQty(job, scopeKey, matName, val) {
   const scopeData = S.matBanks[job+'_scopes'] || (S.matBanks[job+'_scopes'] = {});
