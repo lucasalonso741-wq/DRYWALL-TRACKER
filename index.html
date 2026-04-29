@@ -766,7 +766,8 @@ async function loadSharedData() {
   ]);
   if (budgets) S.budgets = budgets;
   if (targets) S.targets = targets;
-  if (matBanks) S.matBanks = matBanks;
+  if (matBanks) { S.matBanks = matBanks; try { localStorage.setItem('dw_matBanks', JSON.stringify(matBanks)); } catch(e) {} }
+  else { try { const lb = localStorage.getItem('dw_matBanks'); if (lb) S.matBanks = JSON.parse(lb); } catch(e) {} }
   if (assignments) S.assignments = assignments;
   if (billAssignments) S.billAssignments = billAssignments;
   if (actuals) S.actuals = actuals;
@@ -1880,30 +1881,56 @@ function openUnitDetail(job, floor, unit, bldg) {
 // ═══════════════════════════════════════════════════════════
 // ESTIMATE TAB (FIX #5: Optional floor-level breakdown)
 // ═══════════════════════════════════════════════════════════
+function getScopeTotal(job, matName) {
+  const scopeData = S.matBanks[job+'_scopes'] || {};
+  const floors = S.jobStructure?.[job]?.floors || [];
+  return floors.reduce((s,f) => s + parseFloat((scopeData['floor:'+(f.bldg||'')+':'+f.floor]||{})[matName]||0), 0);
+}
+function autoFillFromScope(job) {
+  const items = getJobEstimate(job);
+  let filled = 0;
+  items.forEach(it => {
+    const st = getScopeTotal(job, it.name);
+    if (st > 0) { it.qty = st; filled++; }
+  });
+  if (!filled) { showToast('No scope quantities found — fill the Floor-Level Scope Planner first', true); return; }
+  saveJobEstimate(job);
+  renderEstimateTab(job);
+  showToast('✓ Filled ' + filled + ' items from scope totals');
+}
 function renderEstimateTab(job) {
   const el = document.getElementById('jobs-tab-estimate'); if (!el) return;
   const items = getJobEstimate(job);
   const rows = S.rows.filter(r => (r['JOB']||'') === job);
-  let html = '<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Line</button></div></div><div class="card-body" style="overflow-x:auto;">';
-  html += '<table class="tbl"><thead><tr><th>Cat</th><th>Material</th><th>Use</th><th>UOM</th><th class="tbl-r">Price</th><th class="tbl-r" style="min-width:80px;">Qty</th><th class="tbl-r">Total</th><th class="tbl-r">Ordered</th><th></th></tr></thead><tbody>';
+  const hasScope = (S.jobStructure?.[job]?.floors||[]).length > 0;
+  let html = '<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;">';
+  if (hasScope) html += `<button class="btn btn-blue btn-sm" onclick="autoFillFromScope('${jsesc(job)}')">📐 Fill from Scope</button>`;
+  html += `<button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Line</button></div></div><div class="card-body" style="overflow-x:auto;">`;
+  html += '<table class="tbl"><thead><tr><th>Cat</th><th>Material</th><th>Use</th><th>UOM</th><th class="tbl-r">Unit $</th><th class="tbl-r" style="min-width:80px;">Qty</th>';
+  if (hasScope) html += '<th class="tbl-r" style="color:var(--blue);">Scope</th>';
+  html += '<th class="tbl-r">Total</th><th class="tbl-r">Ordered</th><th></th></tr></thead><tbody>';
   const EST_CATS = Object.keys(CAT_COLORS).concat(['Other']);
   let lastCat = '', grandTotal = 0;
   items.forEach((it, i) => {
-    if (it.cat !== lastCat) { lastCat = it.cat; html += '<tr class="est-cat-hdr"><td colspan="9" style="background:' + (CAT_COLORS[it.cat]||'var(--surface3)') + ';color:' + (CAT_TEXT[it.cat]||'var(--ink2)') + ';">' + esc(it.cat) + '</td></tr>'; }
+    if (it.cat !== lastCat) { lastCat = it.cat; const colspan = hasScope ? 10 : 9; html += '<tr class="est-cat-hdr"><td colspan="' + colspan + '" style="background:' + (CAT_COLORS[it.cat]||'var(--surface3)') + ';color:' + (CAT_TEXT[it.cat]||'var(--ink2)') + ';">' + esc(it.cat) + '</td></tr>'; }
     const lineTotal = (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
     grandTotal += lineTotal;
     const ordered = rows.filter(r => (r['MATERIAL']||'').toUpperCase().includes(it.name.toUpperCase().substring(0,8))).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
-    const pct = it.qty > 0 && ordered > 0 ? Math.round(ordered / it.qty * 100) : 0;
+    const budgetQty = parseFloat(it.qty)||0;
+    const pct = budgetQty > 0 && ordered > 0 ? Math.round(ordered / budgetQty * 100) : 0;
     const pctColor = pct > 100 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : pct > 0 ? 'var(--green)' : 'var(--ink3)';
     const tmpl = ESTIMATE_TEMPLATE.find(t => t.name === it.name);
     const catOpts = EST_CATS.map(c => `<option value="${esc(c)}"${c===it.cat?' selected':''}>${esc(c)}</option>`).join('');
+    const scopeQty = hasScope ? getScopeTotal(job, it.name) : 0;
+    const scopeCell = hasScope ? `<td class="tbl-r" style="color:${scopeQty>0?'var(--blue)':'var(--ink3)'};font-size:12px;">${scopeQty>0?scopeQty:'—'}</td>` : '';
     html += `<tr>
       <td><select class="est-inp" style="width:110px;font-size:10px;padding:3px 4px;" onchange="updateEst(${i},'cat',this.value,true)">${catOpts}</select></td>
       <td><input class="est-inp" type="text" style="width:160px;font-size:12px;" value="${esc(it.name)}" onchange="updateEst(${i},'name',this.value)"/></td>
       <td style="font-size:11px;color:var(--ink3);">${esc(tmpl?.use||it.use||'')}</td>
       <td><input class="est-inp" type="text" style="width:52px;font-size:12px;" value="${esc(it.uom||'EA')}" onchange="updateEst(${i},'uom',this.value)"/></td>
-      <td class="tbl-r"><input class="est-inp" type="number" style="width:70px;text-align:right;" value="${it.price!=null&&it.price!==''?it.price:''}" onchange="updateEst(${i},'price',this.value)"/></td>
-      <td class="tbl-r"><input class="est-inp" type="number" style="width:80px;text-align:right;" value="${it.qty!=null&&it.qty!==0?it.qty:''}" onchange="updateEst(${i},'qty',this.value)" placeholder="${esc(tmpl?.hint||'')}"/></td>
+      <td class="tbl-r"><input class="est-inp" type="number" style="width:70px;text-align:right;" value="${it.price!=null&&it.price!==''?it.price:''}" oninput="updateEst(${i},'price',this.value)"/></td>
+      <td class="tbl-r"><input class="est-inp" type="number" style="width:80px;text-align:right;" value="${budgetQty||''}" oninput="updateEst(${i},'qty',this.value)" placeholder="${esc(tmpl?.hint||'')}"/></td>
+      ${scopeCell}
       <td class="tbl-r" style="font-weight:700;">${lineTotal>0?fmt(lineTotal):'—'}</td>
       <td class="tbl-r" style="color:${pctColor};">${ordered>0?Math.round(ordered)+' ('+pct+'%)':'—'}</td>
       <td><button class="est-rem" onclick="removeEstItem(${i})">✕</button></td>
@@ -1941,7 +1968,12 @@ function updateEst(i, field, val, rerender) {
   if (rerender) renderEstimateTab(_currentJob);
   else updateGrandTotal();
 }
-function saveJobEstimate(job) { saveSharedData('matBanks'); }
+let _estSaveTimer = null;
+function saveJobEstimate(job) {
+  try { localStorage.setItem('dw_matBanks', JSON.stringify(S.matBanks)); } catch(e) {}
+  clearTimeout(_estSaveTimer);
+  _estSaveTimer = setTimeout(() => saveSharedData('matBanks'), 800);
+}
 function updateGrandTotal() {
   const items = getJobEstimate(_currentJob);
   const total = items.reduce((s,it) => s + (parseFloat(it.qty)||0) * (parseFloat(it.price)||0), 0);
