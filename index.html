@@ -273,7 +273,7 @@ a{color:var(--accent);}
   <div id="new-job-alert-banner" style="display:none;margin-bottom:14px;"></div>
   <div class="tabs" id="home-tabs">
     <button class="tab-btn active" data-tab="feed" onclick="switchHomeTab('feed')">🏗️ Activity Feed</button>
-    <button class="tab-btn" data-tab="inbox" onclick="switchHomeTab('inbox')">📥 Inbox <span class="nav-badge-dot" id="home-inbox-badge" style="display:none;position:relative;top:-1px;width:6px;height:6px;border-radius:50%;background:var(--yellow);border:none;display:inline-block;vertical-align:middle;margin-left:4px;"></span></button>
+    <button class="tab-btn" data-tab="inbox" onclick="switchHomeTab('inbox')">📥 Inbox <span class="nav-badge-dot" id="home-inbox-badge" style="display:none;position:relative;top:-1px;width:6px;height:6px;border-radius:50%;background:var(--yellow);vertical-align:middle;margin-left:4px;"></span></button>
     <button class="tab-btn" data-tab="history" onclick="switchHomeTab('history')">📋 History</button>
   </div>
   <!-- Feed sub-tab -->
@@ -892,14 +892,19 @@ async function syncAll() {
   showToast('Syncing...');
   try {
     // Fetch Google Sheet PO data + email-extracted POs in parallel
-    await Promise.all([fetchRawData(), loadEmailPOs(), loadNewJobAlerts()]);
+    // Fetch email POs (always) and Google Sheet data (only if sheetId set)
+    const syncPromises = [loadEmailPOs(), loadNewJobAlerts()];
+    if (S.sheetId) syncPromises.push(fetchRawData().catch(e => console.warn('Sheet fetch failed:', e)));
+    await Promise.all(syncPromises);
     S.lastSync = new Date().toISOString();
     localStorage.setItem('dw_last_sync', S.lastSync);
     const lsl = document.getElementById('last-sync-label'); if(lsl) lsl.textContent = 'Last sync: ' + new Date().toLocaleTimeString();
-    const smi = document.getElementById('sheet-status-mini'); if(smi){smi.textContent='✓ ' + S.rows.length + ' PO rows · ' + (S.emailPOs?.length||0) + ' email POs';smi.className='sheet-status ok';}
+    const smi = document.getElementById('sheet-status-mini');
+    if(smi){ const rowTxt = S.rows.length > 0 ? S.rows.length + ' sheet rows · ' : ''; smi.textContent='✓ ' + rowTxt + (S.emailPOs?.length||0) + ' email POs'; smi.className='sheet-status ok'; }
     const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--green)';
     populateJobSelects(); updateInboxBadge();
-    showToast('✓ Synced — ' + S.rows.length + ' sheet rows · ' + (S.emailPOs?.length||0) + ' email POs');
+    const rowCountTxt = S.rows.length > 0 ? S.rows.length + ' sheet rows · ' : '';
+    showToast('✓ Synced — ' + rowCountTxt + (S.emailPOs?.length||0) + ' email POs');
   } catch(e) {
     showToast('⚠️ Sync failed: ' + e.message, true);
     const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--red)';
@@ -1022,7 +1027,7 @@ function nav(page) {
   document.querySelectorAll('.nav-icon-btn').forEach(b => b.classList.toggle('active', b.dataset.page === page));
   const el = document.getElementById('page-' + page); if (el) el.classList.add('active');
   document.getElementById('page-title').textContent = PAGE_TITLES[page] || page;
-  if (page === 'home') { activePage = 'home'; renderHome(); }
+  if (page === 'home') renderHome();
   else if (page === 'dashboard') renderDashboard();
   else if (page === 'inbox') { /* redirected to home inbox tab */ }
   else if (page === 'jobs') { populateJobSelects(); if (_currentJob) onJobSelect(); }
@@ -1100,7 +1105,7 @@ function renderSettings() {
     <div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Google Sheet</span></div><div class="card-body">
       <div style="font-size:12px;color:var(--ink3);margin-bottom:8px;">Sheet ID for PO &amp; Bill data</div>
       <div style="display:flex;gap:8px;"><input id="sheet-id-input" class="inp inp-sm" value="${esc(S.sheetId)}" style="max-width:400px;"/><button class="btn btn-ghost btn-sm" onclick="saveSheetId()">Save</button></div>
-      <div id="sheet-connected-label" class="sheet-status" style="margin-top:6px;">${S.rows.length>0?'✓ Sheet connected · '+S.rows.length+' rows':'Not synced yet'}</div>
+      <div id="sheet-connected-label" class="sheet-status" style="margin-top:6px;">${S.rows.length>0?'✓ Sheet connected · '+S.rows.length+' rows':'Optional — app works fully without Google Sheets'}</div>
     </div></div>
     <div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Company Logo</span></div><div class="card-body">
       <div style="display:flex;gap:12px;align-items:center;">
@@ -1224,14 +1229,14 @@ function getFeedBillGroups() {
 function renderActivityFeed() {
   const el = document.getElementById('activity-feed'); if (!el) return;
 
-  // ── Section 1: Email-extracted POs (from Resend → extract-po edge function) ──
-  const emailPOs = S.emailPOs || [];
+  // ── Section 1: Email-extracted POs (unconfirmed only — confirmed go to History) ──
+  const emailPOs = (S.emailPOs || []).filter(p => p.status !== 'confirmed');
   let emailHtml = '';
   if (emailPOs.length) {
-    emailHtml += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📧 Email-Extracted POs</div>`;
+    emailHtml += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📧 Email POs — Needs Review</div>`;
     emailPOs.slice(0,30).forEach(p => {
       const isNew = p.status === 'needs_review';
-      const isConfirmed = p.status === 'confirmed';
+      const isConfirmed = false;
       const isDupe = p.status === 'duplicate';
       const statusBadge = isNew
         ? '<span class="badge badge-yellow">⚠ Needs Review</span>'
@@ -1319,7 +1324,8 @@ function renderActivityFeed() {
     });
   }
 
-  el.innerHTML = emailHtml + sheetHtml;
+  const feedContent = emailHtml + sheetHtml;
+  el.innerHTML = feedContent || '<div style="text-align:center;padding:40px 20px;"><div style="font-size:40px;margin-bottom:12px;">✅</div><div style="font-family:\'Space Grotesk\',sans-serif;font-size:18px;font-weight:700;margin-bottom:8px;">All caught up!</div><div style="color:var(--ink3);font-size:14px;">No pending POs to review. Confirmed POs appear in the History tab.</div></div>';
 
   el.querySelectorAll('.feed-item').forEach(div => {
     div.addEventListener('click', function(e) {
@@ -1493,7 +1499,7 @@ function openPODetailModal(poNum) {
     '<button class="btn btn-ghost" onclick="closeModal(\'po-modal\')">Cancel</button><button class="btn btn-primary" onclick="quickAssignPO(\'' + jsesc(poNum) + '\')">✓ Assign</button>';
   document.getElementById('po-modal').classList.add('open');
 }
-function quickAssignPO(po) {
+async function quickAssignPO(po) {
   S.assignments[po] = {
     job: document.getElementById('qa-job')?.value||'',
     building: document.getElementById('qa-bldg')?.value||'',
@@ -1753,7 +1759,7 @@ function switchJobTab(tab) {
 function renderJobPPBCards(job) {
   const el = document.getElementById('jobs-ppb-cards'); if (!el) return;
   const _ppbSheet = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
-  const _ppbEmail = (S.emailPOs||[]).filter(p=>p.status==='confirmed'&&p.job_name===job).flatMap(p=>(p.line_items||[]).map(li=>({'JOB':job,'MATERIAL':li.description||li.name||'','QTY':parseFloat(li.qty||li.quantity||0)||0,'LINE TOTAL':parseFloat(li.total||li.line_total||0)||0})));
+  const _ppbEmail = (S.emailPOs||[]).filter(p=>p.status==='confirmed'&&p.job_name===job).flatMap(p=>(p.line_items||p.lines||[]).map(li=>({'JOB':job,'MATERIAL':li.description||li.name||'','QTY':parseFloat(li.qty||li.quantity||0)||0,'LINE TOTAL':parseFloat(li.total||li.line_total||0)||0})));
   const rows = [..._ppbSheet, ..._ppbEmail];
   const boards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
   const matSpend = rows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
@@ -1791,7 +1797,9 @@ let _jobMapFilter = {building:'', floor:'', unit:''};
 function renderJobMap(job) {
   const el = document.getElementById('jobs-tab-map'); if (!el) return;
   const struct = S.jobStructure?.[job];
-  const rows = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  const _mapSheetRows = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  const _mapEmailRows = (S.emailPOs||[]).filter(p=>p.status==='confirmed'&&p.job_name===job).flatMap(p=>(p.line_items||p.lines||[]).map(li=>({'JOB':job,'MATERIAL':li.description||li.name||'','QTY':parseFloat(li.qty||li.quantity||0)||0,'LINE TOTAL':parseFloat(li.total||li.line_total||0)||0,'FLOOR':String(p.floor||'').trim(),'BUILDING':String(p.building||'').trim(),'UNIT':String(p.unit||'').trim(),'PO NUMBER':p.po_number||'','VENDOR':p.vendor||''})));
+  const rows = [..._mapSheetRows, ..._mapEmailRows];
   // Collect filter options
   const buildings = [...new Set([...rows.map(r=>String(r['BUILDING']||'').trim()), ...(struct?.floors||[]).map(f=>String(f.bldg||'').trim())].filter(Boolean))].sort();
   const floors = [...new Set([...rows.map(r=>String(r['FLOOR']||'').trim()), ...(struct?.floors||[]).map(f=>String(f.floor||'').trim())].filter(Boolean))].sort((a,b)=>parseFloat(a)-parseFloat(b)||a.localeCompare(b));
@@ -1810,7 +1818,7 @@ function renderJobMap(job) {
       <option value="">All Units</option>
       ${units.map(u=>`<option value="${u}" ${_jobMapFilter.unit===u?'selected':''}>${u}</option>`).join('')}
     </select>
-    ${(_jobMapFilter.building||_jobMapFilter.floor||_jobMapFilter.unit)?'<button class="btn btn-ghost btn-sm" onclick="applyJobMapFilter('clear','')">✕ Clear</button>':''}
+    ${(_jobMapFilter.building||_jobMapFilter.floor||_jobMapFilter.unit)?'<button class="btn btn-ghost btn-sm" onclick="applyJobMapFilter(\'clear\',\'\')">✕ Clear</button>':''}
   </div>`;
   // Budgeted vs Ordered comparison when filter is active
   const hasFilter = !!(  _jobMapFilter.building || _jobMapFilter.floor || _jobMapFilter.unit);
@@ -1874,7 +1882,7 @@ function renderMapMaterial(job, el) {
   const struct = S.jobStructure?.[job];
   const sheetRows2 = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
   const emailRows2 = (S.emailPOs||[]).filter(p => p.status === 'confirmed' && p.job_name === job).flatMap(p =>
-    (p.line_items||[]).map(li => ({'JOB':job,'MATERIAL':li.description||li.name||'','QTY':parseFloat(li.qty||li.quantity||0)||0,'LINE TOTAL':parseFloat(li.total||li.line_total||0)||0,'FLOOR':p.floor||'','BUILDING':p.building||'','UNIT':p.unit||'','PO NUMBER':p.po_number||'','VENDOR':p.vendor||''}))
+    (p.line_items||p.lines||[]).map(li => ({'JOB':job,'MATERIAL':li.description||li.name||'','QTY':parseFloat(li.qty||li.quantity||0)||0,'LINE TOTAL':parseFloat(li.total||li.line_total||0)||0,'FLOOR':p.floor||'','BUILDING':p.building||'','UNIT':p.unit||'','PO NUMBER':p.po_number||'','VENDOR':p.vendor||''}))
   );
   const rows = [...sheetRows2, ...emailRows2];
   if (!struct?.floors?.length) {
@@ -2045,7 +2053,7 @@ function toggleFloorBlock(hdr) {
 }
 
 function openUnitDetail(job, floor, unit, bldg) {
-  const _allRows = [...(S.rows||[]).filter(r=>(r['JOB']||r['Job']||'')===job), ...(S.emailPOs||[]).filter(p=>p.status==='confirmed'&&p.job_name===job).flatMap(p=>(p.line_items||[]).map(li=>({'JOB':job,'MATERIAL':li.description||li.name||'','QTY':parseFloat(li.qty||li.quantity||0)||0,'LINE TOTAL':parseFloat(li.total||li.line_total||0)||0,'FLOOR':p.floor||'','BUILDING':p.building||'','UNIT':p.unit||''})))];
+  const _allRows = [...(S.rows||[]).filter(r=>(r['JOB']||r['Job']||'')===job), ...(S.emailPOs||[]).filter(p=>p.status==='confirmed'&&p.job_name===job).flatMap(p=>(p.line_items||p.lines||[]).map(li=>({'JOB':job,'MATERIAL':li.description||li.name||'','QTY':parseFloat(li.qty||li.quantity||0)||0,'LINE TOTAL':parseFloat(li.total||li.line_total||0)||0,'FLOOR':p.floor||'','BUILDING':p.building||'','UNIT':p.unit||''})))];
   const rows = _allRows.filter(r => { const rfl=String(r['FLOOR']||'').trim(), ru=String(r['UNIT']||'').trim(), rb=String(r['BUILDING']||'').trim(); if(rfl!==String(floor)) return false; if(bldg&&rb&&rb!==bldg) return false; if(unit==='General') return !ru||ru==='N/A'; return ru===String(unit); });
   const boards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
   const spend = rows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
@@ -2216,9 +2224,10 @@ function renderJobSummaryTab(job) {
   const el = document.getElementById('jobs-tab-summary'); if (!el) return;
   // Build rows: Google Sheet rows + email-confirmed POs expanded into rows
   const sheetRows = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
-  const emailRows = (S.emailPOs||[]).filter(p => p.status === 'confirmed' && p.job_name === job).flatMap(p =>
-    (p.line_items||[]).map(li => ({'JOB':job,'MATERIAL':li.description||li.name||'','QTY':parseFloat(li.qty||li.quantity||0)||0,'LINE TOTAL':parseFloat(li.total||li.line_total||0)||0,'UNIT_PRICE':parseFloat(li.unit_price||li.price||0)||0,'UOM':li.uom||'EA','FLOOR':p.floor||'','BUILDING':p.building||'','UNIT':p.unit||'','PO NUMBER':p.po_number||'','VENDOR':p.vendor||''}))
-  );
+  const emailRows = (S.emailPOs||[]).filter(p => p.status === 'confirmed' && p.job_name === job).flatMap(p => {
+    const lineArr = p.line_items || p.lines || [];
+    return lineArr.map(li => ({'JOB':job,'MATERIAL':li.description||li.name||li.sku||'','QTY':parseFloat(li.qty||li.quantity||li.units||0)||0,'LINE TOTAL':parseFloat(li.total||li.amount||li.line_total||0)||0,'UNIT_PRICE':parseFloat(li.unit_price||li.rate||li.price||0)||0,'UOM':li.uom||'EA','FLOOR':String(p.floor||'').trim(),'BUILDING':String(p.building||'').trim(),'UNIT':String(p.unit||'').trim(),'PO NUMBER':p.po_number||'','VENDOR':p.vendor||''}));
+  });
   const rows = [...sheetRows, ...emailRows];
   const items = getJobEstimate(job);
   const labor = getJobLabor(job);
@@ -2612,6 +2621,20 @@ function renderPDFResult(po, savedId) {
   const rawJob = po.job_name || '';
   const matchedJob = resolveJobFromPDF(po.job_name, po.ship_to);
   const isNewJob = rawJob && !matchedJob;
+  // Auto-confirm if job is matched — still show the result card but mark as auto-tracked
+  if (matchedJob && savedId) {
+    fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + savedId, {
+      method:'PATCH',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({status:'confirmed', job_name:matchedJob, building:po.building||'', floor:po.floor||'', unit:po.unit||''})
+    }).then(() => {
+      if (po.po_number) {
+        S.assignments[po.po_number] = {job:matchedJob, building:po.building||'', bldg:po.building||'', floor:po.floor||'', unit:po.unit||'', vendor:po.vendor||'', manual:true, date:new Date().toISOString().split('T')[0]};
+        saveSharedData('assignments');
+      }
+      loadEmailPOs().then(() => { renderActivityFeed(); updateInboxBadge(); });
+    }).catch(()=>{});
+  }
   
   const newJobBanner = isNewJob ? `<div class="alert alert-yellow" style="margin-bottom:14px;">
     🆕 <strong>New Job Detected:</strong> "${esc(rawJob)}" doesn't match any existing job.
@@ -2775,7 +2798,7 @@ function switchRawTab(tab) {
 }
 function renderRawPO() {
   const el = document.getElementById('raw-tab-raw-po'); if (!el) return;
-  if (!S.rows.length) { el.innerHTML = '<div class="no-data">No PO data. Click Sync first.</div>'; return; }
+  if (!(S.rows||[]).length) { el.innerHTML = '<div class="no-data">No PO data. Click Sync first to pull from Google Sheet (optional), or tracked POs appear here via email/PDF.</div>'; return; }
   let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:11px;color:var(--ink3);">Click any row to edit. Data comes from Google Sheet — edits are saved as local overrides.</div><div style="font-size:11px;color:var(--ink3);">' + S.rows.length + ' rows</div></div>';
   html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Job</th><th>Material</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Total</th><th>Bldg</th><th>Fl</th><th>Unit</th><th>Vendor</th><th>Actions</th></tr></thead><tbody>';
   S.rows.slice(0, 300).forEach((r, idx) => {
@@ -3120,8 +3143,10 @@ async function init() {
   loadBackfillData(); // load backfill in background (don't await — non-blocking)
   populateJobSelects();
   await Promise.all([loadEmailPOs(), loadNewJobAlerts()]);
-  syncAll();
+  // Only sync Google Sheet data if a sheetId is configured
+  if (S.sheetId) syncAll().catch(e => console.warn('Initial sync failed:', e));
   renderHome();
+  updateInboxBadge();
 }
 
 // Check auth on load
