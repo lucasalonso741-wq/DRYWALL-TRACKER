@@ -580,6 +580,11 @@ async function setManualCategory(rawDesc, category) {
   showToast('✓ Category saved: ' + rawDesc.substring(0,30) + ' → ' + category);
 }
 function isBoard(desc) { return categorize(desc) === 'boards'; }
+// Price per board: returns "$X.XX/bd" string or null if no data
+function ppb(boards, spend) {
+  if (!boards || !spend) return null;
+  return '$' + (spend / boards).toFixed(2) + '/bd';
+}
 function isLaborVendor(vendor) {
   if (!vendor) return false;
   const v = String(vendor).toUpperCase();
@@ -1867,7 +1872,18 @@ function renderJobMap(job) {
       return true;
     });
     const estItems = getJobEstimate(job);
-    filterSummaryHtml = `<div class="card" style="margin-bottom:14px;"><div class="card-hdr"><span class="card-title">📊 Filtered View: Budgeted vs Ordered</span><span style="font-size:11px;color:var(--ink3);">${filtRows.length} PO lines · ${[_jobMapFilter.building,_jobMapFilter.floor?'Fl '+_jobMapFilter.floor:'',_jobMapFilter.unit?'Unit '+_jobMapFilter.unit:''].filter(Boolean).join(' · ')}</span></div>
+    const filtBoards = filtRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+    const filtBoardSpend = filtRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+    const filtPpb = ppb(filtBoards, filtBoardSpend);
+    const filtBudBoards = estItems.filter(it=>it.uom==='BD'||isBoard(it.name)).reduce((s,it)=>s+(parseFloat(it.qty)||0),0);
+    const filtBudBoardSpend = estItems.filter(it=>it.uom==='BD'||isBoard(it.name)).reduce((s,it)=>s+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0),0);
+    const filtBudPpb = ppb(filtBudBoards, filtBudBoardSpend);
+    filterSummaryHtml = `<div class="card" style="margin-bottom:14px;"><div class="card-hdr" style="flex-wrap:wrap;gap:10px;"><div><span class="card-title">📊 Filtered: Budgeted vs Ordered</span><div style="font-size:11px;color:var(--ink3);margin-top:2px;">${filtRows.length} PO lines · ${[_jobMapFilter.building,_jobMapFilter.floor?'Fl '+_jobMapFilter.floor:'',_jobMapFilter.unit?'Unit '+_jobMapFilter.unit:''].filter(Boolean).join(' · ')}</div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      ${filtBoards>0?'<div style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.25);border-radius:8px;padding:6px 12px;text-align:center;"><div style="font-size:10px;color:var(--blue);font-weight:700;">Boards Ordered</div><div style="font-weight:800;color:var(--blue);">'+Math.round(filtBoards)+'</div></div>':''}
+      ${filtPpb?'<div style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.25);border-radius:8px;padding:6px 12px;text-align:center;"><div style="font-size:10px;color:var(--blue);font-weight:700;">Actual $/Board</div><div style="font-weight:800;color:var(--blue);">'+filtPpb+'</div></div>':''}
+      ${filtBudPpb?'<div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.25);border-radius:8px;padding:6px 12px;text-align:center;"><div style="font-size:10px;color:var(--green);font-weight:700;">Budget $/Board</div><div style="font-weight:800;color:var(--green);">'+filtBudPpb+'</div></div>':''}
+    </div></div>
     <div class="card-body" style="padding:0;overflow-x:auto;"><table class="tbl" style="border:none;"><thead><tr><th>Material</th><th class="tbl-r" style="color:var(--blue);">Budgeted Qty</th><th class="tbl-r" style="color:var(--accent);">Ordered Qty</th><th class="tbl-r">$</th><th style="width:100px;">Used</th></tr></thead><tbody>
     ${(() => {
       const ordMap = {};
@@ -1937,14 +1953,21 @@ function renderMapMaterial(job, el) {
     // Building header
     const bldgRows = rows.filter(r => (String(r['BUILDING']||'').trim() === bldg) || (bldg === '—' && !String(r['BUILDING']||'').trim()));
     const bldgBoards = bldgRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+    const bldgBoardSpend = bldgRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
     const bldgSpend = bldgRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+    const budBldgBoards = floors.reduce((s, fl) => s + parseFloat(fl.budgetBoards||0), 0);
+    const bldgBoardPct = budBldgBoards > 0 ? Math.min(bldgBoards / budBldgBoards * 100, 100) : 0;
+    const bldgBarCol = bldgBoardPct > 90 ? 'var(--red)' : bldgBoardPct > 70 ? 'var(--yellow)' : 'var(--green)';
+    const bldgPpb = ppb(bldgBoards, bldgBoardSpend);
     html += `<div class="card" style="margin-bottom:18px;">
       <div class="card-hdr" style="background:var(--surface2);">
-        <div>
+        <div style="flex:1;">
           <div style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;">🏢 Building ${esc(bldg)}</div>
           <div style="font-size:11px;color:var(--ink3);margin-top:2px;">${esc(job.replace('JOB ',''))} · ${floors.length} floor${floors.length!==1?'s':''}</div>
+          ${budBldgBoards > 0 ? '<div style="margin-top:8px;max-width:220px;"><div class="prog" style="height:6px;"><div class="prog-fill" style="width:'+bldgBoardPct.toFixed(1)+'%;background:'+bldgBarCol+';"></div></div><div style="display:flex;justify-content:space-between;margin-top:3px;font-size:10px;color:var(--ink3);"><span>'+Math.round(bldgBoards)+' / '+Math.round(budBldgBoards)+' boards</span><span style="color:'+bldgBarCol+';font-weight:700;">'+bldgBoardPct.toFixed(0)+'%</span></div></div>' : ''}
         </div>
         <div style="display:flex;gap:18px;align-items:center;">
+          ${bldgPpb ? '<div style="text-align:right;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.25);border-radius:8px;padding:6px 12px;"><div style="font-size:10px;color:var(--blue);text-transform:uppercase;font-weight:700;">$/Board</div><div style="font-weight:800;color:var(--blue);font-size:16px;">' + bldgPpb + '</div></div>' : ''}
           ${bldgBoards > 0 ? '<div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;">Boards</div><div style="font-weight:700;color:var(--blue);">' + Math.round(bldgBoards) + '</div></div>' : ''}
           <div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;">Spend</div><div style="font-weight:700;">${fmt(bldgSpend)}</div></div>
         </div>
@@ -1953,19 +1976,22 @@ function renderMapMaterial(job, el) {
     floors.forEach(fl => {
       const flRows = rows.filter(r => { const rfl=String(r['FLOOR']||'').trim(), rb=String(r['BUILDING']||'').trim(); if (rfl !== String(fl.floor)) return false; if (fl.bldg && rb && rb !== fl.bldg) return false; return true; });
       const flBoards = flRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+      const flBoardSpend = flRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
       const flSpend = flRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
       const budBoards = parseFloat(fl.budgetBoards||0);
       const pct = budBoards > 0 ? Math.min((flBoards/budBoards)*100, 100) : 0;
       const barCol = pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--yellow)' : 'var(--green)';
+      const flPpb = ppb(flBoards, flBoardSpend);
       html += `<div class="floor-block" style="margin-bottom:10px;">
         <div class="floor-hdr" onclick="toggleFloorBlock(this)">
           <div style="flex:1;">
-            <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <div class="floor-num">Floor ${esc(fl.floor)}</div>
               ${flBoards>0?'<span class="badge badge-blue">🟦 '+Math.round(flBoards)+' boards</span>':''}
               ${budBoards>0?'<span style="font-size:11px;color:var(--ink3);">/ '+Math.round(budBoards)+' budgeted</span>':''}
+              ${flPpb?'<span style="font-size:11px;font-weight:700;color:var(--blue);">'+flPpb+'</span>':''}
             </div>
-            ${budBoards>0?'<div style="width:200px;margin-top:6px;"><div class="prog"><div class="prog-fill" style="width:'+pct.toFixed(1)+'%;background:'+barCol+';"></div></div></div>':''}
+            ${budBoards>0?'<div style="width:200px;margin-top:6px;"><div class="prog"><div class="prog-fill" style="width:'+pct.toFixed(1)+'%;background:'+barCol+';"></div></div><div style="display:flex;justify-content:space-between;margin-top:2px;font-size:10px;color:var(--ink3);"><span>'+pct.toFixed(0)+'% ordered</span></div></div>':''}
           </div>
           <div style="display:flex;align-items:center;gap:12px;">
             <div style="text-align:right;"><div style="font-size:11px;color:var(--ink3);">Spend</div><div style="font-weight:700;">${fmt(flSpend)}</div></div>
@@ -1975,13 +2001,15 @@ function renderMapMaterial(job, el) {
         <div class="floor-body" style="display:none;"><div class="unit-grid">`;
       const genRows = flRows.filter(r => !String(r['UNIT']||'').trim() || String(r['UNIT']||'').trim()==='N/A');
       const genBoards = genRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+      const genBoardSpend = genRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
       const genSpend = genRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
-      if (genBoards > 0 || genSpend > 0) html += buildUnitCard(job, fl.floor, fl.bldg, 'General', genBoards, 0, genSpend, true);
+      if (genBoards > 0 || genSpend > 0) html += buildUnitCard(job, fl.floor, fl.bldg, 'General', genBoards, 0, genSpend, true, genBoardSpend);
       fl.units.forEach(u => {
         const uRows = flRows.filter(r => String(r['UNIT']||'').trim() === String(u.unit));
         const uBoards = uRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+        const uBoardSpend = uRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
         const uSpend = uRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
-        html += buildUnitCard(job, fl.floor, fl.bldg, u.unit, uBoards, parseFloat(u.budgetBoards||0), uSpend, false);
+        html += buildUnitCard(job, fl.floor, fl.bldg, u.unit, uBoards, parseFloat(u.budgetBoards||0), uSpend, false, uBoardSpend);
       });
       html += '</div></div></div>';
     });
@@ -2010,11 +2038,13 @@ function renderMapMaterial(job, el) {
   el.innerHTML = html || '<div class="alert alert-y">No PO data found for this job.</div>';
 }
 
-function buildUnitCard(job, floor, bldg, unit, boards, budBoards, spend, isGen) {
+function buildUnitCard(job, floor, bldg, unit, boards, budBoards, spend, isGen, boardSpend) {
   const cls = boards > 0 ? (budBoards > 0 && boards > budBoards ? 'over-budget' : budBoards > 0 && boards > budBoards*0.85 ? 'near-budget' : 'has-data') : (spend > 0 ? 'has-data' : 'no-data');
+  const unitPpb = ppb(boards, boardSpend||0);
   return `<div class="unit-card ${cls}" onclick="openUnitDetail('${jsesc(job)}','${floor}','${jsesc(unit)}','${jsesc(bldg||'')}')">
     <div class="unit-num">${isGen ? '📦 General' : unit}</div>
-    ${boards > 0 ? '<div class="unit-boards">' + Math.round(boards) + ' boards' + (budBoards > 0 ? ' / ' + Math.round(budBoards) : '') + '</div>' : ''}
+    ${boards > 0 ? '<div class="unit-boards">' + Math.round(boards) + ' bd' + (budBoards > 0 ? ' / ' + Math.round(budBoards) + ' budg' : '') + '</div>' : ''}
+    ${unitPpb ? '<div style="font-size:10px;font-weight:700;color:var(--blue);margin-top:2px;">' + unitPpb + '</div>' : ''}
     ${spend > 0 ? '<div class="unit-spend">' + fmt(spend) + '</div>' : '<div class="unit-spend" style="color:var(--ink3);">No data</div>'}
   </div>`;
 }
@@ -2112,7 +2142,9 @@ function openUnitDetail(job, floor, unit, bldg) {
   const _allRows = [...(S.rows||[]).filter(r=>(r['JOB']||r['Job']||'')===job), ...(S.emailPOs||[]).filter(p=>p.status==='confirmed'&&p.job_name===job).flatMap(p=>(p.line_items||p.lines||[]).map(li=>({'JOB':job,'MATERIAL':li.description||li.name||'','QTY':parseFloat(li.qty||li.quantity||0)||0,'LINE TOTAL':parseFloat(li.total||li.line_total||0)||0,'FLOOR':p.floor||'','BUILDING':p.building||'','UNIT':p.unit||''})))];
   const rows = _allRows.filter(r => { const rfl=String(r['FLOOR']||'').trim(), ru=String(r['UNIT']||'').trim(), rb=String(r['BUILDING']||'').trim(); if(rfl!==String(floor)) return false; if(bldg&&rb&&rb!==bldg) return false; if(unit==='General') return !ru||ru==='N/A'; return ru===String(unit); });
   const boards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
+  const boardSpend = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
   const spend = rows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
+  const unitPpb = ppb(boards, boardSpend);
   const matMap = {};
   rows.forEach(r => { const mat=(r['MATERIAL']||'').trim()||'[TAX]', cat=categorize(r['MATERIAL']||''); if(!matMap[mat]) matMap[mat]={qty:0,total:0,cat,uom:r['UOM']||''}; matMap[mat].qty+=parseFloat(r['QTY']||0); matMap[mat].total+=parseFloat(r['LINE TOTAL']||0); });
   const CAT_ORDER=['boards','metal','finish','supplies','tax','other'];
@@ -2120,8 +2152,9 @@ function openUnitDetail(job, floor, unit, bldg) {
   const CAT_TC={boards:'var(--blue)',metal:'var(--yellow)',finish:'var(--green)',supplies:'var(--ink3)',tax:'var(--red)',other:'var(--ink3)'};
   document.getElementById('unit-modal-title').textContent = job.replace('JOB ','') + ' · Floor ' + floor + ' · ' + (unit==='General'?'General':'Unit '+unit);
   document.getElementById('unit-modal-body').innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
-      <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Boards</div><div style="font-size:24px;font-weight:800;color:var(--blue);">${Math.round(boards)}</div></div>
+    <div style="display:grid;grid-template-columns:repeat(${boards>0?4:3},1fr);gap:10px;margin-bottom:16px;">
+      <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Boards</div><div style="font-size:24px;font-weight:800;color:var(--blue);">${Math.round(boards)||'—'}</div></div>
+      ${boards>0&&unitPpb?'<div class="stat" style="padding:12px;text-align:center;background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.25);"><div class="stat-lbl" style="color:var(--blue);">$/Board</div><div style="font-size:20px;font-weight:800;color:var(--blue);">'+unitPpb+'</div></div>':''}
       <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Spend</div><div style="font-size:22px;font-weight:800;color:var(--accent);">${fmt(spend)}</div></div>
       <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Lines</div><div style="font-size:22px;font-weight:800;">${rows.length}</div></div>
     </div>
@@ -2169,7 +2202,15 @@ function renderEstimateTab(job) {
     </tr>`;
   });
   html += '</tbody></table>';
-  html += '<div style="text-align:right;margin-top:10px;font-family:\'Space Grotesk\',sans-serif;font-size:18px;font-weight:700;">Grand Total: <span id="est-grand-total" style="color:var(--accent);">' + fmt(grandTotal) + '</span></div>';
+  // Budget $/board KPI
+  const _bdItems = items.filter(it => it.uom === 'BD' || isBoard(it.name));
+  const _bdQty = _bdItems.reduce((s,it) => s + (parseFloat(it.qty)||0), 0);
+  const _bdSpend = _bdItems.reduce((s,it) => s + (parseFloat(it.qty)||0)*(parseFloat(it.price)||0), 0);
+  const _budPpb = ppb(_bdQty, _bdSpend);
+  html += '<div style="display:flex;justify-content:flex-end;align-items:center;gap:24px;margin-top:12px;flex-wrap:wrap;">';
+  if (_budPpb) html += '<div style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.3);border-radius:8px;padding:8px 16px;text-align:center;"><div style="font-size:10px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Budget $/Board</div><div style="font-size:18px;font-weight:800;color:var(--blue);">' + _budPpb + '</div><div style="font-size:10px;color:var(--ink3);">' + Math.round(_bdQty) + ' boards budgeted</div></div>';
+  html += '<div style="font-family:\'Space Grotesk\',sans-serif;font-size:18px;font-weight:700;">Grand Total: <span id="est-grand-total" style="color:var(--accent);">' + fmt(grandTotal) + '</span></div>';
+  html += '</div>';
   html += '</div></div>';
 
   // FIX #5: Optional floor-level breakdown (collapsible)
@@ -2297,6 +2338,14 @@ function renderJobSummaryTab(job) {
   const labor = getJobLabor(job);
   const matOrdered = rows.reduce((s,r) => s + (parseFloat(r['LINE TOTAL']||0)||0), 0);
   const matBudget = items.reduce((s,it) => s + ((parseFloat(it.qty)||0)*(parseFloat(it.price)||0)), 0);
+  // Board metrics for $/board KPIs
+  const ordBoards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + (parseFloat(r['QTY']||0)||0), 0);
+  const ordBoardSpend = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + (parseFloat(r['LINE TOTAL']||0)||0), 0);
+  const estBoardItems = items.filter(it => it.uom === 'BD' || isBoard(it.name));
+  const estBoards = estBoardItems.reduce((s,it) => s + (parseFloat(it.qty)||0), 0);
+  const estBoardSpend = estBoardItems.reduce((s,it) => s + (parseFloat(it.qty)||0)*(parseFloat(it.price)||0), 0);
+  const actualPpb = ppb(ordBoards, ordBoardSpend);
+  const budgetPpb = ppb(estBoards, estBoardSpend);
   const laborBudget = LABOR_CATS.reduce((s,c) => s + (parseFloat(labor[c]||0)||0), 0);
   const billAssigns = Object.values(S.billAssignments||{}).filter(ba => ba.job === job);
   const laborBilled = billAssigns.filter(ba => LABOR_CATS.some(lc => (ba.category||'').includes(lc))).reduce((s,ba) => s + (parseFloat(ba.total||0)||0), 0);
@@ -2365,11 +2414,14 @@ function renderJobSummaryTab(job) {
       <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--ink3);"><span>${pct.toFixed(1)}% used</span><span>${totalBudget > totalActual ? fmt(totalBudget - totalActual) + ' remaining' : fmt(totalActual - totalBudget) + ' over'}</span></div>
     </div></div>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px;">
       <div class="stat"><div class="stat-lbl">Ordered on POs</div><div class="stat-val" style="color:var(--blue);">${fmt(matOrdered)}</div></div>
       <div class="stat"><div class="stat-lbl">Billed Material</div><div class="stat-val">${fmt(matBilled)}</div></div>
       <div class="stat"><div class="stat-lbl">Billed Labor</div><div class="stat-val" style="color:var(--accent);">${fmt(laborBilled)}</div></div>
       ${viewMode==='whole' && bf ? '<div class="stat"><div class="stat-lbl">Historical Material</div><div class="stat-val" style="color:var(--yellow);">' + fmt(bfMatTotal) + '</div></div><div class="stat"><div class="stat-lbl">Historical Labor</div><div class="stat-val" style="color:var(--yellow);">' + fmt(bfLabTotal) + '</div></div>' : ''}
+      ${ordBoards > 0 ? '<div class="stat"><div class="stat-lbl">Boards Ordered</div><div class="stat-val" style="color:var(--blue);">' + Math.round(ordBoards) + '</div></div>' : ''}
+      ${actualPpb ? '<div class="stat" style="background:rgba(79,142,247,.08);border-color:rgba(79,142,247,.3);"><div class="stat-lbl" style="color:var(--blue);">Actual $/Board</div><div class="stat-val" style="color:var(--blue);">' + actualPpb + '</div></div>' : ''}
+      ${budgetPpb ? '<div class="stat" style="background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.3);"><div class="stat-lbl" style="color:var(--green);">Budget $/Board</div><div class="stat-val" style="color:var(--green);">' + budgetPpb + '</div></div>' : ''}
       <div class="stat"><div class="stat-lbl">Items Tracked</div><div class="stat-val">${allItems.length}</div></div>
     </div>
 
