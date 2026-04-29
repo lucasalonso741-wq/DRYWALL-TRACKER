@@ -248,9 +248,7 @@ a{color:var(--accent);}
   <div class="nav-divider"></div>
   <button class="nav-icon-btn active" data-page="home" onclick="nav('home')"><span>🏗️</span><span class="label">Feed</span></button>
   <button class="nav-icon-btn" data-page="dashboard" onclick="nav('dashboard')"><span>📊</span><span class="label">Dash</span></button>
-  <button class="nav-icon-btn" data-page="home" onclick="nav('home');switchHomeTab('inbox')" style="position:relative;"><span>📥</span><span class="label">Inbox</span><span class="nav-badge-dot" id="inbox-badge" style="display:none;"></span></button>
-  <button class="nav-icon-btn" data-page="jobs" onclick="nav('jobs')"><span>🏗️</span><span class="label">Jobs</span></button>
-  <button class="nav-icon-btn" data-page="raw" onclick="nav('raw')"><span>🗃️</span><span class="label">Data</span></button>
+  <button class="nav-icon-btn" data-page="jobs" onclick="nav('jobs')"><span>📋</span><span class="label">Jobs</span></button>
   <button class="nav-icon-btn" data-page="settings" onclick="nav('settings')"><span>⚙️</span><span class="label">Setup</span></button>
   <div class="nav-divider"></div>
   <button class="nav-sync-btn" id="sync-btn" onclick="syncAll()" title="Sync from Google Sheet">⟳ <span class="sync-dot" id="sync-dot"></span></button>
@@ -356,19 +354,6 @@ a{color:var(--accent);}
     <div id="jobs-tab-summary" class="tab-panel"></div>
     <div id="jobs-tab-allmats" class="tab-panel"></div>
   </div>
-</div>
-
-<!-- PAGE: RAW DATA -->
-
-<div id="page-raw" class="page">
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="raw-po" onclick="switchRawTab('raw-po')">PO Lines</button>
-    <button class="tab-btn" data-tab="raw-bills" onclick="switchRawTab('raw-bills')">Bills</button>
-    <button class="tab-btn" data-tab="raw-pdf" onclick="switchRawTab('raw-pdf')">PDF Extractions</button>
-  </div>
-  <div id="raw-tab-raw-po" class="tab-panel active"></div>
-  <div id="raw-tab-raw-bills" class="tab-panel"></div>
-  <div id="raw-tab-raw-pdf" class="tab-panel"></div>
 </div>
 
 <!-- PAGE: SETTINGS -->
@@ -546,7 +531,6 @@ function openCatChangeMenu(ev, rawDesc) {
       if (typeof updateInboxBadge === 'function') updateInboxBadge();
     }
     if (_currentJob) { renderJobSummaryTab(_currentJob); renderAllMaterialsTab(_currentJob); }
-    if (document.getElementById('page-raw')?.classList.contains('active')) renderRaw();
   });
   menu.addEventListener('mouseenter', () => menu.dataset.hover='1');
   setTimeout(() => { document.addEventListener('click', () => menu.remove(), { once: true }); }, 50);
@@ -927,9 +911,44 @@ async function loadEmailPOs() {
     });
     const rows = await res.json();
     S.emailPOs = Array.isArray(rows) ? rows : [];
-    // Check for any needs_review items to badge the inbox
     S._pendingNewJobs = S.emailPOs.filter(p => p.status === 'needs_review').length;
+    await autoAssignExtractedPOs();
   } catch(e) { console.warn('loadEmailPOs failed:', e); S.emailPOs = []; }
+}
+
+async function autoAssignExtractedPOs() {
+  // Only process uploaded PDFs (source='upload') that are still pending — not random emails
+  const pending = (S.emailPOs||[]).filter(p => p.source === 'upload' && p.status === 'pending');
+  if (!pending.length) return;
+  const jobs = getJobs();
+  for (const p of pending) {
+    const matchedJob = resolveJobFromPDF(p.job_name, p.ship_to);
+    // Only auto-confirm when matched job actually exists in our job list
+    if (!matchedJob || !jobs.includes(matchedJob)) {
+      // Flag for manual review
+      await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + p.id, {
+        method:'PATCH',
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({status:'needs_review'})
+      }).catch(()=>{});
+      p.status = 'needs_review';
+      continue;
+    }
+    // Auto-confirm and assign
+    await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + p.id, {
+      method:'PATCH',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({status:'confirmed', job_name:matchedJob})
+    }).catch(()=>{});
+    p.status = 'confirmed';
+    p.job_name = matchedJob;
+    if (p.po_number) {
+      if (!S.assignments) S.assignments = {};
+      S.assignments[p.po_number] = {job:matchedJob, building:p.building||'', floor:p.floor||'', unit:p.unit||'', vendor:p.vendor||'', date:(p.created_at||'').split('T')[0]};
+    }
+  }
+  if (pending.length) saveSharedData('assignments').catch(()=>{});
+  S._pendingNewJobs = (S.emailPOs||[]).filter(p => p.status === 'needs_review').length;
 }
 
 // Load new job alerts from app_data
@@ -1021,7 +1040,7 @@ function checkAuth() {
     init();
   }
 }
-const PAGE_TITLES = {home:'Activity Feed',dashboard:'Dashboard',inbox:'Activity Feed',jobs:'Jobs',raw:'Raw Data',settings:'Settings'};
+const PAGE_TITLES = {home:'Activity Feed',dashboard:'Dashboard',jobs:'Jobs',settings:'Setup'};
 function nav(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-icon-btn').forEach(b => b.classList.toggle('active', b.dataset.page === page));
@@ -1029,9 +1048,7 @@ function nav(page) {
   document.getElementById('page-title').textContent = PAGE_TITLES[page] || page;
   if (page === 'home') renderHome();
   else if (page === 'dashboard') renderDashboard();
-  else if (page === 'inbox') { /* redirected to home inbox tab */ }
   else if (page === 'jobs') { populateJobSelects(); if (_currentJob) onJobSelect(); }
-  else if (page === 'raw') renderRaw();
   else if (page === 'settings') renderSettings();
 }
 function populateJobSelects() {
@@ -1421,6 +1438,25 @@ async function confirmEmailPO(id) {
   if (poNum) {
     S.assignments[poNum] = {job, building:bldg, floor, unit, vendor, manual:true, date:new Date().toISOString().split('T')[0]};
     await saveSharedData('assignments');
+  }
+
+  // Auto-create floor/unit in jobStructure if floor or unit was provided
+  if (floor || unit) {
+    if (!S.jobStructure) S.jobStructure = {};
+    if (!S.jobStructure[job]) S.jobStructure[job] = {floors:[]};
+    const struct = S.jobStructure[job];
+    let flEntry = struct.floors.find(f => String(f.floor) === String(floor) && (!bldg || f.bldg === bldg));
+    if (!flEntry && floor) {
+      flEntry = {floor, bldg:bldg||'', budgetBoards:0, units:[]};
+      struct.floors.push(flEntry);
+    }
+    if (flEntry && unit && unit !== 'N/A') {
+      if (!flEntry.units) flEntry.units = [];
+      if (!flEntry.units.find(u => String(u.unit) === String(unit))) {
+        flEntry.units.push({unit, budgetBoards:0});
+      }
+    }
+    await saveSharedData('jobStructure');
   }
 
   closeModal('po-modal');
@@ -1951,6 +1987,26 @@ function renderMapMaterial(job, el) {
     });
     html += '</div></div>';
   });
+  // Append unassigned POs (no floor set) at the bottom so nothing is hidden
+  const unassigned = rows.filter(r => !String(r['FLOOR']||'').trim());
+  if (unassigned.length) {
+    const uBoards = unassigned.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+    const uSpend = unassigned.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+    html += `<div class="card" style="margin-bottom:18px;border:1.5px dashed var(--border);">
+      <div class="card-hdr" style="background:var(--surface2);">
+        <div><div style="font-size:15px;font-weight:700;">📦 Unassigned / No Floor</div>
+        <div style="font-size:11px;color:var(--ink3);">POs confirmed but floor not yet set — edit the PO to assign a floor</div></div>
+        <div style="display:flex;gap:16px;align-items:center;">
+          ${uBoards>0?'<div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);">Boards</div><div style="font-weight:700;color:var(--blue);">'+Math.round(uBoards)+'</div></div>':''}
+          <div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);">Spend</div><div style="font-weight:700;">${fmt(uSpend)}</div></div>
+        </div>
+      </div>
+      <div class="card-body" style="padding:10px 16px;font-size:12px;">
+        ${unassigned.map(r=>'<div style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:10px;"><span style="flex:1;">'+(r['MATERIAL']||'?')+'</span><span style="color:var(--ink3);">Qty: '+(r['QTY']||0)+'</span><span style="font-weight:600;">'+fmt(r['LINE TOTAL']||0)+'</span></div>').join('')}
+      </div>
+    </div>`;
+  }
+
   el.innerHTML = html || '<div class="alert alert-y">No PO data found for this job.</div>';
 }
 
@@ -2080,15 +2136,23 @@ function openUnitDetail(job, floor, unit, bldg) {
 function renderEstimateTab(job) {
   const el = document.getElementById('jobs-tab-estimate'); if (!el) return;
   const items = getJobEstimate(job);
-  const rows = S.rows.filter(r => (r['JOB']||'') === job);
-  let html = '<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Line</button></div></div><div class="card-body" style="overflow-x:auto;">';
+  // Combine sheet rows + confirmed email PO line items for ordered-qty lookup
+  const _estSheet = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  const _estEmail = (S.emailPOs||[]).filter(p => p.status==='confirmed' && p.job_name===job)
+    .flatMap(p => (p.line_items||p.lines||[]).map(li => ({'MATERIAL':li.description||li.name||li.sku||'','QTY':parseFloat(li.qty||li.quantity||0)||0})));
+  const rows = [..._estSheet, ..._estEmail];
+  let html = '<div class="card" style="margin-bottom:16px;">'<div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Line</button></div></div><div class="card-body" style="overflow-x:auto;">';
   html += '<table class="tbl"><thead><tr><th>Cat</th><th>Material</th><th>Use</th><th>UOM</th><th class="tbl-r">Price</th><th class="tbl-r" style="min-width:80px;">Qty</th><th class="tbl-r">Total</th><th class="tbl-r">Ordered</th><th></th></tr></thead><tbody>';
   let lastCat = '', grandTotal = 0;
   items.forEach((it, i) => {
     if (it.cat !== lastCat) { lastCat = it.cat; html += '<tr class="est-cat-hdr"><td colspan="9" style="background:' + (CAT_COLORS[it.cat]||'var(--surface3)') + ';color:' + (CAT_TEXT[it.cat]||'var(--ink2)') + ';">' + esc(it.cat) + '</td></tr>'; }
     const lineTotal = (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
     grandTotal += lineTotal;
-    const ordered = rows.filter(r => (r['MATERIAL']||'').toUpperCase().includes(it.name.toUpperCase().substring(0,8))).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+    const _itKey = it.name.toUpperCase().substring(0,8).trim();
+    const ordered = rows.filter(r => {
+      const rm = (r['MATERIAL']||'').toUpperCase();
+      return rm.includes(_itKey) || _itKey.includes(rm.substring(0,8).trim());
+    }).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
     const pct = it.qty > 0 && ordered > 0 ? Math.round(ordered / it.qty * 100) : 0;
     const pctColor = pct > 100 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : pct > 0 ? 'var(--green)' : 'var(--ink3)';
     const tmpl = ESTIMATE_TEMPLATE.find(t => t.name === it.name);
@@ -2677,7 +2741,7 @@ async function confirmNewJob(rawName) {
   if (sel) sel.value = name;
   showToast('✓ Job "' + name + '" created — you can now confirm the PO');
 }
-function confirmPDFPO(po, savedId) {
+async function confirmPDFPO(po, savedId) {
   if (!po) return;
   const job = document.getElementById('pdf-job')?.value;
   const bldg = document.getElementById('pdf-bldg')?.value || po.building || '';
@@ -2687,13 +2751,33 @@ function confirmPDFPO(po, savedId) {
   if (!job) { showToast('Please select a job'); return; }
   if (!S.assignments) S.assignments = {};
   S.assignments[poNum] = {job, building:bldg, floor, unit, manual:true, lines:po.lines, total:po.total, vendor:po.vendor, date:new Date().toISOString().split('T')[0]};
-  saveSharedData('assignments').then(async () => {
-    if (savedId) {
-      await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + savedId, { method:'PATCH', headers:{'apikey':SB_KEY,'Content-Type':'application/json'}, body:JSON.stringify({status:'confirmed',job_name:job}) });
+  // Auto-create floor/unit in jobStructure if provided
+  if (floor || unit) {
+    if (!S.jobStructure) S.jobStructure = {};
+    if (!S.jobStructure[job]) S.jobStructure[job] = {floors:[]};
+    const struct = S.jobStructure[job];
+    let flEntry = struct.floors.find(f => String(f.floor) === String(floor) && (!bldg || f.bldg === bldg));
+    if (!flEntry && floor) {
+      flEntry = {floor, bldg:bldg||'', budgetBoards:0, units:[]};
+      struct.floors.push(flEntry);
     }
-    showToast('✓ PO #' + poNum + ' added to ' + job.replace('JOB ',''));
-    document.getElementById('pdf-result').style.display = 'none';
-  });
+    if (flEntry && unit && unit !== 'N/A') {
+      if (!flEntry.units) flEntry.units = [];
+      if (!flEntry.units.find(u => String(u.unit) === String(unit))) {
+        flEntry.units.push({unit, budgetBoards:0});
+      }
+    }
+    await saveSharedData('jobStructure');
+  }
+  await saveSharedData('assignments');
+  if (savedId) {
+    await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + savedId, { method:'PATCH', headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'}, body:JSON.stringify({status:'confirmed',job_name:job,building:bldg,floor,unit}) });
+  }
+  await loadEmailPOs();
+  renderActivityFeed();
+  updateInboxBadge();
+  showToast('✓ PO #' + poNum + ' added to ' + job.replace('JOB ',''));
+  document.getElementById('pdf-result').style.display = 'none';
 }
 async function loadPendingPOs() {
   const el = document.getElementById('pending-pos-list'); if (!el) return;
