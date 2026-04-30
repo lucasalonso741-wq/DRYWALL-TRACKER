@@ -608,6 +608,28 @@ function isLaborVendor(vendor) {
   return false;
 }
 
+// Deep merge matBanks: for nested objects, prefer the version with more non-zero data (local wins on tie)
+function deepMergeMatBanks(base, local) {
+  const out = Object.assign({}, base);
+  Object.keys(local).forEach(k => {
+    if (!(k in out)) { out[k] = local[k]; return; }
+    const b = out[k], l = local[k];
+    if (b && l && typeof b === 'object' && typeof l === 'object' && !Array.isArray(b)) {
+      // Merge one level deeper (scope keys like {'6" TRAC': 48})
+      const merged = Object.assign({}, b);
+      Object.keys(l).forEach(ik => {
+        const bv = b[ik], lv = l[ik];
+        if (bv && typeof bv === 'object' && lv && typeof lv === 'object') {
+          merged[ik] = Object.assign({}, bv, lv); // local wins at leaf
+        } else {
+          merged[ik] = (lv !== undefined && lv !== null && lv !== 0 && lv !== '') ? lv : (bv ?? lv);
+        }
+      });
+      out[k] = merged;
+    }
+  });
+  return out;
+}
 function normBldg(s) { return String(s||'').trim().replace(/^(?:BLDG?|BUILDING)\s*/i,'').trim().toLowerCase(); }
 function normFloor(s) { return String(s||'').trim().replace(/^0+/,'').replace(/(?:ST|ND|RD|TH|FL(?:OOR)?)$/i,'').trim().toLowerCase(); }
 function getJobs() {
@@ -808,14 +830,15 @@ async function loadSharedData() {
   if (budgets) S.budgets = budgets;
   if (targets) S.targets = targets;
   if (matBanks) {
-    S.matBanks = matBanks;
-    // Merge any newer local edits that didn't make it to Supabase before last refresh
+    // Deep-merge: prefer localStorage for any nested keys that have actual data
     try {
       const local = JSON.parse(localStorage.getItem('dw_matBanks_cache') || 'null');
       if (local && typeof local === 'object') {
-        Object.keys(local).forEach(k => { if (!(k in S.matBanks)) S.matBanks[k] = local[k]; });
+        S.matBanks = deepMergeMatBanks(matBanks, local);
+      } else {
+        S.matBanks = matBanks;
       }
-    } catch(e) {}
+    } catch(e) { S.matBanks = matBanks; }
   } else {
     try { const local = JSON.parse(localStorage.getItem('dw_matBanks_cache') || 'null'); if (local) S.matBanks = local; } catch(e) {}
   }
@@ -2094,169 +2117,167 @@ function clearSummaryFilter(job) { _summaryFilter = {building:'',floor:'',unit:'
 
 function renderJobSummaryTab(job) {
   const el = document.getElementById('jobs-tab-summary'); if (!el) return;
+  const struct = S.jobStructure?.[job];
+  const scopeData = (S.matBanks || {})[job+'_scopes'] || {};
+  const estItems = getJobEstimate(job); // [{name, qty, price, uom, cat}]
+  const priceMap = {}; estItems.forEach(it => { priceMap[it.name] = parseFloat(it.price)||0; });
   const allJobRows = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
-  const buildings = [...new Set(allJobRows.map(r => String(r['BUILDING']||'').trim()).filter(Boolean))].sort();
-  const filtByBldg = _summaryFilter.building ? allJobRows.filter(r => String(r['BUILDING']||'').trim() === _summaryFilter.building) : allJobRows;
-  const floors = [...new Set(filtByBldg.map(r => String(r['FLOOR']||'').trim()).filter(Boolean))].sort((a,b) => parseInt(a)-parseInt(b));
-  const filtByFloor = _summaryFilter.floor ? filtByBldg.filter(r => String(r['FLOOR']||'').trim() === _summaryFilter.floor) : filtByBldg;
-  const units = [...new Set(filtByFloor.map(r => parseUnitModel(String(r['UNIT']||'').trim()).base).filter(Boolean))].sort((a,b) => parseInt(a)-parseInt(b));
-  const rows = _summaryFilter.unit ? filtByFloor.filter(r => parseUnitModel(String(r['UNIT']||'').trim()).base === _summaryFilter.unit) : filtByFloor;
-  const filterLabel = [_summaryFilter.building?'Bldg '+_summaryFilter.building:'',_summaryFilter.floor?'Floor '+_summaryFilter.floor:'',_summaryFilter.unit?'Unit '+_summaryFilter.unit:''].filter(Boolean).join(' · ')||'All';
-  const filterHtml = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);">
-    <span style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Filter:</span>
-    <select class="inp inp-sm" style="max-width:140px;" onchange="setSummaryFilter('building',this.value,'${jsesc(job)}')"><option value="">All Buildings</option>${buildings.map(b=>'<option value="'+esc(b)+'"'+(_summaryFilter.building===b?' selected':'')+'>Bldg '+esc(b)+'</option>').join('')}</select>
-    <select class="inp inp-sm" style="max-width:120px;" onchange="setSummaryFilter('floor',this.value,'${jsesc(job)}')"><option value="">All Floors</option>${floors.map(f=>'<option value="'+esc(f)+'"'+(_summaryFilter.floor===f?' selected':'')+'>Floor '+esc(f)+'</option>').join('')}</select>
-    <select class="inp inp-sm" style="max-width:120px;" onchange="setSummaryFilter('unit',this.value,'${jsesc(job)}')"><option value="">All Units</option>${units.map(u=>'<option value="'+esc(u)+'"'+(_summaryFilter.unit===u?' selected':'')+'>Unit '+esc(u)+'</option>').join('')}</select>
-    ${filterLabel!=='All'?'<button class="btn btn-ghost btn-sm" onclick="clearSummaryFilter(\''+jsesc(job)+'\')">✕ Clear</button><span style="font-size:12px;font-weight:700;color:var(--accent);">'+esc(filterLabel)+'</span>':''}
-    <span style="margin-left:auto;font-size:11px;color:var(--ink3);">${rows.length} lines${filterLabel!=='All'?' (filtered)':''}</span>
-  </div>`;
-  const items = getJobEstimate(job);
-  const labor = getJobLabor(job);
-  const matOrdered = rows.reduce((s,r) => s + (parseFloat(r['LINE TOTAL']||0)||0), 0);
-  const matBudget = items.reduce((s,it) => s + ((parseFloat(it.qty)||0)*(parseFloat(it.price)||0)), 0);
-  const laborBudget = LABOR_CATS.reduce((s,c) => s + (parseFloat(labor[c]||0)||0), 0);
-  const billAssigns = Object.values(S.billAssignments||{}).filter(ba => ba.job === job);
-  const laborBilled = billAssigns.filter(ba => LABOR_CATS.some(lc => (ba.category||'').includes(lc))).reduce((s,ba) => s + (parseFloat(ba.total||0)||0), 0);
-  const matBilled = billAssigns.filter(ba => !LABOR_CATS.some(lc => (ba.category||'').includes(lc))).reduce((s,ba) => s + (parseFloat(ba.total||0)||0), 0);
+  // Collect all buildings from both structure and PO rows
+  const structBuildings = struct?.floors ? [...new Set(struct.floors.map(f => String(f.bldg||'').trim()).filter(Boolean))] : [];
+  const rowBuildings = [...new Set(allJobRows.map(r => String(r['BUILDING']||'').trim()).filter(Boolean))];
+  const allBuildings = [...new Set([...structBuildings, ...rowBuildings])].sort();
 
-  // Get backfill historical data
-  const bf = getBackfillForJob(job);
-  const bfMatTotal = bf ? parseFloat(bf.materialTotal||0) : 0;
-  const bfLabTotal = bf ? parseFloat(bf.laborTotal||0) : 0;
-  const bfTaxTotal = bf ? parseFloat(bf.taxTotal||0) : 0;
+  const activeBldg = _summaryFilter.building || '';
+  const activeFloor = _summaryFilter.floor || '';
 
-  // View mode: 'whole' shows backfill + live combined, 'live' shows only live (current sync)
-  const viewMode = S._summaryView?.[job] || 'whole';
+  // Build per-floor rows using structure + scope planner + actual PO rows
+  const floorRows = [];
+  const structFloors = struct?.floors || [];
+  // Also include floors seen in PO data that may not be in structure
+  const poFloors = [...new Set(allJobRows.map(r => ({ fl: String(r['FLOOR']||'').trim(), bldg: String(r['BUILDING']||'').trim() })).filter(x=>x.fl).map(x=>x.fl+':'+x.bldg))];
+  const allFloorKeys = new Set(structFloors.map(f => String(f.floor)+':'+String(f.bldg||'')));
+  poFloors.forEach(key => allFloorKeys.add(key));
 
-  const totalBudget = matBudget + laborBudget;
-  const totalActualLive = matBilled + laborBilled + matOrdered;
-  const totalActualWhole = totalActualLive + bfMatTotal + bfLabTotal + bfTaxTotal;
-  const totalActual = viewMode === 'whole' ? totalActualWhole : totalActualLive;
-  const pct = totalBudget > 0 ? Math.min(totalActual/totalBudget*100, 100) : 0;
-
-  // Build unified item list
-  const itemMap = {};
-  items.forEach(it => {
-    const norm = normalizeMaterial(it.name);
-    const key = norm.group;
-    if (!itemMap[key]) itemMap[key] = { label: norm.label, budgetQty: 0, budgetDollars: 0, orderedQty: 0, orderedDollars: 0, bfDollars: 0, rawNames: new Set(), uom: it.uom||'EA', budgeted: true };
-    itemMap[key].budgetQty += parseFloat(it.qty) || 0;
-    itemMap[key].budgetDollars += (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
-    itemMap[key].rawNames.add(it.name);
-  });
-  rows.forEach(r => {
-    const raw = (r['MATERIAL']||'').trim(); if (!raw) return;
-    const norm = normalizeMaterial(raw);
-    const key = norm.group;
-    if (!itemMap[key]) itemMap[key] = { label: norm.label, budgetQty: 0, budgetDollars: 0, orderedQty: 0, orderedDollars: 0, bfDollars: 0, rawNames: new Set(), uom: r['UOM']||'EA', budgeted: false };
-    itemMap[key].orderedQty += parseFloat(r['QTY']||0) || 0;
-    itemMap[key].orderedDollars += parseFloat(r['LINE TOTAL']||0) || 0;
-    itemMap[key].rawNames.add(raw);
-  });
-  // Add backfill material items in "whole" mode
-  if (viewMode === 'whole' && bf?.materialItems) {
-    Object.entries(bf.materialItems).forEach(([name, amt]) => {
-      const norm = normalizeMaterial(name);
-      const key = norm.group;
-      if (!itemMap[key]) itemMap[key] = { label: norm.label, budgetQty: 0, budgetDollars: 0, orderedQty: 0, orderedDollars: 0, bfDollars: 0, rawNames: new Set(), uom: 'EA', budgeted: false };
-      itemMap[key].bfDollars += parseFloat(amt) || 0;
-      itemMap[key].rawNames.add(name);
+  allFloorKeys.forEach(key => {
+    const [fl, bldg] = key.split(':');
+    if (activeBldg && normBldg(bldg) !== normBldg(activeBldg)) return;
+    const scopeKey = 'floor:' + bldg + ':' + fl;
+    const sd = scopeData[scopeKey] || {};
+    // Budget from scope planner
+    let budgetBoards = 0, budgetDollars = 0;
+    Object.entries(sd).forEach(([matName, qty]) => {
+      const q = parseFloat(qty)||0; if (!q) return;
+      budgetDollars += q * (priceMap[matName]||0);
+      if (isBoard(matName)) budgetBoards += q;
     });
+    // Ordered from PO rows
+    const flRowsFiltered = allJobRows.filter(r => normFloor(String(r['FLOOR']||'').trim()) === normFloor(fl) && (!bldg || normBldg(String(r['BUILDING']||'').trim()) === normBldg(bldg)));
+    const orderedBoards = flRowsFiltered.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+    const orderedDollars = flRowsFiltered.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+    const orderedLines = flRowsFiltered.length;
+    floorRows.push({ fl, bldg, budgetBoards, budgetDollars, orderedBoards, orderedDollars, orderedLines, sd, flRows: flRowsFiltered });
+  });
+  floorRows.sort((a,b) => { const bd = normBldg(a.bldg).localeCompare(normBldg(b.bldg)); return bd !== 0 ? bd : parseInt(a.fl)-parseInt(b.fl); });
+
+  // Material detail for selected floor
+  const detailRows = activeFloor ? floorRows.find(f => normFloor(f.fl)===normFloor(activeFloor) && (!activeBldg || normBldg(f.bldg)===normBldg(activeBldg))) : null;
+
+  const bldgSelect = `<select class="inp inp-sm" style="max-width:160px;" onchange="setSummaryFilter('building',this.value,'${jsesc(job)}')"><option value="">All Buildings</option>${allBuildings.map(b=>'<option value="'+esc(b)+'"'+(activeBldg===b?' selected':'')+'>Bldg '+esc(b)+'</option>').join('')}</select>`;
+  const floorSelect = `<select class="inp inp-sm" style="max-width:140px;" onchange="setSummaryFilter('floor',this.value,'${jsesc(job)}')"><option value="">All Floors</option>${floorRows.map(f=>'<option value="'+esc(f.fl)+'"'+(activeFloor===f.fl?' selected':'')+'>Fl '+esc(f.fl)+(f.bldg?' · Bldg '+esc(f.bldg):'')+'</option>').join('')}</select>`;
+
+  const barHtml = (ordered, budget, color) => {
+    if (!budget) return ordered > 0 ? `<span style="font-size:11px;color:var(--blue);">No budget set</span>` : '—';
+    const pct = Math.min(ordered/budget*100, 100);
+    const rawPct = ordered/budget*100;
+    const c = rawPct > 100 ? 'var(--red)' : rawPct > 80 ? 'var(--yellow)' : 'var(--green)';
+    return `<div style="display:flex;align-items:center;gap:8px;">
+      <div style="flex:1;min-width:80px;height:8px;border-radius:4px;background:var(--surface3);overflow:hidden;"><div style="height:100%;width:${pct.toFixed(1)}%;background:${c};border-radius:4px;transition:width .5s;"></div></div>
+      <span style="font-size:11px;font-weight:700;color:${c};min-width:36px;">${Math.round(rawPct)}%</span>
+    </div>`;
+  };
+
+  const totalBudgetBoards = floorRows.reduce((s,f)=>s+f.budgetBoards,0);
+  const totalOrderedBoards = floorRows.reduce((s,f)=>s+f.orderedBoards,0);
+  const totalBudgetDollars = floorRows.reduce((s,f)=>s+f.budgetDollars,0);
+  const totalOrderedDollars = floorRows.reduce((s,f)=>s+f.orderedDollars,0);
+  const hasScopeData = floorRows.some(f=>f.budgetDollars>0||f.budgetBoards>0);
+
+  let html = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);">
+    <span style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Filter:</span>
+    ${bldgSelect} ${floorSelect}
+    ${(activeBldg||activeFloor)?'<button class="btn btn-ghost btn-sm" onclick="clearSummaryFilter(\''+jsesc(job)+'\')">✕ Clear</button>':''}
+    <span style="margin-left:auto;font-size:11px;color:var(--ink3);">${floorRows.length} floors${activeBldg?' · Bldg '+esc(activeBldg):''}</span>
+  </div>`;
+
+  if (!hasScopeData) {
+    html += `<div class="alert alert-y" style="margin-bottom:14px;">No scope budgets set yet — go to the <strong>Estimate → Allocate by Floor</strong> tab to enter quantities per floor, then the comparison will show here.</div>`;
   }
 
-  const allItems = Object.entries(itemMap).sort((a,b) => (b[1].orderedDollars + b[1].budgetDollars + b[1].bfDollars) - (a[1].orderedDollars + a[1].budgetDollars + a[1].bfDollars));
-
-  el.innerHTML = filterHtml + `
-    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
-      <span style="font-size:12px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">View:</span>
-      <button class="btn ${viewMode==='whole'?'btn-primary':'btn-ghost'} btn-sm" onclick="toggleSummaryView('${jsesc(job)}','whole')">📊 Whole Job</button>
-      <button class="btn ${viewMode==='live'?'btn-primary':'btn-ghost'} btn-sm" onclick="toggleSummaryView('${jsesc(job)}','live')">⚡ Current POs only</button>
-      ${bf ? '<span style="font-size:11px;color:var(--ink3);">History: ' + fmt(bfMatTotal+bfLabTotal+bfTaxTotal) + '</span>' : ''}
+  // Summary strip
+  html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px;">
+    <div class="card" style="padding:12px 16px;">
+      <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Budget (Boards)</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;">${Math.round(totalBudgetBoards)||'—'}</div>
     </div>
-    <div class="card" style="margin-bottom:16px;"><div class="card-body">
-      <div style="display:flex;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:12px;">
-        <div><div style="font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Total Budget</div><div style="font-size:28px;font-weight:800;font-family:'Space Grotesk',sans-serif;">${fmt(totalBudget)}</div></div>
-        <div style="text-align:right;"><div style="font-size:11px;color:var(--ink3);">${viewMode==='whole'?'Total Spent (Whole Job)':'Actual (Current)'}</div><div style="font-size:24px;font-weight:700;color:${totalActual>totalBudget?'var(--red)':'var(--green)'};">${fmt(totalActual)}</div></div>
-      </div>
-      <div class="prog" style="height:10px;"><div class="prog-fill" style="width:${pct.toFixed(1)}%;background:${pct>90?'var(--red)':pct>70?'var(--yellow)':'var(--green)'}"></div></div>
-      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--ink3);"><span>${pct.toFixed(1)}% used</span><span>${totalBudget > totalActual ? fmt(totalBudget - totalActual) + ' remaining' : fmt(totalActual - totalBudget) + ' over'}</span></div>
-    </div></div>
-
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
-      <div class="stat"><div class="stat-lbl">Ordered on POs</div><div class="stat-val" style="color:var(--blue);">${fmt(matOrdered)}</div></div>
-      <div class="stat"><div class="stat-lbl">Billed Material</div><div class="stat-val">${fmt(matBilled)}</div></div>
-      <div class="stat"><div class="stat-lbl">Billed Labor</div><div class="stat-val" style="color:var(--accent);">${fmt(laborBilled)}</div></div>
-      ${viewMode==='whole' && bf ? '<div class="stat"><div class="stat-lbl">Historical Material</div><div class="stat-val" style="color:var(--yellow);">' + fmt(bfMatTotal) + '</div></div><div class="stat"><div class="stat-lbl">Historical Labor</div><div class="stat-val" style="color:var(--yellow);">' + fmt(bfLabTotal) + '</div></div>' : ''}
-      <div class="stat"><div class="stat-lbl">Items Tracked</div><div class="stat-val">${allItems.length}</div></div>
+    <div class="card" style="padding:12px 16px;">
+      <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Ordered (Boards)</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:var(--blue);">${Math.round(totalOrderedBoards)||'—'}</div>
     </div>
+    <div class="card" style="padding:12px 16px;">
+      <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Budget $</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;">${totalBudgetDollars>0?fmt(totalBudgetDollars):'—'}</div>
+    </div>
+    <div class="card" style="padding:12px 16px;">
+      <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Ordered $</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:${totalOrderedDollars>totalBudgetDollars&&totalBudgetDollars>0?'var(--red)':'var(--blue)'};">${totalOrderedDollars>0?fmt(totalOrderedDollars):'—'}</div>
+    </div>
+  </div>`;
 
-    <div class="card"><div class="card-hdr"><span class="card-title">Job Cost — All Items ${viewMode==='whole'?'(Whole Job)':'(Current POs)'}</span><span style="font-size:12px;color:var(--ink3);">${allItems.length} groups</span></div><div class="card-body" style="padding:0;">
-      <table class="tbl" style="border:none;"><thead><tr>
-        <th>Material Group</th>
-        <th class="tbl-r">Budget Qty</th>
-        <th class="tbl-r">Actual Qty</th>
-        <th style="width:22%;">Qty Used</th>
-        <th class="tbl-r">Budget $</th>
-        <th class="tbl-r">Actual $</th>
-        ${viewMode==='whole'?'<th class="tbl-r">Historical $</th>':''}
-        <th>Status</th>
-        <th>Actions</th>
-      </tr></thead><tbody>
-      ${allItems.map(([key, it]) => {
-        const qtyPct = it.budgetQty > 0 ? (it.orderedQty / it.budgetQty * 100) : (it.orderedQty > 0 ? 999 : 0);
-        const barColor = qtyPct > 110 ? 'var(--red)' : qtyPct > 85 ? 'var(--yellow)' : qtyPct > 0 ? 'var(--green)' : 'var(--ink3)';
-        let statusBadge = '';
-        if (!it.budgeted && (it.orderedDollars > 0 || it.bfDollars > 0)) statusBadge = '<span class="badge badge-orange">Non-budgeted</span>';
-        else if (qtyPct > 110) statusBadge = '<span class="badge badge-red">Over ' + Math.round(qtyPct-100) + '%</span>';
-        else if (qtyPct > 85) statusBadge = '<span class="badge badge-yellow">Near cap</span>';
-        else if (qtyPct > 0) statusBadge = '<span class="badge badge-green">On track</span>';
-        else statusBadge = '<span class="badge badge-gray">Not ordered</span>';
-        const firstRaw = [...it.rawNames][0] || '';
-        return `<tr>
-          <td><div style="font-weight:600;">${esc(it.label)}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px;">${esc([...it.rawNames].slice(0,3).join(' • '))}${it.rawNames.size>3?' +'+(it.rawNames.size-3)+' more':''}</div></td>
-          <td class="tbl-r">${it.budgetQty > 0 ? Math.round(it.budgetQty) : '—'}</td>
-          <td class="tbl-r" style="font-weight:700;color:${it.orderedQty>0?'var(--blue)':'var(--ink3)'};">${it.orderedQty > 0 ? Math.round(it.orderedQty) : '—'}</td>
-          <td>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <div style="flex:1;background:var(--surface3);border-radius:4px;height:8px;overflow:hidden;min-width:60px;">
-                ${qtyPct>0 ? '<div style="height:100%;width:' + Math.min(qtyPct,100).toFixed(0) + '%;background:' + barColor + ';border-radius:4px;"></div>' : ''}
-              </div>
-              <span style="font-size:11px;font-weight:700;color:${barColor};min-width:40px;text-align:right;">${qtyPct > 0 ? (qtyPct>999 ? '∞' : qtyPct.toFixed(0) + '%') : '—'}</span>
-            </div>
-          </td>
-          <td class="tbl-r">${it.budgetDollars > 0 ? fmt(it.budgetDollars) : '—'}</td>
-          <td class="tbl-r" style="font-weight:700;">${it.orderedDollars > 0 ? fmt(it.orderedDollars) : '—'}</td>
-          ${viewMode==='whole'?'<td class="tbl-r" style="color:var(--yellow);">' + (it.bfDollars > 0 ? fmt(it.bfDollars) : '—') + '</td>':''}
-          <td>${statusBadge}</td>
-          <td>${firstRaw ? '<button class="btn btn-ghost btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(firstRaw) + '\')" title="Re-categorize this item">🏷</button>' : ''}</td>
+  // Per-floor table
+  html += `<div class="card" style="margin-bottom:14px;"><div class="card-hdr"><span class="card-title">Per-Floor: Budget vs Ordered</span><span style="font-size:11px;color:var(--ink3);">Click a floor to see material detail</span></div>
+    <div class="card-body" style="padding:0;overflow-x:auto;">
+    <table class="tbl" style="border:none;">
+      <thead><tr>
+        <th>Floor</th><th>Bldg</th>
+        <th class="tbl-r">Budget Bds</th><th class="tbl-r">Ordered Bds</th>
+        <th style="min-width:140px;">Board Progress</th>
+        <th class="tbl-r">Budget $</th><th class="tbl-r">Ordered $</th>
+        <th class="tbl-r">PO Lines</th>
+      </tr></thead>
+      <tbody>
+      ${floorRows.length ? floorRows.map(f => {
+        const isActive = activeFloor === f.fl && (!activeBldg || activeBldg === f.bldg);
+        return `<tr style="cursor:pointer;${isActive?'background:rgba(99,102,241,.08);':''}" onclick="setSummaryFilter('floor','${jsesc(f.fl)}','${jsesc(job)}')">
+          <td style="font-weight:700;">Floor ${esc(f.fl)}</td>
+          <td style="color:var(--ink3);">${f.bldg?esc(f.bldg):'—'}</td>
+          <td class="tbl-r">${f.budgetBoards>0?Math.round(f.budgetBoards):'—'}</td>
+          <td class="tbl-r" style="font-weight:700;color:${f.orderedBoards>0?'var(--blue)':'var(--ink3)'};">${f.orderedBoards>0?Math.round(f.orderedBoards):'—'}</td>
+          <td>${barHtml(f.orderedBoards, f.budgetBoards)}</td>
+          <td class="tbl-r">${f.budgetDollars>0?fmt(f.budgetDollars):'—'}</td>
+          <td class="tbl-r" style="font-weight:700;">${f.orderedDollars>0?fmt(f.orderedDollars):'—'}</td>
+          <td class="tbl-r" style="color:var(--ink3);">${f.orderedLines||'—'}</td>
+        </tr>`;
+      }).join('') : `<tr><td colspan="8" class="no-data">No floor data yet — set up floors in the job structure and enter scope quantities in the Estimate tab.</td></tr>`}
+      </tbody>
+    </table>
+    </div></div>`;
+
+  // Material detail for selected floor
+  if (detailRows) {
+    const { sd, flRows: selectedFlRows, fl, bldg } = detailRows;
+    const matMap = {};
+    // Budget from scope planner
+    Object.entries(sd).forEach(([name, qty]) => {
+      const q = parseFloat(qty)||0; if (!q) return;
+      if (!matMap[name]) matMap[name] = { budgetQty:0, orderedQty:0, orderedDollars:0, uom:'EA' };
+      matMap[name].budgetQty += q;
+    });
+    // Ordered from PO rows
+    selectedFlRows.forEach(r => {
+      const mat = (r['MATERIAL']||'').trim(); if (!mat) return;
+      if (!matMap[mat]) matMap[mat] = { budgetQty:0, orderedQty:0, orderedDollars:0, uom:r['UOM']||'EA' };
+      matMap[mat].orderedQty += parseFloat(r['QTY']||0);
+      matMap[mat].orderedDollars += parseFloat(r['LINE TOTAL']||0);
+    });
+    const matEntries = Object.entries(matMap).sort((a,b)=>b[1].orderedDollars-a[1].orderedDollars);
+    html += `<div class="card"><div class="card-hdr"><span class="card-title">Floor ${esc(fl)}${bldg?' · Bldg '+esc(bldg):''} — Material Detail</span><button class="btn btn-ghost btn-sm" onclick="clearSummaryFilter('${jsesc(job)}')">✕ Clear floor</button></div>
+      <div class="card-body" style="padding:0;overflow-x:auto;">
+      <table class="tbl" style="border:none;"><thead><tr><th>Material</th><th class="tbl-r">Budget Qty</th><th class="tbl-r">Ordered Qty</th><th style="min-width:120px;">Progress</th><th class="tbl-r">Ordered $</th></tr></thead><tbody>
+      ${matEntries.map(([name, d]) => {
+        const pct = d.budgetQty > 0 ? d.orderedQty/d.budgetQty*100 : 0;
+        const c = pct > 100 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : pct > 0 ? 'var(--green)' : 'var(--ink3)';
+        return `<tr><td style="font-weight:500;">${esc(name)}</td>
+          <td class="tbl-r">${d.budgetQty>0?Math.round(d.budgetQty):'—'}</td>
+          <td class="tbl-r" style="color:${d.orderedQty>0?'var(--blue)':'var(--ink3)'};font-weight:700;">${d.orderedQty>0?Math.round(d.orderedQty):'—'}</td>
+          <td>${d.budgetQty>0?barHtml(d.orderedQty,d.budgetQty):(d.orderedQty>0?'<span style="font-size:11px;color:var(--ink3);">No budget</span>':'—')}</td>
+          <td class="tbl-r">${d.orderedDollars>0?fmt(d.orderedDollars):'—'}</td>
         </tr>`;
       }).join('')}
-      ${allItems.length === 0 ? '<tr><td colspan="' + (viewMode==='whole'?9:8) + '" class="no-data" style="text-align:center;">No items tracked yet. Add estimate items or sync POs.</td></tr>' : ''}
-      </tbody></table>
-    </div></div>
-
-    ${(() => {
-      // TRACKED POs SECTION — show all POs the user sent to this job, even without location details
-      const tracked = Object.entries(S.assignments||{}).filter(([po, a]) => (a.job||'') === job);
-      if (!tracked.length) return '';
-      const totalTracked = tracked.reduce((s, [po,a]) => s + (parseFloat(a.total)||0), 0);
-      return `<div class="card" style="margin-top:16px;"><div class="card-hdr"><span class="card-title">🎯 Tracked POs for this Job</span><span style="font-size:12px;color:var(--ink3);">${tracked.length} PO${tracked.length!==1?'s':''} · ${fmt(totalTracked)}</span></div><div class="card-body" style="padding:0;"><table class="tbl" style="border:none;"><thead><tr><th>PO#</th><th>Vendor</th><th>Location</th><th class="tbl-r">Total</th><th>Date</th><th>Actions</th></tr></thead><tbody>
-        ${tracked.sort((a,b) => String(b[1].date||'').localeCompare(String(a[1].date||''))).map(([po, a]) => {
-          const loc = [a.building||a.bldg, a.floor?'Fl '+a.floor:'', a.unit?'Unit '+a.unit:''].filter(Boolean).join(' · ');
-          const needsLoc = !a.building && !a.bldg && !a.floor && !a.unit;
-          return `<tr><td style="font-weight:700;">#${esc(po)}</td><td>${esc(a.vendor||'')}</td><td>${loc ? esc(loc) : '<span class="badge badge-yellow">⚠ No location</span>'}</td><td class="tbl-r" style="font-weight:700;">${fmt(a.total||0)}</td><td style="font-size:11px;color:var(--ink3);">${esc(a.date||'')}</td><td><button class="btn ${needsLoc?'btn-primary':'btn-ghost'} btn-sm" onclick="editAssignedPO('${jsesc(po)}')">${needsLoc?'📍 Add Location':'✏ Edit'}</button> <button class="btn btn-danger btn-sm" onclick="deleteAssignment('po','${jsesc(po)}')">🗑</button></td></tr>`;
-        }).join('')}
+      ${!matEntries.length?'<tr><td colspan="5" class="no-data">No budget or ordered data for this floor yet.</td></tr>':''}
       </tbody></table></div></div>`;
-    })()}
+  }
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">
-      <div class="card"><div class="card-body"><div class="section-title">Drill Down</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" onclick="switchJobTab('map')">Job Map</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('estimate')">Estimate</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('bills')">Bills</button><button class="btn btn-ghost btn-sm" onclick="switchJobTab('allmats')">Historical Data</button></div></div></div>
-      <div class="card"><div class="card-body"><div class="section-title">Labor Breakdown</div>
-        <div style="font-size:13px;color:var(--ink2);line-height:1.9;">
-          ${LABOR_CATS.map(c => { const billed = billAssigns.filter(ba => ba.category === c).reduce((s,ba) => s+parseFloat(ba.total||0), 0); return billed > 0 ? `<div>${c}: <strong>${fmt(billed)}</strong></div>` : ''; }).filter(Boolean).join('') || '<div style="color:var(--ink3);">No labor billed yet</div>'}
-        </div>
-      </div></div>
-    </div>`;
+  el.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════════════
