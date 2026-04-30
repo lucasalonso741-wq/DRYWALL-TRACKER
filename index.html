@@ -248,9 +248,7 @@ a{color:var(--accent);}
   <div class="nav-divider"></div>
   <button class="nav-icon-btn active" data-page="home" onclick="nav('home')"><span>🏗️</span><span class="label">Feed</span></button>
   <button class="nav-icon-btn" data-page="dashboard" onclick="nav('dashboard')"><span>📊</span><span class="label">Dash</span></button>
-  <button class="nav-icon-btn" data-page="inbox" onclick="nav('inbox')" style="position:relative;"><span>📥</span><span class="label">Inbox</span><span class="nav-badge-dot" id="inbox-badge" style="display:none;"></span></button>
-  <button class="nav-icon-btn" data-page="jobs" onclick="nav('jobs')"><span>🏗️</span><span class="label">Jobs</span></button>
-  <button class="nav-icon-btn" data-page="raw" onclick="nav('raw')"><span>🗃️</span><span class="label">Data</span></button>
+  <button class="nav-icon-btn" data-page="jobs" onclick="nav('jobs')"><span>📋</span><span class="label">Jobs</span></button>
   <button class="nav-icon-btn" data-page="settings" onclick="nav('settings')"><span>⚙️</span><span class="label">Setup</span></button>
   <div class="nav-divider"></div>
   <button class="nav-sync-btn" id="sync-btn" onclick="syncAll()" title="Sync from Google Sheet">⟳ <span class="sync-dot" id="sync-dot"></span></button>
@@ -271,18 +269,34 @@ a{color:var(--accent);}
 
 <div id="page-home" class="page active">
   <div id="new-job-alert-banner" style="display:none;margin-bottom:14px;"></div>
-  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
-    <div class="drop-zone" id="pdf-drop" style="flex:1;min-width:200px;padding:16px;">
-      <div style="font-size:13px;font-weight:600;">📄 Drop PO PDF here or <label style="color:var(--accent);cursor:pointer;">browse<input type="file" accept=".pdf" id="pdf-upload" style="display:none;" onchange="handlePDFFile(this.files[0])"/></label></div>
-      <div style="font-size:11px;color:var(--ink3);margin-top:4px;">Auto-extracts PO number, vendor, materials &amp; totals · or email to <strong>po@aadrywalltracker.com</strong></div>
-    </div>
-    <button class="btn btn-ghost" id="feed-select-po-btn" onclick="startFeedSelect('po')">☑ Multi-select POs</button>
-    <button class="btn btn-ghost" id="feed-select-bill-btn" onclick="startFeedSelect('bill')">☑ Multi-select Bills</button>
-    <button class="btn btn-ghost" id="feed-cancel-select-btn" style="display:none;" onclick="clearFeedSelection()">Cancel</button>
-    <button class="btn btn-primary" id="feed-bulk-btn" style="display:none;" onclick="openFeedBulkAssignModal()">📦 Assign Selected to Job</button>
+  <div class="tabs" id="home-tabs">
+    <button class="tab-btn active" data-tab="feed" onclick="switchHomeTab('feed')">🏗️ Activity Feed</button>
+    <button class="tab-btn" data-tab="inbox" onclick="switchHomeTab('inbox')">📥 Inbox <span class="nav-badge-dot" id="home-inbox-badge" style="display:none;position:relative;top:-1px;width:6px;height:6px;border-radius:50%;background:var(--yellow);vertical-align:middle;margin-left:4px;"></span></button>
+    <button class="tab-btn" data-tab="history" onclick="switchHomeTab('history')">📋 History</button>
   </div>
-  <div id="pdf-result" style="display:none;margin-bottom:16px;"></div>
-  <div id="activity-feed"></div>
+  <!-- Feed sub-tab -->
+  <div id="home-tab-feed" class="tab-panel active">
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+      <div class="drop-zone" id="pdf-drop" style="flex:1;min-width:200px;padding:16px;">
+        <div style="font-size:13px;font-weight:600;">📄 Drop PO PDF here or <label style="color:var(--accent);cursor:pointer;">browse<input type="file" accept=".pdf" id="pdf-upload" style="display:none;" onchange="handlePDFFile(this.files[0])"/></label></div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:4px;">Auto-extracts PO number, vendor, materials &amp; totals · or email to <strong>po@aadrywalltracker.com</strong></div>
+      </div>
+      <button class="btn btn-ghost" id="feed-select-po-btn" onclick="startFeedSelect('po')">☑ Multi-select POs</button>
+      <button class="btn btn-ghost" id="feed-select-bill-btn" onclick="startFeedSelect('bill')">☑ Multi-select Bills</button>
+      <button class="btn btn-ghost" id="feed-cancel-select-btn" style="display:none;" onclick="clearFeedSelection()">Cancel</button>
+      <button class="btn btn-primary" id="feed-bulk-btn" style="display:none;" onclick="openFeedBulkAssignModal()">📦 Assign Selected to Job</button>
+    </div>
+    <div id="pdf-result" style="display:none;margin-bottom:16px;"></div>
+    <div id="activity-feed"></div>
+  </div>
+  <!-- Inbox sub-tab (replaces separate Inbox page) -->
+  <div id="home-tab-inbox" class="tab-panel">
+    <div id="home-inbox-content"></div>
+  </div>
+  <!-- History sub-tab -->
+  <div id="home-tab-history" class="tab-panel">
+    <div id="home-history-content"></div>
+  </div>
 </div>
 
 <!-- PAGE: DASHBOARD -->
@@ -340,19 +354,6 @@ a{color:var(--accent);}
     <div id="jobs-tab-summary" class="tab-panel"></div>
     <div id="jobs-tab-allmats" class="tab-panel"></div>
   </div>
-</div>
-
-<!-- PAGE: RAW DATA -->
-
-<div id="page-raw" class="page">
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="raw-po" onclick="switchRawTab('raw-po')">PO Lines</button>
-    <button class="tab-btn" data-tab="raw-bills" onclick="switchRawTab('raw-bills')">Bills</button>
-    <button class="tab-btn" data-tab="raw-pdf" onclick="switchRawTab('raw-pdf')">PDF Extractions</button>
-  </div>
-  <div id="raw-tab-raw-po" class="tab-panel active"></div>
-  <div id="raw-tab-raw-bills" class="tab-panel"></div>
-  <div id="raw-tab-raw-pdf" class="tab-panel"></div>
 </div>
 
 <!-- PAGE: SETTINGS -->
@@ -525,9 +526,11 @@ function openCatChangeMenu(ev, rawDesc) {
     await setManualCategory(rawDesc, cat);
     menu.remove();
     // Re-render whatever page is open
-    if (typeof renderActivityFeed === 'function') renderActivityFeed();
+    if (typeof renderActivityFeed === 'function') {
+      renderActivityFeed();
+      if (typeof updateInboxBadge === 'function') updateInboxBadge();
+    }
     if (_currentJob) { renderJobSummaryTab(_currentJob); renderAllMaterialsTab(_currentJob); }
-    if (document.getElementById('page-raw')?.classList.contains('active')) renderRaw();
   });
   menu.addEventListener('mouseenter', () => menu.dataset.hover='1');
   setTimeout(() => { document.addEventListener('click', () => menu.remove(), { once: true }); }, 50);
@@ -577,6 +580,11 @@ async function setManualCategory(rawDesc, category) {
   showToast('✓ Category saved: ' + rawDesc.substring(0,30) + ' → ' + category);
 }
 function isBoard(desc) { return categorize(desc) === 'boards'; }
+// Price per board: returns "$X.XX/bd" string or null if no data
+function ppb(boards, spend) {
+  if (!boards || !spend) return null;
+  return '$' + (spend / boards).toFixed(2) + '/bd';
+}
 function isLaborVendor(vendor) {
   if (!vendor) return false;
   const v = String(vendor).toUpperCase();
@@ -593,7 +601,18 @@ function getJobs() {
 function getJobEstimate(job) {
   if (!S.matBanks) S.matBanks = {};
   const key = job + '_est2';
-  if (!S.matBanks[key]) S.matBanks[key] = ESTIMATE_TEMPLATE.map(t => ({cat:t.cat, name:t.name, uom:t.uom, qty:0, price:t.price||0}));
+  if (!S.matBanks[key]) {
+    S.matBanks[key] = ESTIMATE_TEMPLATE.map(t => ({cat:t.cat, name:t.name, uom:t.uom, qty:0, price:t.price||0}));
+  } else {
+    // Sync in any new template items not yet in the saved array
+    const existing = S.matBanks[key];
+    const existingNames = new Set(existing.map(it => it.name));
+    ESTIMATE_TEMPLATE.forEach(t => {
+      if (!existingNames.has(t.name)) {
+        existing.push({cat:t.cat, name:t.name, uom:t.uom, qty:0, price:t.price||0});
+      }
+    });
+  }
   return S.matBanks[key];
 }
 function getJobLabor(job) {
@@ -753,8 +772,8 @@ async function sbSet(key, value) {
       headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
       body: JSON.stringify({ key, value })
     });
-    if (!res.ok) { const err = await res.text(); console.warn('sbSet error:', res.status, err); }
-  } catch(e) { console.warn('sbSet error:', e); }
+    if (!res.ok) { const err = await res.text(); console.warn('sbSet error:', res.status, err); showToast('⚠ Save error: ' + res.status, true); }
+  } catch(e) { console.warn('sbSet error:', e); showToast('⚠ Save failed (network)', true); }
 }
 async function saveSharedData(key) {
   const val = S[key];
@@ -862,14 +881,19 @@ async function syncAll() {
   showToast('Syncing...');
   try {
     // Fetch Google Sheet PO data + email-extracted POs in parallel
-    await Promise.all([fetchRawData(), loadEmailPOs(), loadNewJobAlerts()]);
+    // Fetch email POs (always) and Google Sheet data (only if sheetId set)
+    const syncPromises = [loadEmailPOs(), loadNewJobAlerts()];
+    if (S.sheetId) syncPromises.push(fetchRawData().catch(e => console.warn('Sheet fetch failed:', e)));
+    await Promise.all(syncPromises);
     S.lastSync = new Date().toISOString();
     localStorage.setItem('dw_last_sync', S.lastSync);
     const lsl = document.getElementById('last-sync-label'); if(lsl) lsl.textContent = 'Last sync: ' + new Date().toLocaleTimeString();
-    const smi = document.getElementById('sheet-status-mini'); if(smi){smi.textContent='✓ ' + S.rows.length + ' PO rows · ' + (S.emailPOs?.length||0) + ' email POs';smi.className='sheet-status ok';}
+    const smi = document.getElementById('sheet-status-mini');
+    if(smi){ const rowTxt = S.rows.length > 0 ? S.rows.length + ' sheet rows · ' : ''; smi.textContent='✓ ' + rowTxt + (S.emailPOs?.length||0) + ' email POs'; smi.className='sheet-status ok'; }
     const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--green)';
     populateJobSelects(); updateInboxBadge();
-    showToast('✓ Synced — ' + S.rows.length + ' sheet rows · ' + (S.emailPOs?.length||0) + ' email POs');
+    const rowCountTxt = S.rows.length > 0 ? S.rows.length + ' sheet rows · ' : '';
+    showToast('✓ Synced — ' + rowCountTxt + (S.emailPOs?.length||0) + ' email POs');
   } catch(e) {
     showToast('⚠️ Sync failed: ' + e.message, true);
     const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--red)';
@@ -892,9 +916,44 @@ async function loadEmailPOs() {
     });
     const rows = await res.json();
     S.emailPOs = Array.isArray(rows) ? rows : [];
-    // Check for any needs_review items to badge the inbox
     S._pendingNewJobs = S.emailPOs.filter(p => p.status === 'needs_review').length;
+    await autoAssignExtractedPOs();
   } catch(e) { console.warn('loadEmailPOs failed:', e); S.emailPOs = []; }
+}
+
+async function autoAssignExtractedPOs() {
+  // Only process uploaded PDFs (source='upload') that are still pending — not random emails
+  const pending = (S.emailPOs||[]).filter(p => p.source === 'upload' && p.status === 'pending');
+  if (!pending.length) return;
+  const jobs = getJobs();
+  for (const p of pending) {
+    const matchedJob = resolveJobFromPDF(p.job_name, p.ship_to);
+    // Only auto-confirm when matched job actually exists in our job list
+    if (!matchedJob || !jobs.includes(matchedJob)) {
+      // Flag for manual review
+      await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + p.id, {
+        method:'PATCH',
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({status:'needs_review'})
+      }).catch(()=>{});
+      p.status = 'needs_review';
+      continue;
+    }
+    // Auto-confirm and assign
+    await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + p.id, {
+      method:'PATCH',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({status:'confirmed', job_name:matchedJob})
+    }).catch(()=>{});
+    p.status = 'confirmed';
+    p.job_name = matchedJob;
+    if (p.po_number) {
+      if (!S.assignments) S.assignments = {};
+      S.assignments[p.po_number] = {job:matchedJob, building:p.building||'', floor:p.floor||'', unit:p.unit||'', vendor:p.vendor||'', date:(p.created_at||'').split('T')[0]};
+    }
+  }
+  if (pending.length) saveSharedData('assignments').catch(()=>{});
+  S._pendingNewJobs = (S.emailPOs||[]).filter(p => p.status === 'needs_review').length;
 }
 
 // Load new job alerts from app_data
@@ -986,7 +1045,7 @@ function checkAuth() {
     init();
   }
 }
-const PAGE_TITLES = {home:'Activity Feed',dashboard:'Dashboard',inbox:'Inbox',jobs:'Jobs',raw:'Raw Data',settings:'Settings'};
+const PAGE_TITLES = {home:'Activity Feed',dashboard:'Dashboard',jobs:'Jobs',settings:'Setup'};
 function nav(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-icon-btn').forEach(b => b.classList.toggle('active', b.dataset.page === page));
@@ -994,9 +1053,7 @@ function nav(page) {
   document.getElementById('page-title').textContent = PAGE_TITLES[page] || page;
   if (page === 'home') renderHome();
   else if (page === 'dashboard') renderDashboard();
-  else if (page === 'inbox') renderInbox();
   else if (page === 'jobs') { populateJobSelects(); if (_currentJob) onJobSelect(); }
-  else if (page === 'raw') renderRaw();
   else if (page === 'settings') renderSettings();
 }
 function populateJobSelects() {
@@ -1015,6 +1072,12 @@ function openJobFromAnywhere(job, tab) {
   if (tab) setTimeout(() => switchJobTab(tab), 50);
 }
 function updateInboxBadge() {
+  // Also update the home-inbox-badge dot
+  const homeBadge = document.getElementById('home-inbox-badge');
+  if (homeBadge) {
+    const count = (S.emailPOs||[]).filter(p => p.status==='needs_review'||p.status==='pending').length + (S.newJobAlerts||[]).length;
+    homeBadge.style.display = count > 0 ? 'inline-block' : 'none';
+  }
   const unmatchedBills = S.bills.filter(b => { const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim(); return inv && !S.billAssignments[inv]; }).length;
   const needsReviewPOs = (S.emailPOs||[]).filter(p => p.status === 'needs_review').length;
   const newJobAlerts = (S.newJobAlerts||[]).length;
@@ -1064,7 +1127,7 @@ function renderSettings() {
     <div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Google Sheet</span></div><div class="card-body">
       <div style="font-size:12px;color:var(--ink3);margin-bottom:8px;">Sheet ID for PO &amp; Bill data</div>
       <div style="display:flex;gap:8px;"><input id="sheet-id-input" class="inp inp-sm" value="${esc(S.sheetId)}" style="max-width:400px;"/><button class="btn btn-ghost btn-sm" onclick="saveSheetId()">Save</button></div>
-      <div id="sheet-connected-label" class="sheet-status" style="margin-top:6px;">${S.rows.length>0?'✓ Sheet connected · '+S.rows.length+' rows':'Not synced yet'}</div>
+      <div id="sheet-connected-label" class="sheet-status" style="margin-top:6px;">${S.rows.length>0?'✓ Sheet connected · '+S.rows.length+' rows':'Optional — app works fully without Google Sheets'}</div>
     </div></div>
     <div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Company Logo</span></div><div class="card-body">
       <div style="display:flex;gap:12px;align-items:center;">
@@ -1096,7 +1159,74 @@ function saveAiKey() { S.aiKey = document.getElementById('ai-key-input')?.value.
 // ═══════════════════════════════════════════════════════════
 // HOME — ACTIVITY FEED (FIX #1: whole row clickable)
 // ═══════════════════════════════════════════════════════════
-function renderHome() { renderActivityFeed(); }
+function renderHome() {
+  const activeTab = document.querySelector('#home-tabs .tab-btn.active')?.dataset?.tab || 'feed';
+  switchHomeTab(activeTab);
+}
+function switchHomeTab(tab) {
+  document.querySelectorAll('#home-tabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('#page-home .tab-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('home-tab-' + tab); if (panel) panel.classList.add('active');
+  if (tab === 'feed') renderActivityFeed();
+  else if (tab === 'inbox') renderHomeInbox();
+  else if (tab === 'history') renderHomeHistory();
+}
+function renderHomeInbox() {
+  const el = document.getElementById('home-inbox-content'); if (!el) return;
+  // Re-use inbox tab rendering
+  const review = (S.emailPOs||[]).filter(p => p.status === 'needs_review' || p.status === 'pending');
+  const newJobAlerts = (S.newJobAlerts||[]);
+  const unassignedPOs = getFeedPOGroups().filter(g => !S.assignments[g.po]);
+  let html = '';
+  if (newJobAlerts.length) {
+    html += `<div style="margin-bottom:16px;"><div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--yellow);margin-bottom:8px;">🆕 New Job Alerts (${newJobAlerts.length})</div>`;
+    html += newJobAlerts.map(a => `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);border-radius:10px;margin-bottom:8px;"><div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:13px;color:var(--yellow);">"${esc(a.job_name)}"</div><div style="font-size:12px;color:var(--ink3);">PO #${esc(a.po_number||'?')} · ${esc(a.vendor||'')} · ${new Date(a.created_at).toLocaleDateString()}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="createJobFromAlert('${jsesc(a.id)}','${jsesc(a.job_name)}','${jsesc(a.po_id||'')}')">✓ Create Job</button><button class="btn btn-ghost btn-sm" onclick="assignAlertToExisting('${jsesc(a.id)}','${jsesc(a.job_name)}','${jsesc(a.po_id||'')}')">↳ Assign to Existing</button><button class="btn btn-ghost btn-sm" onclick="dismissJobAlert('${jsesc(a.id)}')">✕</button></div></div>`).join('');
+    html += '</div>';
+  }
+  if (review.length) {
+    html += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);margin-bottom:10px;">📧 Email POs — ${review.length} need review</div>`;
+    review.forEach(p => {
+      const isNewJob = p.status === 'needs_review';
+      html += `<div class="feed-item" style="cursor:pointer;" onclick="openEmailPOReview('${esc(p.id)}')">
+        <div class="feed-dot" style="background:${isNewJob?'var(--yellow)':'var(--blue)'};"></div>
+        <div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span style="font-weight:700;">📧 PO #${esc(p.po_number||'?')}</span>${isNewJob?'<span class="badge badge-yellow">⚠ New Job</span>':'<span class="badge badge-blue">Pending</span>'}</div><div style="font-size:12px;color:var(--ink2);">${esc(p.vendor||'?')} · ${p.job_name?'<strong>'+esc(p.job_name)+'</strong>':'<span style="color:var(--yellow);">No job detected</span>'}</div></div>
+        <div style="text-align:right;"><div style="font-weight:700;">${fmt(p.total)}</div><button class="btn btn-primary btn-sm" style="margin-top:4px;" onclick="event.stopPropagation();openEmailPOReview('${esc(p.id)}')">Review →</button></div>
+      </div>`;
+    });
+  }
+  if (unassignedPOs.length) {
+    html += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);margin:16px 0 10px;">📦 Unassigned Sheet POs (${unassignedPOs.length})</div>`;
+    unassignedPOs.slice(0,10).forEach(g => {
+      html += `<div class="feed-item" style="cursor:pointer;" onclick="openPODetailModal('${jsesc(g.po)}')"><div class="feed-dot" style="background:var(--blue);"></div><div style="flex:1;"><div style="font-weight:700;">PO #${esc(g.po)}</div><div style="font-size:12px;color:var(--ink2);">${esc(g.vendor)} · ${esc(g.job.replace('JOB ',''))}</div></div><div style="font-weight:700;">${fmt(g.total)}</div></div>`;
+    });
+    if (unassignedPOs.length > 10) html += `<div style="font-size:12px;color:var(--ink3);padding:8px 0;">...and ${unassignedPOs.length-10} more</div>`;
+  }
+  if (!review.length && !newJobAlerts.length && !unassignedPOs.length) {
+    html = '<div class="alert alert-g">✓ Inbox clear — no items need review.</div>';
+  }
+  el.innerHTML = html;
+}
+function renderHomeHistory() {
+  const el = document.getElementById('home-history-content'); if (!el) return;
+  // All confirmed email POs + all assigned sheet POs, sorted by date desc
+  const confirmedEmails = (S.emailPOs||[]).filter(p => p.status === 'confirmed').map(p => ({
+    type:'email', id:p.id, po:p.po_number, vendor:p.vendor, job:p.job_name, total:p.total, date:p.confirmed_at||p.created_at, building:p.building, floor:p.floor, unit:p.unit
+  }));
+  const assignedSheet = Object.entries(S.assignments||{}).map(([po,a]) => ({
+    type:'sheet', id:po, po, vendor:a.vendor||'', job:a.job||'', total:parseFloat(a.total||0), date:a.date||'', building:a.building||a.bldg||'', floor:a.floor||'', unit:a.unit||''
+  }));
+  const all = [...confirmedEmails, ...assignedSheet].sort((a,b) => String(b.date||'').localeCompare(String(a.date||'')));
+  if (!all.length) { el.innerHTML = '<div class="no-data">No tracking history yet.</div>'; return; }
+  let html = `<div style="font-size:11px;color:var(--ink3);margin-bottom:12px;">${all.length} tracked items — most recent first</div>`;
+  html += '<table class="tbl"><thead><tr><th>Date</th><th>Type</th><th>PO#</th><th>Vendor</th><th>Job</th><th>Location</th><th class="tbl-r">Total</th></tr></thead><tbody>';
+  all.forEach(item => {
+    const loc = [item.building, item.floor?'Fl '+item.floor:'', item.unit?'Unit '+item.unit:''].filter(Boolean).join(' · ');
+    const badge = item.type==='email'?'<span class="badge badge-blue" style="font-size:9px;">📧 Email</span>':'<span class="badge badge-gray" style="font-size:9px;">📊 Sheet</span>';
+    html += `<tr><td style="font-size:11px;color:var(--ink3);">${esc(String(item.date||'').substring(0,10))}</td><td>${badge}</td><td style="font-weight:600;">#${esc(item.po||'?')}</td><td>${esc(item.vendor)}</td><td style="font-size:12px;">${esc((item.job||'').replace('JOB ',''))}</td><td style="font-size:11px;color:var(--ink3);">${esc(loc)||'—'}</td><td class="tbl-r">${fmt(parseFloat(item.total||0))}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
 
 function getFeedPOGroups() {
   const groups = {};
@@ -1121,14 +1251,14 @@ function getFeedBillGroups() {
 function renderActivityFeed() {
   const el = document.getElementById('activity-feed'); if (!el) return;
 
-  // ── Section 1: Email-extracted POs (from Resend → extract-po edge function) ──
-  const emailPOs = S.emailPOs || [];
+  // ── Section 1: Email-extracted POs (unconfirmed only — confirmed go to History) ──
+  const emailPOs = (S.emailPOs || []).filter(p => p.status !== 'confirmed');
   let emailHtml = '';
   if (emailPOs.length) {
-    emailHtml += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📧 Email-Extracted POs</div>`;
+    emailHtml += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📧 Email POs — Needs Review</div>`;
     emailPOs.slice(0,30).forEach(p => {
       const isNew = p.status === 'needs_review';
-      const isConfirmed = p.status === 'confirmed';
+      const isConfirmed = false;
       const isDupe = p.status === 'duplicate';
       const statusBadge = isNew
         ? '<span class="badge badge-yellow">⚠ Needs Review</span>'
@@ -1216,7 +1346,8 @@ function renderActivityFeed() {
     });
   }
 
-  el.innerHTML = emailHtml + sheetHtml;
+  const feedContent = emailHtml + sheetHtml;
+  el.innerHTML = feedContent || '<div style="text-align:center;padding:40px 20px;"><div style="font-size:40px;margin-bottom:12px;">✅</div><div style="font-family:\'Space Grotesk\',sans-serif;font-size:18px;font-weight:700;margin-bottom:8px;">All caught up!</div><div style="color:var(--ink3);font-size:14px;">No pending POs to review. Confirmed POs appear in the History tab.</div></div>';
 
   el.querySelectorAll('.feed-item').forEach(div => {
     div.addEventListener('click', function(e) {
@@ -1314,10 +1445,34 @@ async function confirmEmailPO(id) {
     await saveSharedData('assignments');
   }
 
+  // Auto-create floor/unit in jobStructure if floor or unit was provided
+  if (floor || unit) {
+    if (!S.jobStructure) S.jobStructure = {};
+    if (!S.jobStructure[job]) S.jobStructure[job] = {floors:[]};
+    const struct = S.jobStructure[job];
+    let flEntry = struct.floors.find(f => String(f.floor) === String(floor) && (!bldg || f.bldg === bldg));
+    if (!flEntry && floor) {
+      flEntry = {floor, bldg:bldg||'', budgetBoards:0, units:[]};
+      struct.floors.push(flEntry);
+    }
+    if (flEntry && unit && unit !== 'N/A') {
+      if (!flEntry.units) flEntry.units = [];
+      if (!flEntry.units.find(u => String(u.unit) === String(unit))) {
+        flEntry.units.push({unit, budgetBoards:0});
+      }
+    }
+    await saveSharedData('jobStructure');
+  }
+
   closeModal('po-modal');
   await loadEmailPOs();
   renderActivityFeed();
   updateInboxBadge();
+  if (_currentJob === job && document.getElementById('page-jobs')?.classList.contains('active')) {
+    const activeJobTab = document.querySelector('#jobs-content .tab-btn.active')?.dataset?.tab || 'map';
+    if (activeJobTab === 'summary') renderJobSummaryTab(_currentJob);
+    else if (activeJobTab === 'map') renderJobMap(_currentJob);
+  }
   showToast('✓ PO #' + poNum + ' verified → ' + job.replace('JOB ',''));
 }
 
@@ -1385,7 +1540,7 @@ function openPODetailModal(poNum) {
     '<button class="btn btn-ghost" onclick="closeModal(\'po-modal\')">Cancel</button><button class="btn btn-primary" onclick="quickAssignPO(\'' + jsesc(poNum) + '\')">✓ Assign</button>';
   document.getElementById('po-modal').classList.add('open');
 }
-function quickAssignPO(po) {
+async function quickAssignPO(po) {
   S.assignments[po] = {
     job: document.getElementById('qa-job')?.value||'',
     building: document.getElementById('qa-bldg')?.value||'',
@@ -1393,7 +1548,14 @@ function quickAssignPO(po) {
     unit: document.getElementById('qa-unit')?.value||''
   };
   saveSharedData('assignments');
-  closeModal('po-modal'); renderActivityFeed(); showToast('✓ PO #' + po + ' assigned');
+  closeModal('po-modal');
+  renderActivityFeed();
+  if (_currentJob && document.getElementById('page-jobs')?.classList.contains('active')) {
+    const activeJobTab = document.querySelector('#jobs-content .tab-btn.active')?.dataset?.tab || 'map';
+    if (activeJobTab === 'summary') renderJobSummaryTab(_currentJob);
+    else if (activeJobTab === 'map') renderJobMap(_currentJob);
+  }
+  showToast('✓ PO #' + po + ' assigned');
 }
 
 // Bulk assign
@@ -1637,7 +1799,9 @@ function switchJobTab(tab) {
 // PPB Cards
 function renderJobPPBCards(job) {
   const el = document.getElementById('jobs-ppb-cards'); if (!el) return;
-  const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const _ppbSheet = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  const _ppbEmail = (S.emailPOs||[]).filter(p=>p.status==='confirmed'&&p.job_name===job).flatMap(p=>(p.line_items||p.lines||[]).map(li=>({'JOB':job,'MATERIAL':li.description||li.name||'','QTY':parseFloat(li.qty||li.quantity||0)||0,'LINE TOTAL':parseFloat(li.total||li.line_total||0)||0})));
+  const rows = [..._ppbSheet, ..._ppbEmail];
   const boards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
   const matSpend = rows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
   const laborSpend = Object.values(S.billAssignments||{}).filter(ba => ba.job === job && LABOR_CATS.some(lc => (ba.category||'').includes(lc))).reduce((s,ba) => s + parseFloat(ba.total||0), 0);
@@ -1669,13 +1833,91 @@ function editTargetPPB(job) {
 // ═══════════════════════════════════════════════════════════
 // JOB MAP TAB
 // ═══════════════════════════════════════════════════════════
+// Floor/building/unit filter state for job map
+let _jobMapFilter = {building:'', floor:'', unit:''};
 function renderJobMap(job) {
   const el = document.getElementById('jobs-tab-map'); if (!el) return;
-  el.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:16px;">
+  const struct = S.jobStructure?.[job];
+  const _mapSheetRows = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  const _mapEmailRows = (S.emailPOs||[]).filter(p=>p.status==='confirmed'&&p.job_name===job).flatMap(p=>(p.line_items||p.lines||[]).map(li=>({'JOB':job,'MATERIAL':li.description||li.name||'','QTY':parseFloat(li.qty||li.quantity||0)||0,'LINE TOTAL':parseFloat(li.total||li.line_total||0)||0,'FLOOR':String(p.floor||'').trim(),'BUILDING':String(p.building||'').trim(),'UNIT':String(p.unit||'').trim(),'PO NUMBER':p.po_number||'','VENDOR':p.vendor||''})));
+  const rows = [..._mapSheetRows, ..._mapEmailRows];
+  // Collect filter options
+  const buildings = [...new Set([...rows.map(r=>String(r['BUILDING']||'').trim()), ...(struct?.floors||[]).map(f=>String(f.bldg||'').trim())].filter(Boolean))].sort();
+  const floors = [...new Set([...rows.map(r=>String(r['FLOOR']||'').trim()), ...(struct?.floors||[]).map(f=>String(f.floor||'').trim())].filter(Boolean))].sort((a,b)=>parseFloat(a)-parseFloat(b)||a.localeCompare(b));
+  const units = [...new Set(rows.map(r=>String(r['UNIT']||'').trim()).filter(Boolean))].sort();
+  const filterHtml = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;">
+    <span style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;">Filter:</span>
+    <select class="inp inp-sm" style="min-width:110px;" onchange="applyJobMapFilter('building',this.value)">
+      <option value="">All Buildings</option>
+      ${buildings.map(b=>`<option value="${b}" ${_jobMapFilter.building===b?'selected':''}>${b}</option>`).join('')}
+    </select>
+    <select class="inp inp-sm" style="min-width:90px;" onchange="applyJobMapFilter('floor',this.value)">
+      <option value="">All Floors</option>
+      ${floors.map(f=>`<option value="${f}" ${_jobMapFilter.floor===String(f)?'selected':''}>${f}</option>`).join('')}
+    </select>
+    <select class="inp inp-sm" style="min-width:90px;" onchange="applyJobMapFilter('unit',this.value)">
+      <option value="">All Units</option>
+      ${units.map(u=>`<option value="${u}" ${_jobMapFilter.unit===u?'selected':''}>${u}</option>`).join('')}
+    </select>
+    ${(_jobMapFilter.building||_jobMapFilter.floor||_jobMapFilter.unit)?'<button class="btn btn-ghost btn-sm" onclick="applyJobMapFilter(\'clear\',\'\')">✕ Clear</button>':''}
+  </div>`;
+  // Budgeted vs Ordered comparison when filter is active
+  const hasFilter = !!(  _jobMapFilter.building || _jobMapFilter.floor || _jobMapFilter.unit);
+  let filterSummaryHtml = '';
+  if (hasFilter) {
+    const filtRows = rows.filter(r => {
+      if (_jobMapFilter.building && String(r['BUILDING']||'').trim() !== _jobMapFilter.building) return false;
+      if (_jobMapFilter.floor && String(r['FLOOR']||'').trim() !== _jobMapFilter.floor) return false;
+      if (_jobMapFilter.unit && String(r['UNIT']||'').trim() !== _jobMapFilter.unit) return false;
+      return true;
+    });
+    const estItems = getJobEstimate(job);
+    const filtBoards = filtRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+    const filtBoardSpend = filtRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+    const filtPpb = ppb(filtBoards, filtBoardSpend);
+    const filtBudBoards = estItems.filter(it=>it.uom==='BD'||isBoard(it.name)).reduce((s,it)=>s+(parseFloat(it.qty)||0),0);
+    const filtBudBoardSpend = estItems.filter(it=>it.uom==='BD'||isBoard(it.name)).reduce((s,it)=>s+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0),0);
+    const filtBudPpb = ppb(filtBudBoards, filtBudBoardSpend);
+    filterSummaryHtml = `<div class="card" style="margin-bottom:14px;"><div class="card-hdr" style="flex-wrap:wrap;gap:10px;"><div><span class="card-title">📊 Filtered: Budgeted vs Ordered</span><div style="font-size:11px;color:var(--ink3);margin-top:2px;">${filtRows.length} PO lines · ${[_jobMapFilter.building,_jobMapFilter.floor?'Fl '+_jobMapFilter.floor:'',_jobMapFilter.unit?'Unit '+_jobMapFilter.unit:''].filter(Boolean).join(' · ')}</div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      ${filtBoards>0?'<div style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.25);border-radius:8px;padding:6px 12px;text-align:center;"><div style="font-size:10px;color:var(--blue);font-weight:700;">Boards Ordered</div><div style="font-weight:800;color:var(--blue);">'+Math.round(filtBoards)+'</div></div>':''}
+      ${filtPpb?'<div style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.25);border-radius:8px;padding:6px 12px;text-align:center;"><div style="font-size:10px;color:var(--blue);font-weight:700;">Actual $/Board</div><div style="font-weight:800;color:var(--blue);">'+filtPpb+'</div></div>':''}
+      ${filtBudPpb?'<div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.25);border-radius:8px;padding:6px 12px;text-align:center;"><div style="font-size:10px;color:var(--green);font-weight:700;">Budget $/Board</div><div style="font-weight:800;color:var(--green);">'+filtBudPpb+'</div></div>':''}
+    </div></div>
+    <div class="card-body" style="padding:0;overflow-x:auto;"><table class="tbl" style="border:none;"><thead><tr><th>Material</th><th class="tbl-r" style="color:var(--blue);">Budgeted Qty</th><th class="tbl-r" style="color:var(--accent);">Ordered Qty</th><th class="tbl-r">$</th><th style="width:100px;">Used</th></tr></thead><tbody>
+    ${(() => {
+      const ordMap = {};
+      filtRows.forEach(r => { const m=(r['MATERIAL']||'').trim(); if(!m)return; if(!ordMap[m])ordMap[m]={qty:0,total:0}; ordMap[m].qty+=parseFloat(r['QTY']||0); ordMap[m].total+=parseFloat(r['LINE TOTAL']||0); });
+      const rows2 = estItems.map(it => {
+        const ord = Object.entries(ordMap).filter(([m])=>m.toUpperCase().includes(it.name.toUpperCase().substring(0,6))||it.name.toUpperCase().includes(m.toUpperCase().substring(0,6))).reduce((s,[,d])=>s+d.qty,0);
+        const tot = Object.entries(ordMap).filter(([m])=>m.toUpperCase().includes(it.name.toUpperCase().substring(0,6))||it.name.toUpperCase().includes(m.toUpperCase().substring(0,6))).reduce((s,[,d])=>s+d.total,0);
+        return {name:it.name, bud:parseFloat(it.qty)||0, ord, tot};
+      }).filter(r=>r.bud>0||r.ord>0);
+      // Also add ordered items not in estimate
+      Object.entries(ordMap).forEach(([m,d]) => {
+        const inEst = estItems.some(it=>m.toUpperCase().includes(it.name.toUpperCase().substring(0,6))||it.name.toUpperCase().includes(m.toUpperCase().substring(0,6)));
+        if (!inEst) rows2.push({name:m, bud:0, ord:d.qty, tot:d.total});
+      });
+      if (!rows2.length) return '<tr><td colspan="5" class="no-data" style="text-align:center;">No data for this filter</td></tr>';
+      return rows2.map(r=>{
+        const pct = r.bud>0?(r.ord/r.bud*100):0;
+        const col = pct>110?'var(--red)':pct>85?'var(--yellow)':pct>0?'var(--green)':'var(--ink3)';
+        return `<tr><td style="font-weight:500;">${r.name}</td><td class="tbl-r" style="color:var(--blue);">${r.bud>0?Math.round(r.bud):'—'}</td><td class="tbl-r" style="font-weight:700;color:${r.ord>0?'var(--accent)':'var(--ink3)'};">${r.ord>0?Math.round(r.ord):'—'}</td><td class="tbl-r">${r.tot>0?fmt(r.tot):'—'}</td><td><div style="display:flex;align-items:center;gap:6px;">${r.bud>0?'<div style="flex:1;background:var(--surface3);border-radius:4px;height:6px;min-width:50px;"><div style="height:100%;width:'+Math.min(pct,100).toFixed(0)+'%;background:'+col+';border-radius:4px;"></div></div><span style="font-size:10px;color:'+col+';">'+pct.toFixed(0)+'%</span>':'<span style="font-size:10px;color:var(--ink3);">No budget</span>'}</td></tr>`;
+      }).join('');
+    })()}
+    </tbody></table></div></div>`;
+  }
+  el.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:12px;">
     <button id="jm-mat-btn" onclick="setMapView('material')" class="btn ${_jobMapView==='material'?'btn-primary':'btn-ghost'} btn-sm">📦 Material</button>
     <button id="jm-lab-btn" onclick="setMapView('labor')" class="btn ${_jobMapView==='labor'?'btn-primary':'btn-ghost'} btn-sm">🔨 Labor</button>
-  </div><div id="jm-content"></div>`;
-  setMapView(_jobMapView);
+  </div>${filterHtml}${filterSummaryHtml}<div id="jm-content"></div>`;
+  if (!hasFilter) setMapView(_jobMapView);
+  else setMapView(_jobMapView);
+}
+function applyJobMapFilter(key, val) {
+  if (key === 'clear') { _jobMapFilter = {building:'',floor:'',unit:''}; }
+  else { _jobMapFilter[key] = val; }
+  if (_currentJob) renderJobMap(_currentJob);
 }
 function setMapView(v) {
   _jobMapView = v;
@@ -1690,7 +1932,11 @@ function setMapView(v) {
 
 function renderMapMaterial(job, el) {
   const struct = S.jobStructure?.[job];
-  const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const sheetRows2 = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  const emailRows2 = (S.emailPOs||[]).filter(p => p.status === 'confirmed' && p.job_name === job).flatMap(p =>
+    (p.line_items||p.lines||[]).map(li => ({'JOB':job,'MATERIAL':li.description||li.name||'','QTY':parseFloat(li.qty||li.quantity||0)||0,'LINE TOTAL':parseFloat(li.total||li.line_total||0)||0,'FLOOR':p.floor||'','BUILDING':p.building||'','UNIT':p.unit||'','PO NUMBER':p.po_number||'','VENDOR':p.vendor||''}))
+  );
+  const rows = [...sheetRows2, ...emailRows2];
   if (!struct?.floors?.length) {
     el.innerHTML = '<div class="alert alert-y">No floors set up yet. Click <strong>⚙ Floors &amp; Units</strong> above.</div><div class="section-title" style="margin-top:16px;">PO Data by Building &amp; Floor (auto-detected)</div>';
     renderAutoFloors(job, rows, el); return;
@@ -1707,14 +1953,21 @@ function renderMapMaterial(job, el) {
     // Building header
     const bldgRows = rows.filter(r => (String(r['BUILDING']||'').trim() === bldg) || (bldg === '—' && !String(r['BUILDING']||'').trim()));
     const bldgBoards = bldgRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+    const bldgBoardSpend = bldgRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
     const bldgSpend = bldgRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+    const budBldgBoards = floors.reduce((s, fl) => s + parseFloat(fl.budgetBoards||0), 0);
+    const bldgBoardPct = budBldgBoards > 0 ? Math.min(bldgBoards / budBldgBoards * 100, 100) : 0;
+    const bldgBarCol = bldgBoardPct > 90 ? 'var(--red)' : bldgBoardPct > 70 ? 'var(--yellow)' : 'var(--green)';
+    const bldgPpb = ppb(bldgBoards, bldgBoardSpend);
     html += `<div class="card" style="margin-bottom:18px;">
       <div class="card-hdr" style="background:var(--surface2);">
-        <div>
+        <div style="flex:1;">
           <div style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;">🏢 Building ${esc(bldg)}</div>
           <div style="font-size:11px;color:var(--ink3);margin-top:2px;">${esc(job.replace('JOB ',''))} · ${floors.length} floor${floors.length!==1?'s':''}</div>
+          ${budBldgBoards > 0 ? '<div style="margin-top:8px;max-width:220px;"><div class="prog" style="height:6px;"><div class="prog-fill" style="width:'+bldgBoardPct.toFixed(1)+'%;background:'+bldgBarCol+';"></div></div><div style="display:flex;justify-content:space-between;margin-top:3px;font-size:10px;color:var(--ink3);"><span>'+Math.round(bldgBoards)+' / '+Math.round(budBldgBoards)+' boards</span><span style="color:'+bldgBarCol+';font-weight:700;">'+bldgBoardPct.toFixed(0)+'%</span></div></div>' : ''}
         </div>
         <div style="display:flex;gap:18px;align-items:center;">
+          ${bldgPpb ? '<div style="text-align:right;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.25);border-radius:8px;padding:6px 12px;"><div style="font-size:10px;color:var(--blue);text-transform:uppercase;font-weight:700;">$/Board</div><div style="font-weight:800;color:var(--blue);font-size:16px;">' + bldgPpb + '</div></div>' : ''}
           ${bldgBoards > 0 ? '<div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;">Boards</div><div style="font-weight:700;color:var(--blue);">' + Math.round(bldgBoards) + '</div></div>' : ''}
           <div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;">Spend</div><div style="font-weight:700;">${fmt(bldgSpend)}</div></div>
         </div>
@@ -1723,19 +1976,22 @@ function renderMapMaterial(job, el) {
     floors.forEach(fl => {
       const flRows = rows.filter(r => { const rfl=String(r['FLOOR']||'').trim(), rb=String(r['BUILDING']||'').trim(); if (rfl !== String(fl.floor)) return false; if (fl.bldg && rb && rb !== fl.bldg) return false; return true; });
       const flBoards = flRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+      const flBoardSpend = flRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
       const flSpend = flRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
       const budBoards = parseFloat(fl.budgetBoards||0);
       const pct = budBoards > 0 ? Math.min((flBoards/budBoards)*100, 100) : 0;
       const barCol = pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--yellow)' : 'var(--green)';
+      const flPpb = ppb(flBoards, flBoardSpend);
       html += `<div class="floor-block" style="margin-bottom:10px;">
         <div class="floor-hdr" onclick="toggleFloorBlock(this)">
           <div style="flex:1;">
-            <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <div class="floor-num">Floor ${esc(fl.floor)}</div>
               ${flBoards>0?'<span class="badge badge-blue">🟦 '+Math.round(flBoards)+' boards</span>':''}
               ${budBoards>0?'<span style="font-size:11px;color:var(--ink3);">/ '+Math.round(budBoards)+' budgeted</span>':''}
+              ${flPpb?'<span style="font-size:11px;font-weight:700;color:var(--blue);">'+flPpb+'</span>':''}
             </div>
-            ${budBoards>0?'<div style="width:200px;margin-top:6px;"><div class="prog"><div class="prog-fill" style="width:'+pct.toFixed(1)+'%;background:'+barCol+';"></div></div></div>':''}
+            ${budBoards>0?'<div style="width:200px;margin-top:6px;"><div class="prog"><div class="prog-fill" style="width:'+pct.toFixed(1)+'%;background:'+barCol+';"></div></div><div style="display:flex;justify-content:space-between;margin-top:2px;font-size:10px;color:var(--ink3);"><span>'+pct.toFixed(0)+'% ordered</span></div></div>':''}
           </div>
           <div style="display:flex;align-items:center;gap:12px;">
             <div style="text-align:right;"><div style="font-size:11px;color:var(--ink3);">Spend</div><div style="font-weight:700;">${fmt(flSpend)}</div></div>
@@ -1745,26 +2001,50 @@ function renderMapMaterial(job, el) {
         <div class="floor-body" style="display:none;"><div class="unit-grid">`;
       const genRows = flRows.filter(r => !String(r['UNIT']||'').trim() || String(r['UNIT']||'').trim()==='N/A');
       const genBoards = genRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+      const genBoardSpend = genRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
       const genSpend = genRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
-      if (genBoards > 0 || genSpend > 0) html += buildUnitCard(job, fl.floor, fl.bldg, 'General', genBoards, 0, genSpend, true);
+      if (genBoards > 0 || genSpend > 0) html += buildUnitCard(job, fl.floor, fl.bldg, 'General', genBoards, 0, genSpend, true, genBoardSpend);
       fl.units.forEach(u => {
         const uRows = flRows.filter(r => String(r['UNIT']||'').trim() === String(u.unit));
         const uBoards = uRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+        const uBoardSpend = uRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
         const uSpend = uRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
-        html += buildUnitCard(job, fl.floor, fl.bldg, u.unit, uBoards, parseFloat(u.budgetBoards||0), uSpend, false);
+        html += buildUnitCard(job, fl.floor, fl.bldg, u.unit, uBoards, parseFloat(u.budgetBoards||0), uSpend, false, uBoardSpend);
       });
       html += '</div></div></div>';
     });
     html += '</div></div>';
   });
+  // Append unassigned POs (no floor set) at the bottom so nothing is hidden
+  const unassigned = rows.filter(r => !String(r['FLOOR']||'').trim());
+  if (unassigned.length) {
+    const uBoards = unassigned.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+    const uSpend = unassigned.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
+    html += `<div class="card" style="margin-bottom:18px;border:1.5px dashed var(--border);">
+      <div class="card-hdr" style="background:var(--surface2);">
+        <div><div style="font-size:15px;font-weight:700;">📦 Unassigned / No Floor</div>
+        <div style="font-size:11px;color:var(--ink3);">POs confirmed but floor not yet set — edit the PO to assign a floor</div></div>
+        <div style="display:flex;gap:16px;align-items:center;">
+          ${uBoards>0?'<div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);">Boards</div><div style="font-weight:700;color:var(--blue);">'+Math.round(uBoards)+'</div></div>':''}
+          <div style="text-align:right;"><div style="font-size:10px;color:var(--ink3);">Spend</div><div style="font-weight:700;">${fmt(uSpend)}</div></div>
+        </div>
+      </div>
+      <div class="card-body" style="padding:10px 16px;font-size:12px;">
+        ${unassigned.map(r=>'<div style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:10px;"><span style="flex:1;">'+(r['MATERIAL']||'?')+'</span><span style="color:var(--ink3);">Qty: '+(r['QTY']||0)+'</span><span style="font-weight:600;">'+fmt(r['LINE TOTAL']||0)+'</span></div>').join('')}
+      </div>
+    </div>`;
+  }
+
   el.innerHTML = html || '<div class="alert alert-y">No PO data found for this job.</div>';
 }
 
-function buildUnitCard(job, floor, bldg, unit, boards, budBoards, spend, isGen) {
+function buildUnitCard(job, floor, bldg, unit, boards, budBoards, spend, isGen, boardSpend) {
   const cls = boards > 0 ? (budBoards > 0 && boards > budBoards ? 'over-budget' : budBoards > 0 && boards > budBoards*0.85 ? 'near-budget' : 'has-data') : (spend > 0 ? 'has-data' : 'no-data');
+  const unitPpb = ppb(boards, boardSpend||0);
   return `<div class="unit-card ${cls}" onclick="openUnitDetail('${jsesc(job)}','${floor}','${jsesc(unit)}','${jsesc(bldg||'')}')">
     <div class="unit-num">${isGen ? '📦 General' : unit}</div>
-    ${boards > 0 ? '<div class="unit-boards">' + Math.round(boards) + ' boards' + (budBoards > 0 ? ' / ' + Math.round(budBoards) : '') + '</div>' : ''}
+    ${boards > 0 ? '<div class="unit-boards">' + Math.round(boards) + ' bd' + (budBoards > 0 ? ' / ' + Math.round(budBoards) + ' budg' : '') + '</div>' : ''}
+    ${unitPpb ? '<div style="font-size:10px;font-weight:700;color:var(--blue);margin-top:2px;">' + unitPpb + '</div>' : ''}
     ${spend > 0 ? '<div class="unit-spend">' + fmt(spend) + '</div>' : '<div class="unit-spend" style="color:var(--ink3);">No data</div>'}
   </div>`;
 }
@@ -1859,9 +2139,12 @@ function toggleFloorBlock(hdr) {
 }
 
 function openUnitDetail(job, floor, unit, bldg) {
-  const rows = S.rows.filter(r => { const rfl=String(r['FLOOR']||'').trim(), ru=String(r['UNIT']||'').trim(), rb=String(r['BUILDING']||'').trim(); if(rfl!==String(floor)) return false; if(bldg&&rb&&rb!==bldg) return false; if(unit==='General') return !ru||ru==='N/A'; return ru===String(unit); });
+  const _allRows = [...(S.rows||[]).filter(r=>(r['JOB']||r['Job']||'')===job), ...(S.emailPOs||[]).filter(p=>p.status==='confirmed'&&p.job_name===job).flatMap(p=>(p.line_items||p.lines||[]).map(li=>({'JOB':job,'MATERIAL':li.description||li.name||'','QTY':parseFloat(li.qty||li.quantity||0)||0,'LINE TOTAL':parseFloat(li.total||li.line_total||0)||0,'FLOOR':p.floor||'','BUILDING':p.building||'','UNIT':p.unit||''})))];
+  const rows = _allRows.filter(r => { const rfl=String(r['FLOOR']||'').trim(), ru=String(r['UNIT']||'').trim(), rb=String(r['BUILDING']||'').trim(); if(rfl!==String(floor)) return false; if(bldg&&rb&&rb!==bldg) return false; if(unit==='General') return !ru||ru==='N/A'; return ru===String(unit); });
   const boards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
+  const boardSpend = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
   const spend = rows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
+  const unitPpb = ppb(boards, boardSpend);
   const matMap = {};
   rows.forEach(r => { const mat=(r['MATERIAL']||'').trim()||'[TAX]', cat=categorize(r['MATERIAL']||''); if(!matMap[mat]) matMap[mat]={qty:0,total:0,cat,uom:r['UOM']||''}; matMap[mat].qty+=parseFloat(r['QTY']||0); matMap[mat].total+=parseFloat(r['LINE TOTAL']||0); });
   const CAT_ORDER=['boards','metal','finish','supplies','tax','other'];
@@ -1869,8 +2152,9 @@ function openUnitDetail(job, floor, unit, bldg) {
   const CAT_TC={boards:'var(--blue)',metal:'var(--yellow)',finish:'var(--green)',supplies:'var(--ink3)',tax:'var(--red)',other:'var(--ink3)'};
   document.getElementById('unit-modal-title').textContent = job.replace('JOB ','') + ' · Floor ' + floor + ' · ' + (unit==='General'?'General':'Unit '+unit);
   document.getElementById('unit-modal-body').innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
-      <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Boards</div><div style="font-size:24px;font-weight:800;color:var(--blue);">${Math.round(boards)}</div></div>
+    <div style="display:grid;grid-template-columns:repeat(${boards>0?4:3},1fr);gap:10px;margin-bottom:16px;">
+      <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Boards</div><div style="font-size:24px;font-weight:800;color:var(--blue);">${Math.round(boards)||'—'}</div></div>
+      ${boards>0&&unitPpb?'<div class="stat" style="padding:12px;text-align:center;background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.25);"><div class="stat-lbl" style="color:var(--blue);">$/Board</div><div style="font-size:20px;font-weight:800;color:var(--blue);">'+unitPpb+'</div></div>':''}
       <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Spend</div><div style="font-size:22px;font-weight:800;color:var(--accent);">${fmt(spend)}</div></div>
       <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Lines</div><div style="font-size:22px;font-weight:800;">${rows.length}</div></div>
     </div>
@@ -1885,7 +2169,11 @@ function openUnitDetail(job, floor, unit, bldg) {
 function renderEstimateTab(job) {
   const el = document.getElementById('jobs-tab-estimate'); if (!el) return;
   const items = getJobEstimate(job);
-  const rows = S.rows.filter(r => (r['JOB']||'') === job);
+  // Combine sheet rows + confirmed email PO line items for ordered-qty lookup
+  const _estSheet = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  const _estEmail = (S.emailPOs||[]).filter(p => p.status==='confirmed' && p.job_name===job)
+    .flatMap(p => (p.line_items||p.lines||[]).map(li => ({'MATERIAL':li.description||li.name||li.sku||'','QTY':parseFloat(li.qty||li.quantity||0)||0})));
+  const rows = [..._estSheet, ..._estEmail];
   let html = '<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Line</button></div></div><div class="card-body" style="overflow-x:auto;">';
   html += '<table class="tbl"><thead><tr><th>Cat</th><th>Material</th><th>Use</th><th>UOM</th><th class="tbl-r">Price</th><th class="tbl-r" style="min-width:80px;">Qty</th><th class="tbl-r">Total</th><th class="tbl-r">Ordered</th><th></th></tr></thead><tbody>';
   let lastCat = '', grandTotal = 0;
@@ -1893,7 +2181,11 @@ function renderEstimateTab(job) {
     if (it.cat !== lastCat) { lastCat = it.cat; html += '<tr class="est-cat-hdr"><td colspan="9" style="background:' + (CAT_COLORS[it.cat]||'var(--surface3)') + ';color:' + (CAT_TEXT[it.cat]||'var(--ink2)') + ';">' + esc(it.cat) + '</td></tr>'; }
     const lineTotal = (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
     grandTotal += lineTotal;
-    const ordered = rows.filter(r => (r['MATERIAL']||'').toUpperCase().includes(it.name.toUpperCase().substring(0,8))).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
+    const _itKey = it.name.toUpperCase().substring(0,8).trim();
+    const ordered = rows.filter(r => {
+      const rm = (r['MATERIAL']||'').toUpperCase();
+      return rm.includes(_itKey) || _itKey.includes(rm.substring(0,8).trim());
+    }).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
     const pct = it.qty > 0 && ordered > 0 ? Math.round(ordered / it.qty * 100) : 0;
     const pctColor = pct > 100 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : pct > 0 ? 'var(--green)' : 'var(--ink3)';
     const tmpl = ESTIMATE_TEMPLATE.find(t => t.name === it.name);
@@ -1902,15 +2194,23 @@ function renderEstimateTab(job) {
       <td style="font-weight:500;">${esc(it.name)}</td>
       <td style="font-size:11px;color:var(--ink3);">${esc(tmpl?.use||'')}</td>
       <td>${esc(it.uom||'EA')}</td>
-      <td class="tbl-r"><input class="est-inp" type="number" style="width:70px;text-align:right;" value="${it.price||''}" onchange="updateEst(${i},'price',this.value)"/></td>
-      <td class="tbl-r"><input class="est-inp" type="number" style="width:80px;text-align:right;" value="${it.qty||''}" onchange="updateEst(${i},'qty',this.value)" placeholder="${tmpl?.hint||''}"/></td>
+      <td class="tbl-r"><input class="est-inp" type="number" style="width:70px;text-align:right;" value="${it.price||''}" oninput="updateEst(${i},'price',this.value)"/></td>
+      <td class="tbl-r"><input class="est-inp" type="number" style="width:80px;text-align:right;" value="${it.qty||''}" oninput="updateEst(${i},'qty',this.value)" placeholder="${tmpl?.hint||''}"/></td>
       <td class="tbl-r" style="font-weight:700;">${lineTotal>0?fmt(lineTotal):'—'}</td>
       <td class="tbl-r" style="color:${pctColor};">${ordered>0?Math.round(ordered)+' ('+pct+'%)':'—'}</td>
       <td><button class="est-rem" onclick="removeEstItem(${i})">✕</button></td>
     </tr>`;
   });
   html += '</tbody></table>';
-  html += '<div style="text-align:right;margin-top:10px;font-family:\'Space Grotesk\',sans-serif;font-size:18px;font-weight:700;">Grand Total: <span id="est-grand-total" style="color:var(--accent);">' + fmt(grandTotal) + '</span></div>';
+  // Budget $/board KPI
+  const _bdItems = items.filter(it => it.uom === 'BD' || isBoard(it.name));
+  const _bdQty = _bdItems.reduce((s,it) => s + (parseFloat(it.qty)||0), 0);
+  const _bdSpend = _bdItems.reduce((s,it) => s + (parseFloat(it.qty)||0)*(parseFloat(it.price)||0), 0);
+  const _budPpb = ppb(_bdQty, _bdSpend);
+  html += '<div style="display:flex;justify-content:flex-end;align-items:center;gap:24px;margin-top:12px;flex-wrap:wrap;">';
+  if (_budPpb) html += '<div style="background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.3);border-radius:8px;padding:8px 16px;text-align:center;"><div style="font-size:10px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Budget $/Board</div><div style="font-size:18px;font-weight:800;color:var(--blue);">' + _budPpb + '</div><div style="font-size:10px;color:var(--ink3);">' + Math.round(_bdQty) + ' boards budgeted</div></div>';
+  html += '<div style="font-family:\'Space Grotesk\',sans-serif;font-size:18px;font-weight:700;">Grand Total: <span id="est-grand-total" style="color:var(--accent);">' + fmt(grandTotal) + '</span></div>';
+  html += '</div>';
   html += '</div></div>';
 
   // FIX #5: Optional floor-level breakdown (collapsible)
@@ -1930,11 +2230,13 @@ function renderEstimateTab(job) {
   el.innerHTML = html;
   renderFloorBudgetSection(job);
 }
+let _estSaveTimer = null;
 function updateEst(i, field, val) {
   const items = getJobEstimate(_currentJob);
   items[i][field] = parseFloat(val) || 0;
-  saveJobEstimate(_currentJob);
   updateGrandTotal();
+  clearTimeout(_estSaveTimer);
+  _estSaveTimer = setTimeout(() => saveJobEstimate(_currentJob), 600);
 }
 function saveJobEstimate(job) { saveSharedData('matBanks'); }
 function updateGrandTotal() {
@@ -1977,7 +2279,7 @@ function renderScopePlanner(job, mode) {
   let html = '';
   const renderTable = (scopeKey, label) => {
     const sd = scopeData[scopeKey] || (scopeData[scopeKey] = {});
-    return `<details open style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;"><summary style="cursor:pointer;padding:10px 12px;font-weight:700;">${esc(label)}</summary><div style="padding:10px 12px;overflow-x:auto;"><table class="tbl" style="min-width:520px;"><thead><tr><th>Material</th><th>UOM</th><th class="tbl-r">Qty</th></tr></thead><tbody>${items.map((it,i) => '<tr><td>'+esc(it.name)+'</td><td style="color:var(--ink3);">'+esc(it.uom||'EA')+'</td><td class="tbl-r"><input type="number" class="est-inp" style="width:90px;text-align:right;" value="'+(sd[it.name]||'')+'" oninput="updateScopeQty(\''+jsesc(job)+'\',\''+jsesc(scopeKey)+'\',\''+jsesc(it.name)+'\',this.value)"></td></tr>').join('')}</tbody></table></div></details>`;
+    return `<details open style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;"><summary style="cursor:pointer;padding:10px 12px;font-weight:700;">${esc(label)}</summary><div style="padding:10px 12px;overflow-x:auto;"><table class="tbl" style="min-width:520px;"><thead><tr><th>Material</th><th>UOM</th><th class="tbl-r">Qty</th><th class="tbl-r" style="color:var(--accent);">Running Total</th></tr></thead><tbody>${items.map((it,i) => { const runTotal=Object.keys(scopeData).reduce((s,sk)=>s+(parseFloat(scopeData[sk]?.[it.name])||0),0); return '<tr><td>'+esc(it.name)+'</td><td style="color:var(--ink3);">'+esc(it.uom||'EA')+'</td><td class="tbl-r"><input type="number" class="est-inp" style="width:90px;text-align:right;" value="'+(sd[it.name]||'')+'" oninput="updateScopeQty(\''+jsesc(job)+'\',\''+jsesc(scopeKey)+'\',\''+jsesc(it.name)+'\',this.value)"></td><td class="tbl-r" style="font-weight:700;color:'+(runTotal>0?'var(--accent)':'var(--ink3)')+';">'+(runTotal>0?runTotal:'—')+'</td></tr>'; }).join('')}</tbody></table></div></details>`;
   };
   if (mode === 'building' || mode === 'both') buildings.forEach(b => { html += renderTable('bldg:'+b, 'Building '+b); });
   if (mode === 'floor' || mode === 'both') floors.forEach(f => { html += renderTable('floor:'+(f.bldg||'')+':'+f.floor, (f.bldg?'Building '+f.bldg+' · ':'')+'Floor '+f.floor); });
@@ -1987,6 +2289,15 @@ function updateScopeQty(job, scopeKey, matName, val) {
   const scopeData = S.matBanks[job+'_scopes'] || (S.matBanks[job+'_scopes'] = {});
   const sd = scopeData[scopeKey] || (scopeData[scopeKey] = {});
   sd[matName] = parseFloat(val) || 0;
+  // Auto-fill: sum across all scopes for this material and update main estimate
+  const allScopeKeys = Object.keys(scopeData);
+  const totalForMat = allScopeKeys.reduce((sum, sk) => sum + (parseFloat(scopeData[sk]?.[matName]) || 0), 0);
+  const items = getJobEstimate(job);
+  const idx = items.findIndex(it => it.name === matName);
+  if (idx >= 0 && totalForMat > 0) {
+    items[idx].qty = totalForMat;
+    updateGrandTotal();
+  }
   saveSharedData('matBanks');
 }
 
@@ -2016,11 +2327,25 @@ function toggleSummaryView(job, mode) {
 }
 function renderJobSummaryTab(job) {
   const el = document.getElementById('jobs-tab-summary'); if (!el) return;
-  const rows = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  // Build rows: Google Sheet rows + email-confirmed POs expanded into rows
+  const sheetRows = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  const emailRows = (S.emailPOs||[]).filter(p => p.status === 'confirmed' && p.job_name === job).flatMap(p => {
+    const lineArr = p.line_items || p.lines || [];
+    return lineArr.map(li => ({'JOB':job,'MATERIAL':li.description||li.name||li.sku||'','QTY':parseFloat(li.qty||li.quantity||li.units||0)||0,'LINE TOTAL':parseFloat(li.total||li.amount||li.line_total||0)||0,'UNIT_PRICE':parseFloat(li.unit_price||li.rate||li.price||0)||0,'UOM':li.uom||'EA','FLOOR':String(p.floor||'').trim(),'BUILDING':String(p.building||'').trim(),'UNIT':String(p.unit||'').trim(),'PO NUMBER':p.po_number||'','VENDOR':p.vendor||''}));
+  });
+  const rows = [...sheetRows, ...emailRows];
   const items = getJobEstimate(job);
   const labor = getJobLabor(job);
   const matOrdered = rows.reduce((s,r) => s + (parseFloat(r['LINE TOTAL']||0)||0), 0);
   const matBudget = items.reduce((s,it) => s + ((parseFloat(it.qty)||0)*(parseFloat(it.price)||0)), 0);
+  // Board metrics for $/board KPIs
+  const ordBoards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + (parseFloat(r['QTY']||0)||0), 0);
+  const ordBoardSpend = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + (parseFloat(r['LINE TOTAL']||0)||0), 0);
+  const estBoardItems = items.filter(it => it.uom === 'BD' || isBoard(it.name));
+  const estBoards = estBoardItems.reduce((s,it) => s + (parseFloat(it.qty)||0), 0);
+  const estBoardSpend = estBoardItems.reduce((s,it) => s + (parseFloat(it.qty)||0)*(parseFloat(it.price)||0), 0);
+  const actualPpb = ppb(ordBoards, ordBoardSpend);
+  const budgetPpb = ppb(estBoards, estBoardSpend);
   const laborBudget = LABOR_CATS.reduce((s,c) => s + (parseFloat(labor[c]||0)||0), 0);
   const billAssigns = Object.values(S.billAssignments||{}).filter(ba => ba.job === job);
   const laborBilled = billAssigns.filter(ba => LABOR_CATS.some(lc => (ba.category||'').includes(lc))).reduce((s,ba) => s + (parseFloat(ba.total||0)||0), 0);
@@ -2089,11 +2414,14 @@ function renderJobSummaryTab(job) {
       <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--ink3);"><span>${pct.toFixed(1)}% used</span><span>${totalBudget > totalActual ? fmt(totalBudget - totalActual) + ' remaining' : fmt(totalActual - totalBudget) + ' over'}</span></div>
     </div></div>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px;">
       <div class="stat"><div class="stat-lbl">Ordered on POs</div><div class="stat-val" style="color:var(--blue);">${fmt(matOrdered)}</div></div>
       <div class="stat"><div class="stat-lbl">Billed Material</div><div class="stat-val">${fmt(matBilled)}</div></div>
       <div class="stat"><div class="stat-lbl">Billed Labor</div><div class="stat-val" style="color:var(--accent);">${fmt(laborBilled)}</div></div>
       ${viewMode==='whole' && bf ? '<div class="stat"><div class="stat-lbl">Historical Material</div><div class="stat-val" style="color:var(--yellow);">' + fmt(bfMatTotal) + '</div></div><div class="stat"><div class="stat-lbl">Historical Labor</div><div class="stat-val" style="color:var(--yellow);">' + fmt(bfLabTotal) + '</div></div>' : ''}
+      ${ordBoards > 0 ? '<div class="stat"><div class="stat-lbl">Boards Ordered</div><div class="stat-val" style="color:var(--blue);">' + Math.round(ordBoards) + '</div></div>' : ''}
+      ${actualPpb ? '<div class="stat" style="background:rgba(79,142,247,.08);border-color:rgba(79,142,247,.3);"><div class="stat-lbl" style="color:var(--blue);">Actual $/Board</div><div class="stat-val" style="color:var(--blue);">' + actualPpb + '</div></div>' : ''}
+      ${budgetPpb ? '<div class="stat" style="background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.3);"><div class="stat-lbl" style="color:var(--green);">Budget $/Board</div><div class="stat-val" style="color:var(--green);">' + budgetPpb + '</div></div>' : ''}
       <div class="stat"><div class="stat-lbl">Items Tracked</div><div class="stat-val">${allItems.length}</div></div>
     </div>
 
@@ -2121,7 +2449,7 @@ function renderJobSummaryTab(job) {
         const firstRaw = [...it.rawNames][0] || '';
         return `<tr>
           <td><div style="font-weight:600;">${esc(it.label)}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px;">${esc([...it.rawNames].slice(0,3).join(' • '))}${it.rawNames.size>3?' +'+(it.rawNames.size-3)+' more':''}</div></td>
-          <td class="tbl-r">${it.budgetQty > 0 ? Math.round(it.budgetQty) : '—'}</td>
+          <td class="tbl-r">${Math.round(it.budgetQty) || 0}</td>
           <td class="tbl-r" style="font-weight:700;color:${it.orderedQty>0?'var(--blue)':'var(--ink3)'};">${it.orderedQty > 0 ? Math.round(it.orderedQty) : '—'}</td>
           <td>
             <div style="display:flex;align-items:center;gap:8px;">
@@ -2409,6 +2737,20 @@ function renderPDFResult(po, savedId) {
   const rawJob = po.job_name || '';
   const matchedJob = resolveJobFromPDF(po.job_name, po.ship_to);
   const isNewJob = rawJob && !matchedJob;
+  // Auto-confirm if job is matched — still show the result card but mark as auto-tracked
+  if (matchedJob && savedId) {
+    fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + savedId, {
+      method:'PATCH',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({status:'confirmed', job_name:matchedJob, building:po.building||'', floor:po.floor||'', unit:po.unit||''})
+    }).then(() => {
+      if (po.po_number) {
+        S.assignments[po.po_number] = {job:matchedJob, building:po.building||'', bldg:po.building||'', floor:po.floor||'', unit:po.unit||'', vendor:po.vendor||'', manual:true, date:new Date().toISOString().split('T')[0]};
+        saveSharedData('assignments');
+      }
+      loadEmailPOs().then(() => { renderActivityFeed(); updateInboxBadge(); });
+    }).catch(()=>{});
+  }
   
   const newJobBanner = isNewJob ? `<div class="alert alert-yellow" style="margin-bottom:14px;">
     🆕 <strong>New Job Detected:</strong> "${esc(rawJob)}" doesn't match any existing job.
@@ -2451,7 +2793,7 @@ async function confirmNewJob(rawName) {
   if (sel) sel.value = name;
   showToast('✓ Job "' + name + '" created — you can now confirm the PO');
 }
-function confirmPDFPO(po, savedId) {
+async function confirmPDFPO(po, savedId) {
   if (!po) return;
   const job = document.getElementById('pdf-job')?.value;
   const bldg = document.getElementById('pdf-bldg')?.value || po.building || '';
@@ -2461,13 +2803,33 @@ function confirmPDFPO(po, savedId) {
   if (!job) { showToast('Please select a job'); return; }
   if (!S.assignments) S.assignments = {};
   S.assignments[poNum] = {job, building:bldg, floor, unit, manual:true, lines:po.lines, total:po.total, vendor:po.vendor, date:new Date().toISOString().split('T')[0]};
-  saveSharedData('assignments').then(async () => {
-    if (savedId) {
-      await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + savedId, { method:'PATCH', headers:{'apikey':SB_KEY,'Content-Type':'application/json'}, body:JSON.stringify({status:'confirmed',job_name:job}) });
+  // Auto-create floor/unit in jobStructure if provided
+  if (floor || unit) {
+    if (!S.jobStructure) S.jobStructure = {};
+    if (!S.jobStructure[job]) S.jobStructure[job] = {floors:[]};
+    const struct = S.jobStructure[job];
+    let flEntry = struct.floors.find(f => String(f.floor) === String(floor) && (!bldg || f.bldg === bldg));
+    if (!flEntry && floor) {
+      flEntry = {floor, bldg:bldg||'', budgetBoards:0, units:[]};
+      struct.floors.push(flEntry);
     }
-    showToast('✓ PO #' + poNum + ' added to ' + job.replace('JOB ',''));
-    document.getElementById('pdf-result').style.display = 'none';
-  });
+    if (flEntry && unit && unit !== 'N/A') {
+      if (!flEntry.units) flEntry.units = [];
+      if (!flEntry.units.find(u => String(u.unit) === String(unit))) {
+        flEntry.units.push({unit, budgetBoards:0});
+      }
+    }
+    await saveSharedData('jobStructure');
+  }
+  await saveSharedData('assignments');
+  if (savedId) {
+    await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + savedId, { method:'PATCH', headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'}, body:JSON.stringify({status:'confirmed',job_name:job,building:bldg,floor,unit}) });
+  }
+  await loadEmailPOs();
+  renderActivityFeed();
+  updateInboxBadge();
+  showToast('✓ PO #' + poNum + ' added to ' + job.replace('JOB ',''));
+  document.getElementById('pdf-result').style.display = 'none';
 }
 async function loadPendingPOs() {
   const el = document.getElementById('pending-pos-list'); if (!el) return;
@@ -2572,7 +2934,7 @@ function switchRawTab(tab) {
 }
 function renderRawPO() {
   const el = document.getElementById('raw-tab-raw-po'); if (!el) return;
-  if (!S.rows.length) { el.innerHTML = '<div class="no-data">No PO data. Click Sync first.</div>'; return; }
+  if (!(S.rows||[]).length) { el.innerHTML = '<div class="no-data">No PO data. Click Sync first to pull from Google Sheet (optional), or tracked POs appear here via email/PDF.</div>'; return; }
   let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:11px;color:var(--ink3);">Click any row to edit. Data comes from Google Sheet — edits are saved as local overrides.</div><div style="font-size:11px;color:var(--ink3);">' + S.rows.length + ' rows</div></div>';
   html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Job</th><th>Material</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Total</th><th>Bldg</th><th>Fl</th><th>Unit</th><th>Vendor</th><th>Actions</th></tr></thead><tbody>';
   S.rows.slice(0, 300).forEach((r, idx) => {
@@ -2917,8 +3279,10 @@ async function init() {
   loadBackfillData(); // load backfill in background (don't await — non-blocking)
   populateJobSelects();
   await Promise.all([loadEmailPOs(), loadNewJobAlerts()]);
-  syncAll();
+  // Only sync Google Sheet data if a sheetId is configured
+  if (S.sheetId) syncAll().catch(e => console.warn('Initial sync failed:', e));
   renderHome();
+  updateInboxBadge();
 }
 
 // Check auth on load
