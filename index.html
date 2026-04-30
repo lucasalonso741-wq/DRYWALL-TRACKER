@@ -253,7 +253,7 @@ a{color:var(--accent);}
   <button class="nav-icon-btn" data-page="raw" onclick="nav('raw')"><span>🗃️</span><span class="label">Data</span></button>
   <button class="nav-icon-btn" data-page="settings" onclick="nav('settings')"><span>⚙️</span><span class="label">Setup</span></button>
   <div class="nav-divider"></div>
-  <button class="nav-sync-btn" id="sync-btn" onclick="syncAll()" title="Sync from Google Sheet">⟳ <span class="sync-dot" id="sync-dot"></span></button>
+  <button class="nav-sync-btn" id="sync-btn" onclick="syncAll()" title="Sync data">⟳ <span class="sync-dot" id="sync-dot"></span></button>
 </div>
 
 <!-- MAIN -->
@@ -276,7 +276,6 @@ a{color:var(--accent);}
       <div style="font-size:13px;font-weight:600;">📄 Drop PO PDF here or <label style="color:var(--accent);cursor:pointer;">browse<input type="file" accept=".pdf" id="pdf-upload" style="display:none;" onchange="handlePDFFile(this.files[0])"/></label></div>
       <div style="font-size:11px;color:var(--ink3);margin-top:4px;">Auto-extracts PO number, vendor, materials &amp; totals · or email to <strong>po@aadrywalltracker.com</strong></div>
     </div>
-    <button class="btn btn-ghost" id="feed-select-po-btn" onclick="startFeedSelect('po')">☑ Multi-select POs</button>
     <button class="btn btn-ghost" id="feed-select-bill-btn" onclick="startFeedSelect('bill')">☑ Multi-select Bills</button>
     <button class="btn btn-ghost" id="feed-cancel-select-btn" style="display:none;" onclick="clearFeedSelection()">Cancel</button>
     <button class="btn btn-primary" id="feed-bulk-btn" style="display:none;" onclick="openFeedBulkAssignModal()">📦 Assign Selected to Job</button>
@@ -419,7 +418,6 @@ const PASSCODE = 'gypsum';
 const LABOR_CATS = ['Framing','Hanging','Finish','Punchout','Layout','Supervision','Other'];
 
 const S = {
-  sheetId: '12EYFZc6wuJOUqoz8iPD6e70iZrK2wzx3drTDncinuvg',
   rows: [], bills: [], jobs: ["JOB VILLAGES @ EAST OCEAN","JOB PIONEER LOFTS","LEGACY AT MARGATE"],
   budgets: {}, targets: {}, matBanks: {}, assignments: {}, billAssignments: {}, actuals: {},
   floorBudgets: {}, jobStructure: {}, lastSync: '', duplicatePOs: [],
@@ -440,6 +438,8 @@ const JOB_ALIASES = {
 };
 
 let _currentJob = '', _jobMapView = 'material', _editStruct = {floors:[]};
+let _summaryFilter = {building: '', floor: '', unit: ''};
+let _undoStack = []; // [{label, undo: async fn}]
 let _chartJobSpend = null, _chartMatCats = null;
 
 const ESTIMATE_TEMPLATE = [
@@ -577,6 +577,29 @@ async function setManualCategory(rawDesc, category) {
   showToast('✓ Category saved: ' + rawDesc.substring(0,30) + ' → ' + category);
 }
 function isBoard(desc) { return categorize(desc) === 'boards'; }
+
+// Re-render whatever page is currently active without navigating away
+function refreshCurrentPage() {
+  const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
+  if (!activePage) return;
+  if (activePage === 'home') renderHome();
+  else if (activePage === 'dashboard') renderDashboard();
+  else if (activePage === 'inbox') renderInbox();
+  else if (activePage === 'jobs') { if (_currentJob) onJobSelect(); }
+  else if (activePage === 'raw') renderRaw();
+  else if (activePage === 'settings') renderSettings();
+}
+
+// Undo stack
+function pushUndo(label, undoFn) {
+  _undoStack.push({label, undo: undoFn});
+  if (_undoStack.length > 20) _undoStack.shift();
+}
+async function doUndo() {
+  const entry = _undoStack.pop(); if (!entry) { showToast('Nothing to undo'); return; }
+  await entry.undo();
+  showToast('↩ Undid: ' + entry.label);
+}
 function isLaborVendor(vendor) {
   if (!vendor) return false;
   const v = String(vendor).toUpperCase();
@@ -813,40 +836,42 @@ async function loadBackfillData() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// GOOGLE SHEETS FETCH
+// DATA FETCH (Supabase only — no Google Sheets)
 // ═══════════════════════════════════════════════════════════
-async function fetchRawData() {
-  if (!S.sheetId) return;
-  const url = `https://docs.google.com/spreadsheets/d/${S.sheetId}/gviz/tq?tqx=out:json&sheet=RAW%20DATA&gid=0`;
-  const res = await fetch(url); const text = await res.text();
-  const json = JSON.parse(text.substring(47).slice(0, -2));
-  const cols = json.table.cols.map(c => c.label);
-  S.rows = json.table.rows.filter(r => r && r.c && r.c[0]?.v).map(r => {
-    const row = {}; cols.forEach((c, i) => { row[c.trim()] = r.c[i]?.v ?? r.c[i]?.f ?? ''; }); return row;
-  });
-  S.rows.forEach(row => {
-    const po = String(row['PO NUMBER'] || row['PO #'] || '');
-    if (po && S.assignments[po]) {
-      const a = S.assignments[po];
-      if (!row['BUILDING'] || row['BUILDING'] === '') row['BUILDING'] = a.building || a.bldg || '';
-      if (!row['FLOOR'] || row['FLOOR'] === '') row['FLOOR'] = a.floor;
-      if (!row['UNIT'] || row['UNIT'] === '') row['UNIT'] = a.unit;
-    }
-  });
-}
-async function fetchBillData() {
-  if (S.sheetId) {
-    try {
-      const url = `https://docs.google.com/spreadsheets/d/${S.sheetId}/gviz/tq?tqx=out:json&sheet=BILL%20DATA`;
-      const res = await fetch(url); const text = await res.text();
-      const json = JSON.parse(text.substring(47).slice(0, -2));
-      const cols = json.table.cols.map(c => c.label);
-      S.bills = json.table.rows.filter(r => r && r.c && r.c[0]?.v).map(r => {
-        const row = {}; cols.forEach((c, i) => { row[c.trim()] = r.c[i]?.v ?? r.c[i]?.f ?? ''; }); return row;
-      });
-    } catch(e) { console.warn('Sheet bill fetch failed:', e); S.bills = S.bills || []; }
-  }
-  await loadBillPDFs();
+async function loadPORows() {
+  try {
+    const res = await fetch(
+      SB_URL + '/rest/v1/po_pdfs?status=in.(pending,confirmed)&order=created_at.desc&limit=1000' +
+      '&select=id,po_number,vendor,job_name,building,floor,unit,model,ship_date,lines,total,created_at',
+      { headers: { 'apikey': SB_KEY } }
+    );
+    if (!res.ok) { console.warn('loadPORows HTTP error:', res.status); return; }
+    const pdfs = await res.json();
+    if (!Array.isArray(pdfs)) { S.rows = []; return; }
+    S.rows = pdfs.flatMap(p => {
+      const asgn = S.assignments[p.po_number] || {};
+      const base = {
+        'PO NUMBER': p.po_number || '',
+        'VENDOR': p.vendor || '',
+        'JOB': asgn.job || p.job_name || '',
+        'BUILDING': asgn.building || asgn.bldg || p.building || '',
+        'FLOOR': String(asgn.floor !== undefined && asgn.floor !== '' ? asgn.floor : (p.floor || '')),
+        'UNIT': asgn.unit || p.unit || p.model || '',
+        'DATE': p.ship_date || (p.created_at || '').split('T')[0],
+        '_po_id': p.id
+      };
+      const lines = Array.isArray(p.lines) ? p.lines : [];
+      if (!lines.length) return [{ ...base, 'MATERIAL': '', 'QTY': 0, 'LINE TOTAL': parseFloat(p.total || 0), 'UOM': '' }];
+      return lines.map(l => ({
+        ...base,
+        'MATERIAL': l.description || l.sku || '',
+        'QTY': parseFloat(l.qty || 0),
+        'LINE TOTAL': parseFloat(l.amount || 0),
+        'UOM': l.uom || ''
+      }));
+    });
+    console.log('loadPORows ✓', S.rows.length, 'lines from', pdfs.length, 'POs');
+  } catch(e) { console.warn('loadPORows failed:', e); }
 }
 async function loadBillPDFs() {
   try {
@@ -874,15 +899,14 @@ async function syncAll() {
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
   showToast('Syncing...');
   try {
-    // Fetch Google Sheet PO data + email-extracted POs in parallel
-    await Promise.all([fetchRawData(), loadEmailPOs(), loadNewJobAlerts()]);
+    await Promise.all([loadPORows(), loadEmailPOs(), loadBillPDFs()]);
     S.lastSync = new Date().toISOString();
     localStorage.setItem('dw_last_sync', S.lastSync);
-    const lsl = document.getElementById('last-sync-label'); if(lsl) lsl.textContent = 'Last sync: ' + new Date().toLocaleTimeString();
-    const smi = document.getElementById('sheet-status-mini'); if(smi){smi.textContent='✓ ' + S.rows.length + ' PO rows · ' + (S.emailPOs?.length||0) + ' email POs';smi.className='sheet-status ok';}
+    const lsl = document.getElementById('last-sync-label'); if(lsl) lsl.textContent = 'Synced: ' + new Date().toLocaleTimeString();
+    const smi = document.getElementById('sheet-status-mini'); if(smi){smi.textContent='✓ ' + S.rows.length + ' PO lines · ' + (S.emailPOs?.length||0) + ' POs';smi.className='sheet-status ok';}
     const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--green)';
     populateJobSelects(); updateInboxBadge();
-    showToast('✓ Synced — ' + S.rows.length + ' sheet rows · ' + (S.emailPOs?.length||0) + ' email POs');
+    showToast('✓ Synced — ' + S.rows.length + ' PO lines · ' + (S.emailPOs?.length||0) + ' POs');
   } catch(e) {
     showToast('⚠️ Sync failed: ' + e.message, true);
     const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--red)';
@@ -895,6 +919,7 @@ async function syncAll() {
   else if (activePage === 'dashboard') try { renderDashboard(); } catch(e) {}
   else if (activePage === 'inbox') try { renderInbox(); } catch(e) {}
   else if (activePage === 'jobs') try { if(_currentJob) onJobSelect(); } catch(e) {}
+  else if (activePage === 'raw') try { renderRaw(); } catch(e) {}
 }
 
 // Load email-extracted POs from Supabase po_pdfs table
@@ -920,24 +945,8 @@ async function loadNewJobAlerts() {
 }
 
 function renderNewJobAlertBanner() {
-  const alerts = (S.newJobAlerts || []).filter(a => !a.resolved);
   const banner = document.getElementById('new-job-alert-banner');
-  if (!banner) return;
-  if (!alerts.length) { banner.style.display = 'none'; return; }
-  banner.style.display = 'block';
-  banner.innerHTML = alerts.map(a => `
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);border-radius:10px;margin-bottom:8px;">
-      <span style="font-size:18px;">🆕</span>
-      <div style="flex:1;min-width:0;">
-        <div style="font-weight:700;font-size:13px;color:var(--yellow);">New Job Detected: "${esc(a.job_name)}"</div>
-        <div style="font-size:12px;color:var(--ink3);">From PO #${esc(a.po_number||'?')} · ${esc(a.vendor||'')} · ${new Date(a.created_at).toLocaleDateString()}</div>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="btn btn-primary btn-sm" onclick="createJobFromAlert('${jsesc(a.id)}','${jsesc(a.job_name)}','${jsesc(a.po_id||'')}')">✓ Create Job</button>
-        <button class="btn btn-ghost btn-sm" onclick="assignAlertToExisting('${jsesc(a.id)}','${jsesc(a.job_name)}','${jsesc(a.po_id||'')}')">↳ Assign to Existing</button>
-        <button class="btn btn-ghost btn-sm" onclick="dismissJobAlert('${jsesc(a.id)}')">✕ Dismiss</button>
-      </div>
-    </div>`).join('');
+  if (banner) banner.style.display = 'none';
 }
 
 async function createJobFromAlert(alertId, jobName, poId) {
@@ -1001,6 +1010,7 @@ function checkAuth() {
 }
 const PAGE_TITLES = {home:'Activity Feed',dashboard:'Dashboard',inbox:'Inbox',jobs:'Jobs',raw:'Raw Data',settings:'Settings'};
 function nav(page) {
+  localStorage.setItem('dw_page', page);
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-icon-btn').forEach(b => b.classList.toggle('active', b.dataset.page === page));
   const el = document.getElementById('page-' + page); if (el) el.classList.add('active');
@@ -1029,9 +1039,8 @@ function openJobFromAnywhere(job, tab) {
 }
 function updateInboxBadge() {
   const unmatchedBills = S.bills.filter(b => { const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim(); return inv && !S.billAssignments[inv]; }).length;
-  const needsReviewPOs = (S.emailPOs||[]).filter(p => p.status === 'needs_review').length;
-  const newJobAlerts = (S.newJobAlerts||[]).length;
-  const total = unmatchedBills + needsReviewPOs + newJobAlerts;
+  const needsReviewPOs = (S.emailPOs||[]).filter(p => p.status === 'needs_review' || p.status === 'pending').length;
+  const total = unmatchedBills + needsReviewPOs;
   const badge = document.getElementById('inbox-badge');
   if (badge) badge.style.display = total > 0 ? 'block' : 'none';
 }
@@ -1074,11 +1083,6 @@ function renderSettings() {
       </div>
       <div style="display:flex;gap:8px;"><input id="new-job" class="inp inp-sm" placeholder="New job name" style="max-width:220px;"/><button class="btn btn-ghost btn-sm" onclick="addJob()">+ Add Job</button></div>
     </div></div>
-    <div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Google Sheet</span></div><div class="card-body">
-      <div style="font-size:12px;color:var(--ink3);margin-bottom:8px;">Sheet ID for PO &amp; Bill data</div>
-      <div style="display:flex;gap:8px;"><input id="sheet-id-input" class="inp inp-sm" value="${esc(S.sheetId)}" style="max-width:400px;"/><button class="btn btn-ghost btn-sm" onclick="saveSheetId()">Save</button></div>
-      <div id="sheet-connected-label" class="sheet-status" style="margin-top:6px;">${S.rows.length>0?'✓ Sheet connected · '+S.rows.length+' rows':'Not synced yet'}</div>
-    </div></div>
     <div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Company Logo</span></div><div class="card-body">
       <div style="display:flex;gap:12px;align-items:center;">
         <label class="btn btn-ghost btn-sm" style="cursor:pointer;">📷 Upload Logo<input type="file" accept="image/*" style="display:none;" onchange="handleLogoUpload(this)"/></label>
@@ -1104,7 +1108,6 @@ function renameJob(old) {
   S.jobs = S.jobs.map(j => j === old ? nw : j); saveSharedData('jobs');
   renderSettings(); populateJobSelects(); showToast('✓ Renamed');
 }
-function saveSheetId() { S.sheetId = document.getElementById('sheet-id-input')?.value.trim()||''; showToast('✓ Sheet ID saved — click Sync'); }
 function saveAiKey() { S.aiKey = document.getElementById('ai-key-input')?.value.trim()||''; showToast('✓ AI key saved'); }
 // ═══════════════════════════════════════════════════════════
 // HOME — ACTIVITY FEED (FIX #1: whole row clickable)
@@ -1179,57 +1182,36 @@ function renderActivityFeed() {
     emailHtml += '<div class="divider"></div>';
   }
 
-  // ── Section 2: Google Sheet POs ──
-  const poGroups = getFeedPOGroups();
+  // ── Section 2: Unmatched Bills ──
   const billGroups = getFeedBillGroups();
-  const items = [];
-  poGroups.slice(0, 40).forEach(g => {
-    const assigned = !!S.assignments[g.po];
-    const boards = g.rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
-    items.push({type:'po', id:g.po, job:g.job, vendor:g.vendor, date:g.date, total:g.total, boards, assigned, building:g.building, floor:g.floor, rows:g.rows});
-  });
-  billGroups.forEach(g => {
-    const matched = !!S.billAssignments[g.inv];
-    const isLabor = isLaborVendor(g.vendor);
-    items.push({type:'bill', id:g.inv, job:g.job, vendor:g.vendor, total:g.total, matched, isLabor, rows:g.rows});
-  });
-
-  if (!emailPOs.length && !items.length) {
-    el.innerHTML = '<div class="no-data">No data yet. Email a PO PDF to po@aadrywalltracker.com or click ⟳ Sync.</div>';
-    return;
-  }
-
+  const unmatchedBills = billGroups.filter(g => !S.billAssignments[g.inv]);
   const selType = S.feedSelection?.type || null;
-  let sheetHtml = '';
-  if (items.length) {
-    sheetHtml += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📊 Sheet POs</div>`;
-    items.forEach(item => {
-      const dotColor = item.type === 'po' ? (item.assigned ? 'var(--green)' : 'var(--blue)') : (item.matched ? 'var(--green)' : 'var(--yellow)');
-      const label = item.type === 'po' ? 'PO #' + item.id : 'Bill #' + item.id;
-      const status = item.type === 'po' ? (item.assigned ? '<span class="badge badge-green">Assigned</span>' : '<span class="badge badge-blue">New</span>') :
-        (item.matched ? '<span class="badge badge-green">Matched</span>' : '<span class="badge badge-yellow">Needs Match</span>');
-      const boardsBadge = item.boards > 0 ? ' <span class="badge badge-blue">' + Math.round(item.boards) + ' boards</span>' : '';
-      sheetHtml += `<div class="feed-item" data-type="${item.type}" data-id="${esc(item.id)}">
-        ${selType === item.type ? '<input type="checkbox" class="feed-cb" data-id="' + esc(item.id) + '" style="margin-right:6px;accent-color:var(--accent);cursor:pointer;" onclick="event.stopPropagation();updateFeedSelection()"/>' : ''}
-        <div class="feed-dot" style="background:${dotColor};"></div>
+  let billHtml = '';
+  if (unmatchedBills.length) {
+    billHtml += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">💰 Unmatched Bills (${unmatchedBills.length})</div>`;
+    unmatchedBills.forEach(g => {
+      const isLabor = isLaborVendor(g.vendor);
+      billHtml += `<div class="feed-item" data-type="bill" data-id="${esc(g.inv)}">
+        ${selType === 'bill' ? '<input type="checkbox" class="feed-cb" data-id="' + esc(g.inv) + '" style="margin-right:6px;accent-color:var(--accent);cursor:pointer;" onclick="event.stopPropagation();updateFeedSelection()"/>' : ''}
+        <div class="feed-dot" style="background:var(--yellow);"></div>
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <span style="font-weight:700;font-size:13px;">${label}</span>
-            ${status}${boardsBadge}
+            <span style="font-weight:700;font-size:13px;">${isLabor ? '🔧' : '📦'} Bill #${esc(g.inv)}</span>
+            <span class="badge badge-yellow">Needs Match</span>
           </div>
-          <div style="font-size:12px;color:var(--ink2);margin-top:2px;">
-            ${esc(item.vendor)}${item.job ? ' · ' + esc(item.job.replace('JOB ','')) : ''}${item.building ? ' · Bldg ' + esc(item.building) : ''}${item.floor ? ' · Fl ' + esc(item.floor) : ''}
-          </div>
+          <div style="font-size:12px;color:var(--ink2);">${esc(g.vendor)}${g.job ? ' · ' + esc(g.job.replace('JOB ','')) : ''}</div>
         </div>
-        <div style="text-align:right;white-space:nowrap;">
-          <div style="font-weight:700;">${fmt(item.total)}</div>
-          <div style="font-size:10px;color:var(--ink3);">${item.rows.length} lines</div>
-        </div>
+        <div style="text-align:right;white-space:nowrap;"><div style="font-weight:700;">${fmt(g.total)}</div><div style="font-size:10px;color:var(--ink3);">${g.rows.length} lines</div></div>
       </div>`;
     });
   }
 
-  el.innerHTML = emailHtml + sheetHtml;
+  if (!emailPOs.length && !unmatchedBills.length) {
+    el.innerHTML = '<div class="no-data">No data yet. Upload or email a PO PDF, then click ⟳ Sync.</div>';
+    return;
+  }
+
+  el.innerHTML = emailHtml + billHtml;
 
   el.querySelectorAll('.feed-item').forEach(div => {
     div.addEventListener('click', function(e) {
@@ -1237,7 +1219,6 @@ function renderActivityFeed() {
       const type = this.dataset.type;
       const id = this.dataset.id;
       if (type === 'emailpo') openEmailPOReview(id);
-      else if (type === 'po') openPODetailModal(id);
       else if (type === 'bill') openSmartBillModal(id);
     });
   });
@@ -1328,9 +1309,8 @@ async function confirmEmailPO(id) {
   }
 
   closeModal('po-modal');
-  await loadEmailPOs();
-  renderActivityFeed();
-  updateInboxBadge();
+  await Promise.all([loadPORows(), loadEmailPOs()]);
+  populateJobSelects(); updateInboxBadge(); refreshCurrentPage();
   showToast('✓ PO #' + poNum + ' verified → ' + job.replace('JOB ',''));
 }
 
@@ -1340,7 +1320,6 @@ function feedSelectedIds(type) {
 function clearFeedSelection() {
   S.feedSelection = null;
   const bulk = document.getElementById('feed-bulk-btn'); if (bulk) bulk.style.display = 'none';
-  const poBtn = document.getElementById('feed-select-po-btn'); if (poBtn) poBtn.style.display = 'inline-flex';
   const billBtn = document.getElementById('feed-select-bill-btn'); if (billBtn) billBtn.style.display = 'inline-flex';
   const cancelBtn = document.getElementById('feed-cancel-select-btn'); if (cancelBtn) cancelBtn.style.display = 'none';
   renderActivityFeed();
@@ -1352,10 +1331,8 @@ function updateFeedSelection() {
 }
 function startFeedSelect(type) {
   S.feedSelection = {type};
-  const poBtn = document.getElementById('feed-select-po-btn'); if (poBtn) poBtn.style.display = type === 'po' ? 'inline-flex' : 'none';
   const billBtn = document.getElementById('feed-select-bill-btn'); if (billBtn) billBtn.style.display = type === 'bill' ? 'inline-flex' : 'none';
   const cancelBtn = document.getElementById('feed-cancel-select-btn'); if (cancelBtn) cancelBtn.style.display = 'inline-flex';
-  if (poBtn && type === 'po') poBtn.style.background = 'var(--accent)';
   if (billBtn && type === 'bill') billBtn.style.background = 'var(--accent)';
   nav('home');
   renderActivityFeed();
@@ -1398,15 +1375,16 @@ function openPODetailModal(poNum) {
     '<button class="btn btn-ghost" onclick="closeModal(\'po-modal\')">Cancel</button><button class="btn btn-primary" onclick="quickAssignPO(\'' + jsesc(poNum) + '\')">✓ Assign</button>';
   document.getElementById('po-modal').classList.add('open');
 }
-function quickAssignPO(po) {
+async function quickAssignPO(po) {
   S.assignments[po] = {
     job: document.getElementById('qa-job')?.value||'',
     building: document.getElementById('qa-bldg')?.value||'',
     floor: document.getElementById('qa-floor')?.value||'',
     unit: document.getElementById('qa-unit')?.value||''
   };
-  saveSharedData('assignments');
-  closeModal('po-modal'); renderActivityFeed(); showToast('✓ PO #' + po + ' assigned');
+  await saveSharedData('assignments');
+  await loadPORows();
+  closeModal('po-modal'); populateJobSelects(); refreshCurrentPage(); showToast('✓ PO #' + po + ' assigned');
 }
 
 // Bulk assign
@@ -1539,25 +1517,15 @@ function switchInboxTab(tab) {
   else if (tab === 'pdfs') renderInboxPDFs();
 }
 function renderInboxBills() {
-  // "Bills" tab now shows email-extracted POs needing review (needs_review status)
+  // "Bills" tab shows email-extracted POs needing review
   const el = document.getElementById('inbox-tab-bills'); if (!el) return;
   const review = (S.emailPOs||[]).filter(p => p.status === 'needs_review' || p.status === 'pending');
-  const newJobAlerts = (S.newJobAlerts||[]);
 
   let html = '';
 
-  // New job alerts section
-  if (newJobAlerts.length) {
-    html += `<div style="margin-bottom:16px;">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--yellow);margin-bottom:8px;">🆕 New Job Alerts (${newJobAlerts.length})</div>
-      <div id="new-job-alert-banner-inbox"></div>
-    </div>`;
-  }
-
-  // Email POs needing review
-  if (!review.length && !newJobAlerts.length) {
+  if (!review.length) {
     html += '<div class="alert alert-g">✓ All clear — no POs need review.</div>';
-  } else if (review.length) {
+  } else {
     html += `<div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--ink3);margin-bottom:10px;">📧 Email POs — ${review.length} need review</div>`;
     review.forEach(p => {
       const isNewJob = p.status === 'needs_review';
@@ -1583,30 +1551,12 @@ function renderInboxBills() {
 
   el.innerHTML = html;
 
-  // Render new job alerts in inbox
-  if (newJobAlerts.length) {
-    const alertEl = document.getElementById('new-job-alert-banner-inbox');
-    if (alertEl) {
-      alertEl.innerHTML = newJobAlerts.map(a => `
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);border-radius:10px;margin-bottom:8px;">
-          <div style="flex:1;min-width:0;">
-            <div style="font-weight:700;font-size:13px;color:var(--yellow);">"${esc(a.job_name)}"</div>
-            <div style="font-size:12px;color:var(--ink3);">PO #${esc(a.po_number||'?')} · ${esc(a.vendor||'')} · ${new Date(a.created_at).toLocaleDateString()}</div>
-          </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="btn btn-primary btn-sm" onclick="createJobFromAlert('${jsesc(a.id)}','${jsesc(a.job_name)}','${jsesc(a.po_id||'')}')">✓ Create Job</button>
-            <button class="btn btn-ghost btn-sm" onclick="assignAlertToExisting('${jsesc(a.id)}','${jsesc(a.job_name)}','${jsesc(a.po_id||'')}')">↳ Assign to Existing</button>
-            <button class="btn btn-ghost btn-sm" onclick="dismissJobAlert('${jsesc(a.id)}')">✕</button>
-          </div>
-        </div>`).join('');
-    }
-  }
 }
 function renderInboxPOs() {
   const el = document.getElementById('inbox-tab-pos'); if (!el) return;
   const unassigned = getFeedPOGroups().filter(g => !S.assignments[g.po]);
-  if (!unassigned.length) { el.innerHTML = '<div class="alert alert-g">All sheet POs assigned! 🎉</div>'; return; }
-  let html = `<div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--ink3);">${unassigned.length} unassigned sheet POs</span><button class="btn btn-ghost btn-sm" onclick="startFeedSelect('po');nav('home')">Multi-select</button></div>`;
+  if (!unassigned.length) { el.innerHTML = '<div class="alert alert-g">All POs assigned! 🎉</div>'; return; }
+  let html = `<div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--ink3);">${unassigned.length} unassigned POs</span><button class="btn btn-ghost btn-sm" onclick="startFeedSelect('po');nav('home')">Multi-select</button></div>`;
   unassigned.forEach(g => {
     html += `<div class="feed-item" style="cursor:pointer;" onclick="openPODetailModal('${jsesc(g.po)}')">
       <div class="feed-dot" style="background:var(--blue);"></div>
@@ -1626,7 +1576,9 @@ function renderInboxPDFs() {
 // ═══════════════════════════════════════════════════════════
 function renderJobsPage() { populateJobSelects(); if (_currentJob) onJobSelect(); }
 function onJobSelect() {
+  const prev = _currentJob;
   _currentJob = document.getElementById('jobs-sel')?.value || '';
+  if (_currentJob !== prev) _summaryFilter = {building: '', floor: '', unit: ''};
   document.getElementById('jobs-content').style.display = _currentJob ? 'block' : 'none';
   document.getElementById('jobs-empty').style.display = _currentJob ? 'none' : 'block';
   document.getElementById('jobs-ppb-cards').style.display = _currentJob ? 'block' : 'none';
@@ -2032,9 +1984,32 @@ function toggleSummaryView(job, mode) {
   S._summaryView[job] = mode;
   renderJobSummaryTab(job);
 }
+function setSummaryFilter(key, val, job) {
+  _summaryFilter[key] = val;
+  if (key === 'building') { _summaryFilter.floor = ''; _summaryFilter.unit = ''; }
+  if (key === 'floor') _summaryFilter.unit = '';
+  renderJobSummaryTab(job);
+}
+function clearSummaryFilter(job) { _summaryFilter = {building:'',floor:'',unit:''}; renderJobSummaryTab(job); }
+
 function renderJobSummaryTab(job) {
   const el = document.getElementById('jobs-tab-summary'); if (!el) return;
-  const rows = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  const allJobRows = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  const buildings = [...new Set(allJobRows.map(r => String(r['BUILDING']||'').trim()).filter(Boolean))].sort();
+  const filtByBldg = _summaryFilter.building ? allJobRows.filter(r => String(r['BUILDING']||'').trim() === _summaryFilter.building) : allJobRows;
+  const floors = [...new Set(filtByBldg.map(r => String(r['FLOOR']||'').trim()).filter(Boolean))].sort((a,b) => parseInt(a)-parseInt(b));
+  const filtByFloor = _summaryFilter.floor ? filtByBldg.filter(r => String(r['FLOOR']||'').trim() === _summaryFilter.floor) : filtByBldg;
+  const units = [...new Set(filtByFloor.map(r => parseUnitModel(String(r['UNIT']||'').trim()).base).filter(Boolean))].sort((a,b) => parseInt(a)-parseInt(b));
+  const rows = _summaryFilter.unit ? filtByFloor.filter(r => parseUnitModel(String(r['UNIT']||'').trim()).base === _summaryFilter.unit) : filtByFloor;
+  const filterLabel = [_summaryFilter.building?'Bldg '+_summaryFilter.building:'',_summaryFilter.floor?'Floor '+_summaryFilter.floor:'',_summaryFilter.unit?'Unit '+_summaryFilter.unit:''].filter(Boolean).join(' · ')||'All';
+  const filterHtml = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);">
+    <span style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Filter:</span>
+    <select class="inp inp-sm" style="max-width:140px;" onchange="setSummaryFilter('building',this.value,'${jsesc(job)}')"><option value="">All Buildings</option>${buildings.map(b=>'<option value="'+esc(b)+'"'+(_summaryFilter.building===b?' selected':'')+'>Bldg '+esc(b)+'</option>').join('')}</select>
+    <select class="inp inp-sm" style="max-width:120px;" onchange="setSummaryFilter('floor',this.value,'${jsesc(job)}')"><option value="">All Floors</option>${floors.map(f=>'<option value="'+esc(f)+'"'+(_summaryFilter.floor===f?' selected':'')+'>Floor '+esc(f)+'</option>').join('')}</select>
+    <select class="inp inp-sm" style="max-width:120px;" onchange="setSummaryFilter('unit',this.value,'${jsesc(job)}')"><option value="">All Units</option>${units.map(u=>'<option value="'+esc(u)+'"'+(_summaryFilter.unit===u?' selected':'')+'>Unit '+esc(u)+'</option>').join('')}</select>
+    ${filterLabel!=='All'?'<button class="btn btn-ghost btn-sm" onclick="clearSummaryFilter(\''+jsesc(job)+'\')">✕ Clear</button><span style="font-size:12px;font-weight:700;color:var(--accent);">'+esc(filterLabel)+'</span>':''}
+    <span style="margin-left:auto;font-size:11px;color:var(--ink3);">${rows.length} lines${filterLabel!=='All'?' (filtered)':''}</span>
+  </div>`;
   const items = getJobEstimate(job);
   const labor = getJobLabor(job);
   const matOrdered = rows.reduce((s,r) => s + (parseFloat(r['LINE TOTAL']||0)||0), 0);
@@ -2091,10 +2066,10 @@ function renderJobSummaryTab(job) {
 
   const allItems = Object.entries(itemMap).sort((a,b) => (b[1].orderedDollars + b[1].budgetDollars + b[1].bfDollars) - (a[1].orderedDollars + a[1].budgetDollars + a[1].bfDollars));
 
-  el.innerHTML = `
+  el.innerHTML = filterHtml + `
     <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
       <span style="font-size:12px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">View:</span>
-      <button class="btn ${viewMode==='whole'?'btn-primary':'btn-ghost'} btn-sm" onclick="toggleSummaryView('${jsesc(job)}','whole')">📊 Whole Job (incl. history)</button>
+      <button class="btn ${viewMode==='whole'?'btn-primary':'btn-ghost'} btn-sm" onclick="toggleSummaryView('${jsesc(job)}','whole')">📊 Whole Job</button>
       <button class="btn ${viewMode==='live'?'btn-primary':'btn-ghost'} btn-sm" onclick="toggleSummaryView('${jsesc(job)}','live')">⚡ Current POs only</button>
       ${bf ? '<span style="font-size:11px;color:var(--ink3);">History: ' + fmt(bfMatTotal+bfLabTotal+bfTaxTotal) + '</span>' : ''}
     </div>
@@ -2557,21 +2532,36 @@ async function savePDFEdit(id) {
       headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify(patch)
     });
-    if (res.ok) { showToast('✓ Record updated'); closeModal('po-modal'); loadPendingPOs(); }
+    if (res.ok) { showToast('✓ Record updated'); closeModal('po-modal'); await Promise.all([loadPORows(), loadEmailPOs()]); populateJobSelects(); updateInboxBadge(); refreshCurrentPage(); loadPendingPOs(); }
     else { const err = await res.text(); showToast('Save failed: ' + err, true); }
   } catch(err) { showToast('Save error: ' + err.message, true); }
 }
 async function deletePORecord(id, poNumber) {
-  if (!confirm('Delete extraction for PO #' + poNumber + '?\nThis only removes the PDF record — not Google Sheet data.')) return;
+  if (!confirm('Delete PO #' + poNumber + '? This cannot be undone.')) return;
   const res = await fetch(SB_URL + '/rest/v1/po_pdfs?id=eq.' + id, { method:'DELETE', headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'} });
-  if (res.ok) { showToast('✓ Removed'); closeModal('po-modal'); loadPendingPOs(); } else showToast('Error: ' + res.status, true);
+  if (res.ok) {
+    showToast('✓ Removed');
+    closeModal('po-modal');
+    await loadPORows(); await loadEmailPOs();
+    populateJobSelects(); updateInboxBadge(); refreshCurrentPage();
+    loadPendingPOs();
+  } else showToast('Error: ' + res.status, true);
 }
 // Delete an assignment (saved PO / bill match)
 async function deleteAssignment(type, id) {
-  if (!confirm('Delete ' + type + ' assignment for ' + id + '?\nThe original data stays — only your assignment is removed.')) return;
+  // Capture for undo
+  const snapAssign = type === 'po' ? {...(S.assignments[id]||{})} : null;
+  const snapBillAssign = type === 'bill' ? {...(S.billAssignments[id]||{})} : null;
+  const snapActual = type === 'bill' ? {...(S.actuals?.[id]||{})} : null;
   if (type === 'po') { delete S.assignments[id]; await saveSharedData('assignments'); }
-  else if (type === 'bill') { delete S.billAssignments[id]; delete S.actuals[id]; await Promise.all([saveSharedData('billAssignments'), saveSharedData('actuals')]); }
-  showToast('✓ Removed'); renderActivityFeed(); updateInboxBadge();
+  else if (type === 'bill') { delete S.billAssignments[id]; if (S.actuals) delete S.actuals[id]; await Promise.all([saveSharedData('billAssignments'), saveSharedData('actuals')]); }
+  pushUndo('Removed ' + type + ' ' + id, async () => {
+    if (type === 'po' && snapAssign) { S.assignments[id] = snapAssign; await saveSharedData('assignments'); }
+    else if (type === 'bill') { if (snapBillAssign) S.billAssignments[id] = snapBillAssign; if (snapActual && S.actuals) S.actuals[id] = snapActual; await Promise.all([saveSharedData('billAssignments'), saveSharedData('actuals')]); }
+    refreshCurrentPage();
+  });
+  showToast('✓ Removed — <a href="#" onclick="doUndo();return false;" style="color:var(--accent);">Undo</a>');
+  refreshCurrentPage(); updateInboxBadge();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2590,8 +2580,8 @@ function switchRawTab(tab) {
 }
 function renderRawPO() {
   const el = document.getElementById('raw-tab-raw-po'); if (!el) return;
-  if (!S.rows.length) { el.innerHTML = '<div class="no-data">No PO data. Click Sync first.</div>'; return; }
-  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:11px;color:var(--ink3);">Click any row to edit. Data comes from Google Sheet — edits are saved as local overrides.</div><div style="font-size:11px;color:var(--ink3);">' + S.rows.length + ' rows</div></div>';
+  if (!S.rows.length) { el.innerHTML = '<div class="no-data">No PO data. Click ⟳ Sync to load from Supabase.</div>'; return; }
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:11px;color:var(--ink3);">PO lines from Supabase po_pdfs — click ✏ to edit location/job overrides.</div><div style="font-size:11px;color:var(--ink3);">' + S.rows.length + ' lines</div></div>';
   html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Job</th><th>Material</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Total</th><th>Bldg</th><th>Fl</th><th>Unit</th><th>Vendor</th><th>Actions</th></tr></thead><tbody>';
   S.rows.slice(0, 300).forEach((r, idx) => {
     html += '<tr><td>' + esc(r['PO NUMBER']||'') + '</td><td>' + esc((r['JOB']||'').replace('JOB ','')) + '</td><td>' + esc(r['MATERIAL']||'') + '</td><td class="tbl-r">' + (r['QTY']||'') + '</td><td>' + esc(r['UOM']||'') + '</td><td class="tbl-r">' + fmt(parseFloat(r['LINE TOTAL']||0)) + '</td><td>' + esc(r['BUILDING']||'') + '</td><td>' + esc(r['FLOOR']||'') + '</td><td>' + esc(r['UNIT']||'') + '</td><td>' + esc(r['VENDOR']||'') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editPORow(' + idx + ')">✏</button> <button class="btn btn-danger btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(r['MATERIAL']||'') + '\')">🏷</button></td></tr>';
@@ -2930,13 +2920,13 @@ document.querySelectorAll('.modal-overlay').forEach(ov => {
 // INIT
 // ═══════════════════════════════════════════════════════════
 async function init() {
-  showToast('Loading data...');
+  showToast('Loading...');
   await loadSharedData();
-  loadBackfillData(); // load backfill in background (don't await — non-blocking)
+  loadBackfillData();
   populateJobSelects();
-  await Promise.all([loadEmailPOs(), loadNewJobAlerts()]);
-  syncAll();
-  renderHome();
+  await syncAll();
+  const savedPage = localStorage.getItem('dw_page') || 'home';
+  nav(savedPage);
 }
 
 // Check auth on load
