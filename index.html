@@ -860,6 +860,7 @@ async function syncAll() {
   const btn = document.getElementById('sync-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
   showToast('Syncing...');
+  let syncOk = false;
   try {
     // Fetch Google Sheet PO data + email-extracted POs in parallel
     await Promise.all([fetchRawData(), loadEmailPOs(), loadNewJobAlerts()]);
@@ -867,14 +868,14 @@ async function syncAll() {
     localStorage.setItem('dw_last_sync', S.lastSync);
     const lsl = document.getElementById('last-sync-label'); if(lsl) lsl.textContent = 'Last sync: ' + new Date().toLocaleTimeString();
     const smi = document.getElementById('sheet-status-mini'); if(smi){smi.textContent='✓ ' + S.rows.length + ' PO rows · ' + (S.emailPOs?.length||0) + ' email POs';smi.className='sheet-status ok';}
-    const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--green)';
     populateJobSelects(); updateInboxBadge();
     showToast('✓ Synced — ' + S.rows.length + ' sheet rows · ' + (S.emailPOs?.length||0) + ' email POs');
+    syncOk = true;
   } catch(e) {
     showToast('⚠️ Sync failed: ' + e.message, true);
-    const dot = document.getElementById('sync-dot'); if(dot) dot.style.background='var(--red)';
   }
-  btn.disabled = false; btn.innerHTML = '⟳';
+  btn.disabled = false; btn.innerHTML = '⟳ <span class="sync-dot" id="sync-dot"></span>';
+  const dot = document.getElementById('sync-dot'); if(dot) dot.style.background = syncOk ? 'var(--green)' : 'var(--red)';
   try { populateJobSelects(); } catch(e) {}
   try { updateInboxBadge(); } catch(e) {}
   const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
@@ -1514,7 +1515,7 @@ function renderDashCharts(jobData) {
 // INBOX (FIX #7: includes PDF extractions tab)
 // ═══════════════════════════════════════════════════════════
 function renderInbox() {
-  const activeTab = document.querySelector('#inbox-tabs .tab-btn.active')?.dataset?.tab || 'review';
+  const activeTab = document.querySelector('#inbox-tabs .tab-btn.active')?.dataset?.tab || 'bills';
   switchInboxTab(activeTab);
 }
 function switchInboxTab(tab) {
