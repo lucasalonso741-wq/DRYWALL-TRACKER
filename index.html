@@ -2174,7 +2174,7 @@ function renderEstimateTab(job) {
   const _estEmail = (S.emailPOs||[]).filter(p => p.status==='confirmed' && p.job_name===job)
     .flatMap(p => (p.line_items||p.lines||[]).map(li => ({'MATERIAL':li.description||li.name||li.sku||'','QTY':parseFloat(li.qty||li.quantity||0)||0})));
   const rows = [..._estSheet, ..._estEmail];
-  let html = '<div class="card" style="margin-bottom:16px;">'<div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Line</button></div></div><div class="card-body" style="overflow-x:auto;">';
+  let html = '<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Line</button></div></div><div class="card-body" style="overflow-x:auto;">';
   html += '<table class="tbl"><thead><tr><th>Cat</th><th>Material</th><th>Use</th><th>UOM</th><th class="tbl-r">Price</th><th class="tbl-r" style="min-width:80px;">Qty</th><th class="tbl-r">Total</th><th class="tbl-r">Ordered</th><th></th></tr></thead><tbody>';
   let lastCat = '', grandTotal = 0;
   items.forEach((it, i) => {
