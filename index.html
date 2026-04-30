@@ -661,6 +661,19 @@ function findBestPOMatch(billRow) {
   return bestScore >= 5 ? best : null;
 }
 function normalizeJobName(s) { return String(s||'').toUpperCase().replace(/^JOB\s+/g,'').replace(/\s*@\s*/g,' AT ').replace(/[^A-Z0-9]+/g,' ').trim(); }
+// "106A" → {base:"106", model:"A"} — model suffix is a trailing single letter on a numeric unit
+function parseUnitModel(raw) {
+  const s = String(raw||'').trim();
+  const m = s.match(/^(\d+)([A-Za-z])$/);
+  if (m) return { base: m[1], model: m[2].toUpperCase() };
+  return { base: s, model: '' };
+}
+// Match two unit strings accounting for model suffix: "106A" matches "106", "106A" matches "106A"
+function unitsMatch(rawUnit, structUnit) {
+  const r = parseUnitModel(rawUnit);
+  const s = parseUnitModel(structUnit);
+  return r.base === s.base;
+}
 function getBackfillForJob(job) {
   // Backfill data is an object: {jobName: {materialItems:{}, laborVendors:{}, materialTotal, laborTotal, taxTotal}}
   const bf = S._backfillJobs;
@@ -1748,10 +1761,12 @@ function renderMapMaterial(job, el) {
       const genSpend = genRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
       if (genBoards > 0 || genSpend > 0) html += buildUnitCard(job, fl.floor, fl.bldg, 'General', genBoards, 0, genSpend, true);
       fl.units.forEach(u => {
-        const uRows = flRows.filter(r => String(r['UNIT']||'').trim() === String(u.unit));
+        const uRows = flRows.filter(r => { const ru = String(r['UNIT']||'').trim(); return ru && unitsMatch(ru, String(u.unit)); });
         const uBoards = uRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
         const uSpend = uRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
-        html += buildUnitCard(job, fl.floor, fl.bldg, u.unit, uBoards, parseFloat(u.budgetBoards||0), uSpend, false);
+        // Collect any model suffixes seen in real PO data (e.g. "A" from "106A")
+        const models = [...new Set(uRows.map(r => parseUnitModel(String(r['UNIT']||'').trim()).model).filter(Boolean))];
+        html += buildUnitCard(job, fl.floor, fl.bldg, u.unit, uBoards, parseFloat(u.budgetBoards||0), uSpend, false, models);
       });
       html += '</div></div></div>';
     });
@@ -1760,10 +1775,11 @@ function renderMapMaterial(job, el) {
   el.innerHTML = html || '<div class="alert alert-y">No PO data found for this job.</div>';
 }
 
-function buildUnitCard(job, floor, bldg, unit, boards, budBoards, spend, isGen) {
+function buildUnitCard(job, floor, bldg, unit, boards, budBoards, spend, isGen, models) {
   const cls = boards > 0 ? (budBoards > 0 && boards > budBoards ? 'over-budget' : budBoards > 0 && boards > budBoards*0.85 ? 'near-budget' : 'has-data') : (spend > 0 ? 'has-data' : 'no-data');
+  const modelTag = models && models.length ? ' <span style="font-size:9px;background:var(--surface3);padding:1px 5px;border-radius:4px;color:var(--ink2);font-weight:700;">Model ' + models.map(esc).join('/') + '</span>' : '';
   return `<div class="unit-card ${cls}" onclick="openUnitDetail('${jsesc(job)}','${floor}','${jsesc(unit)}','${jsesc(bldg||'')}')">
-    <div class="unit-num">${isGen ? '📦 General' : unit}</div>
+    <div class="unit-num" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">${isGen ? '📦 General' : esc(unit)}${modelTag}</div>
     ${boards > 0 ? '<div class="unit-boards">' + Math.round(boards) + ' boards' + (budBoards > 0 ? ' / ' + Math.round(budBoards) : '') + '</div>' : ''}
     ${spend > 0 ? '<div class="unit-spend">' + fmt(spend) + '</div>' : '<div class="unit-spend" style="color:var(--ink3);">No data</div>'}
   </div>`;
@@ -1859,7 +1875,7 @@ function toggleFloorBlock(hdr) {
 }
 
 function openUnitDetail(job, floor, unit, bldg) {
-  const rows = S.rows.filter(r => { const rfl=String(r['FLOOR']||'').trim(), ru=String(r['UNIT']||'').trim(), rb=String(r['BUILDING']||'').trim(); if(rfl!==String(floor)) return false; if(bldg&&rb&&rb!==bldg) return false; if(unit==='General') return !ru||ru==='N/A'; return ru===String(unit); });
+  const rows = S.rows.filter(r => { const rfl=String(r['FLOOR']||'').trim(), ru=String(r['UNIT']||'').trim(), rb=String(r['BUILDING']||'').trim(); if(rfl!==String(floor)) return false; if(bldg&&rb&&rb!==bldg) return false; if(unit==='General') return !ru||ru==='N/A'; return ru && unitsMatch(ru, String(unit)); });
   const boards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
   const spend = rows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
   const matMap = {};
@@ -1867,7 +1883,9 @@ function openUnitDetail(job, floor, unit, bldg) {
   const CAT_ORDER=['boards','metal','finish','supplies','tax','other'];
   const CAT_BG={boards:'rgba(79,142,247,.12)',metal:'rgba(251,191,36,.12)',finish:'rgba(52,211,153,.12)',supplies:'var(--surface3)',tax:'rgba(248,113,113,.12)',other:'var(--surface3)'};
   const CAT_TC={boards:'var(--blue)',metal:'var(--yellow)',finish:'var(--green)',supplies:'var(--ink3)',tax:'var(--red)',other:'var(--ink3)'};
-  document.getElementById('unit-modal-title').textContent = job.replace('JOB ','') + ' · Floor ' + floor + ' · ' + (unit==='General'?'General':'Unit '+unit);
+  const modalModels = [...new Set(rows.map(r => parseUnitModel(String(r['UNIT']||'').trim()).model).filter(Boolean))];
+  const modelSuffix = modalModels.length ? ' — Model ' + modalModels.join('/') : '';
+  document.getElementById('unit-modal-title').textContent = job.replace('JOB ','') + ' · Floor ' + floor + ' · ' + (unit==='General'?'General':'Unit '+unit) + modelSuffix;
   document.getElementById('unit-modal-body').innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
       <div class="stat" style="padding:12px;text-align:center;"><div class="stat-lbl">Boards</div><div style="font-size:24px;font-weight:800;color:var(--blue);">${Math.round(boards)}</div></div>
