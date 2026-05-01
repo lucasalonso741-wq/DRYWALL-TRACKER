@@ -330,12 +330,14 @@ a{color:var(--accent);}
   <div id="jobs-content" style="display:none;">
     <div class="tabs">
       <button class="tab-btn active" data-tab="map" onclick="switchJobTab('map')">🗺 Map</button>
+      <button class="tab-btn" data-tab="orders" onclick="switchJobTab('orders')">📋 Orders</button>
       <button class="tab-btn" data-tab="estimate" onclick="switchJobTab('estimate')">📐 Estimate</button>
       <button class="tab-btn" data-tab="bills" onclick="switchJobTab('bills')">💰 Bills</button>
       <button class="tab-btn" data-tab="summary" onclick="switchJobTab('summary')">📊 Summary</button>
       <button class="tab-btn" data-tab="allmats" onclick="switchJobTab('allmats')">📦 All Materials</button>
     </div>
     <div id="jobs-tab-map" class="tab-panel active"></div>
+    <div id="jobs-tab-orders" class="tab-panel"></div>
     <div id="jobs-tab-estimate" class="tab-panel"></div>
     <div id="jobs-tab-bills" class="tab-panel"></div>
     <div id="jobs-tab-summary" class="tab-panel"></div>
@@ -919,13 +921,21 @@ async function loadPORows() {
       };
       const lines = Array.isArray(p.lines) ? p.lines : [];
       if (!lines.length) return [{ ...base, 'MATERIAL': '', 'QTY': 0, 'LINE TOTAL': parseFloat(p.total || 0), 'UOM': '' }];
-      return lines.map(l => ({
+      const expanded = lines.map(l => ({
         ...base,
         'MATERIAL': l.description || l.sku || '',
         'QTY': parseFloat(l.qty || 0),
         'LINE TOTAL': parseFloat(l.amount || 0),
         'UOM': l.uom || ''
       }));
+      // When line amounts are all $0 but the PO has a total, spread it evenly so nothing shows as $0
+      const lineSum = expanded.reduce((s,r) => s + r['LINE TOTAL'], 0);
+      const poTotal = parseFloat(p.total || 0);
+      if (lineSum === 0 && poTotal > 0) {
+        const perLine = poTotal / expanded.length;
+        expanded.forEach(r => { r['LINE TOTAL'] = perLine; });
+      }
+      return expanded;
     });
     console.log('loadPORows ✓', S.rows.length, 'lines from', pdfs.length, 'POs');
   } catch(e) { console.warn('loadPORows failed:', e); }
@@ -1721,14 +1731,14 @@ function renderInboxHistory() {
     html += '<div class="section-title" style="margin-bottom:8px;">📦 Tracked POs</div><div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Job</th><th>Vendor</th><th>Location</th><th class="tbl-r">Total</th><th>Actions</th></tr></thead><tbody>';
     assigned.sort((a,b)=>String(b[1].date||'').localeCompare(String(a[1].date||''))).forEach(([po,a]) => {
       const loc = [a.building||a.bldg, a.floor?'Fl '+a.floor:'', a.unit?'U '+a.unit:''].filter(Boolean).join(' ');
-      html += `<tr><td style="font-weight:700;">#${esc(po)}</td><td>${esc((a.job||'').replace('JOB ',''))}</td><td>${esc(a.vendor||'')}</td><td>${loc ? esc(loc) : '<span style="color:var(--yellow);font-size:11px;">No location</span>'}</td><td class="tbl-r">${fmt(a.total||0)}</td><td style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" onclick="editAssignedPO('${jsesc(po)}')">✏</button> <button class="btn btn-danger btn-sm" onclick="deleteAssignment('po','${jsesc(po)}');renderInboxHistory()">🗑</button></td></tr>`;
+      html += `<tr><td style="font-weight:700;">#${esc(po)}</td><td>${esc((a.job||'').replace('JOB ',''))}</td><td>${esc(a.vendor||'')}</td><td>${loc ? esc(loc) : '<span style="color:var(--yellow);font-size:11px;">No location</span>'}</td><td class="tbl-r">${fmt(a.total||0)}</td><td style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" onclick="editAssignedPO('${jsesc(po)}')">✏</button> <button class="btn btn-danger btn-sm" onclick="deleteAssignment('po','${jsesc(po)}')">🗑</button></td></tr>`;
     });
     html += '</tbody></table></div>';
   }
   if (matched.length) {
     html += '<div class="section-title" style="margin-top:20px;margin-bottom:8px;">💰 Matched Bills</div><div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Invoice</th><th>Job</th><th>Vendor</th><th>Category</th><th class="tbl-r">Total</th><th>Actions</th></tr></thead><tbody>';
     matched.forEach(([inv,ba]) => {
-      html += `<tr><td style="font-weight:700;">#${esc(inv)}</td><td>${esc((ba.job||'').replace('JOB ',''))}</td><td>${esc(ba.vendor||'')}</td><td>${esc(ba.category||'Material')}</td><td class="tbl-r">${fmt(ba.total||0)}</td><td><button class="btn btn-danger btn-sm" onclick="deleteAssignment('bill','${jsesc(inv)}');renderInboxHistory()">🗑 Unmatch</button></td></tr>`;
+      html += `<tr><td style="font-weight:700;">#${esc(inv)}</td><td>${esc((ba.job||'').replace('JOB ',''))}</td><td>${esc(ba.vendor||'')}</td><td>${esc(ba.category||'Material')}</td><td class="tbl-r">${fmt(ba.total||0)}</td><td><button class="btn btn-danger btn-sm" onclick="deleteAssignment('bill','${jsesc(inv)}')">🗑 Unmatch</button></td></tr>`;
     });
     html += '</tbody></table></div>';
   }
@@ -1758,6 +1768,7 @@ function switchJobTab(tab) {
   const panel = document.getElementById('jobs-tab-' + tab); if (panel) panel.classList.add('active');
   if (!_currentJob) return;
   if (tab === 'map') renderJobMap(_currentJob);
+  else if (tab === 'orders') renderJobOrdersTab(_currentJob);
   else if (tab === 'estimate') renderEstimateTab(_currentJob);
   else if (tab === 'bills') renderJobBillsTab(_currentJob);
   else if (tab === 'summary') renderJobSummaryTab(_currentJob);
@@ -2106,7 +2117,7 @@ function openUnitDetail(job, floor, unit, bldg) {
         <td>${assigned ? '<span class="badge badge-green">✓ Assigned</span>' : '<span class="badge badge-yellow">Unassigned</span>'}</td>
         <td style="white-space:nowrap;">
           <button class="btn btn-ghost btn-sm" onclick="closeModal('unit-modal');openPODetailModal('${jsesc(po)}')">✏ Edit</button>
-          ${assigned ? '<button class="btn btn-danger btn-sm" style="margin-left:4px;" onclick="deleteAssignment(\'po\',\''+jsesc(po)+'\');closeModal(\'unit-modal\');renderJobMap(\''+jsesc(job)+'\')">🗑 Unassign</button>' : ''}
+          ${assigned ? '<button class="btn btn-danger btn-sm" style="margin-left:4px;" onclick="closeModal(\'unit-modal\');deleteAssignment(\'po\',\''+jsesc(po)+'\')">🗑 Unassign</button>' : ''}
         </td>
       </tr>`;
     });
@@ -2344,6 +2355,71 @@ function renderJobBillsTab(job) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// ORDERS TAB — all POs assigned to this job
+// ═══════════════════════════════════════════════════════════
+function renderJobOrdersTab(job) {
+  const el = document.getElementById('jobs-tab-orders'); if (!el) return;
+  const jobRows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  // Group by PO number
+  const poGroups = {};
+  jobRows.forEach(r => {
+    const po = String(r['PO NUMBER']||'').trim(); if (!po) return;
+    if (!poGroups[po]) poGroups[po] = { po, vendor:r['VENDOR']||'', date:r['DATE']||'', building:r['BUILDING']||'', floor:r['FLOOR']||'', unit:r['UNIT']||'', rows:[], total:0, boards:0 };
+    poGroups[po].rows.push(r);
+    poGroups[po].total += parseFloat(r['LINE TOTAL']||0);
+    if (isBoard(r['MATERIAL']||'')) poGroups[po].boards += parseFloat(r['QTY']||0);
+  });
+  // Sort newest date first; fall back to PO number order
+  const pos = Object.values(poGroups).sort((a,b) => String(b.date||'').localeCompare(String(a.date||'')) || String(a.po).localeCompare(String(b.po)));
+
+  if (!pos.length) {
+    el.innerHTML = '<div class="alert alert-y">No POs assigned to this job yet. Use the Feed or Inbox to assign POs.</div>';
+    return;
+  }
+
+  const totalSpend  = pos.reduce((s,p) => s + p.total, 0);
+  const totalBoards = pos.reduce((s,p) => s + p.boards, 0);
+
+  let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:16px;">
+    <div class="stat"><div class="stat-lbl">POs</div><div class="stat-val">${pos.length}</div></div>
+    <div class="stat"><div class="stat-lbl">Total Spend</div><div class="stat-val" style="color:var(--accent);">${fmt(totalSpend)}</div></div>
+    <div class="stat"><div class="stat-lbl">Boards Ordered</div><div class="stat-val" style="color:var(--blue);">${Math.round(totalBoards)}</div></div>
+    <div class="stat"><div class="stat-lbl">$/Board</div><div class="stat-val">${totalBoards>0?'$'+(totalSpend/totalBoards).toFixed(0):'—'}</div></div>
+  </div>
+  <div class="card"><div class="card-hdr">
+    <span class="card-title">All Orders — ${pos.length} POs</span>
+    <span style="font-size:11px;color:var(--ink3);">Newest first · click row to view / edit</span>
+  </div>
+  <div class="card-body" style="padding:0;overflow-x:auto;">
+  <table class="tbl" style="border:none;">
+    <thead><tr>
+      <th>PO #</th><th>Vendor</th><th>Date</th><th>Bldg</th><th>Floor</th><th>Unit</th>
+      <th class="tbl-r">Boards</th><th class="tbl-r">Total</th><th class="tbl-r">Lines</th>
+    </tr></thead><tbody>`;
+
+  pos.forEach(p => {
+    const asgn = S.assignments[p.po] || {};
+    const bldg  = asgn.building || asgn.bldg || p.building || '—';
+    const floor = asgn.floor  || p.floor  || '—';
+    const unit  = asgn.unit   || p.unit   || '—';
+    html += `<tr style="cursor:pointer;" onclick="openPODetailModal('${jsesc(p.po)}')">
+      <td style="font-weight:700;">#${esc(p.po)}</td>
+      <td>${esc(p.vendor)}</td>
+      <td style="color:var(--ink3);white-space:nowrap;">${esc(p.date)}</td>
+      <td>${esc(String(bldg))}</td>
+      <td>${esc(String(floor))}</td>
+      <td>${esc(String(unit))}</td>
+      <td class="tbl-r">${p.boards>0?'<span style="font-weight:700;color:var(--blue);">'+Math.round(p.boards)+'</span>':'—'}</td>
+      <td class="tbl-r" style="font-weight:700;">${fmt(p.total)}</td>
+      <td class="tbl-r" style="color:var(--ink3);">${p.rows.length}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div></div>';
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════
 // SUMMARY TAB (FIX #4: All material items)
 // ═══════════════════════════════════════════════════════════
 function toggleSummaryView(job, mode) {
@@ -2387,12 +2463,14 @@ function renderJobSummaryTab(job) {
     if (activeBldg && normBldg(bldg) !== normBldg(activeBldg)) return;
     const scopeKey = 'floor:' + bldg + ':' + fl;
     const sd = scopeData[scopeKey] || {};
-    // Budget from scope planner
-    let budgetBoards = 0, budgetDollars = 0;
+    // Budget boards come from the job structure (set in Floors & Units setup), NOT scope planner
+    const structFloor = structFloors.find(f => normFloor(String(f.floor)) === normFloor(fl) && (!bldg || normBldg(String(f.bldg||'')) === normBldg(bldg)));
+    const budgetBoards = parseFloat(structFloor?.budgetBoards || 0);
+    // Scope-planner dollars still computed for the material-detail drill-down
+    let budgetDollars = 0;
     Object.entries(sd).forEach(([matName, qty]) => {
       const q = parseFloat(qty)||0; if (!q) return;
       budgetDollars += q * (priceMap[matName]||0);
-      if (isBoard(matName)) budgetBoards += q;
     });
     // Ordered from PO rows
     const flRowsFiltered = allJobRows.filter(r => normFloor(String(r['FLOOR']||'').trim()) === normFloor(fl) && (!bldg || normBldg(String(r['BUILDING']||'').trim()) === normBldg(bldg)));
@@ -2420,11 +2498,13 @@ function renderJobSummaryTab(job) {
     </div>`;
   };
 
-  const totalBudgetBoards = floorRows.reduce((s,f)=>s+f.budgetBoards,0);
+  // Budget boards = sum of per-floor board budgets from job structure (what the user typed in setup)
+  const totalBudgetBoards = (struct?.floors||[]).reduce((s,f)=>s+parseFloat(f.budgetBoards||0),0);
   const totalOrderedBoards = floorRows.reduce((s,f)=>s+f.orderedBoards,0);
-  const totalBudgetDollars = floorRows.reduce((s,f)=>s+f.budgetDollars,0);
+  // Estimate grand total = whole-job estimate (qty × price per item from the Estimate tab)
+  const estGrandTotal = estItems.reduce((s,it)=>s+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0),0);
   const totalOrderedDollars = floorRows.reduce((s,f)=>s+f.orderedDollars,0);
-  const hasScopeData = floorRows.some(f=>f.budgetDollars>0||f.budgetBoards>0);
+  const hasScopeData = totalBudgetBoards > 0 || estGrandTotal > 0;
 
   let html = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);">
     <span style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Filter:</span>
@@ -2440,20 +2520,22 @@ function renderJobSummaryTab(job) {
   // Summary strip
   html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px;">
     <div class="card" style="padding:12px 16px;">
-      <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Budget (Boards)</div>
+      <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Budget Boards</div>
       <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;">${Math.round(totalBudgetBoards)||'—'}</div>
+      <div style="font-size:10px;color:var(--ink3);margin-top:2px;">from floor setup</div>
     </div>
     <div class="card" style="padding:12px 16px;">
-      <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Ordered (Boards)</div>
+      <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Ordered Boards</div>
       <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:var(--blue);">${Math.round(totalOrderedBoards)||'—'}</div>
     </div>
     <div class="card" style="padding:12px 16px;">
-      <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Budget $</div>
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;">${totalBudgetDollars>0?fmt(totalBudgetDollars):'—'}</div>
+      <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Estimate Budget</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;">${estGrandTotal>0?fmt(estGrandTotal):'—'}</div>
+      <div style="font-size:10px;color:var(--ink3);margin-top:2px;">whole-job estimate</div>
     </div>
     <div class="card" style="padding:12px 16px;">
       <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;">Ordered $</div>
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:${totalOrderedDollars>totalBudgetDollars&&totalBudgetDollars>0?'var(--red)':'var(--blue)'};">${totalOrderedDollars>0?fmt(totalOrderedDollars):'—'}</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:${totalOrderedDollars>estGrandTotal&&estGrandTotal>0?'var(--red)':'var(--blue)'};">${totalOrderedDollars>0?fmt(totalOrderedDollars):'—'}</div>
     </div>
   </div>`;
 
@@ -2465,7 +2547,7 @@ function renderJobSummaryTab(job) {
         <th>Floor</th><th>Bldg</th>
         <th class="tbl-r">Budget Bds</th><th class="tbl-r">Ordered Bds</th>
         <th style="min-width:140px;">Board Progress</th>
-        <th class="tbl-r">Budget $</th><th class="tbl-r">Ordered $</th>
+        <th class="tbl-r">Ordered $</th>
         <th class="tbl-r">PO Lines</th>
       </tr></thead>
       <tbody>
@@ -2477,11 +2559,10 @@ function renderJobSummaryTab(job) {
           <td class="tbl-r">${f.budgetBoards>0?Math.round(f.budgetBoards):'—'}</td>
           <td class="tbl-r" style="font-weight:700;color:${f.orderedBoards>0?'var(--blue)':'var(--ink3)'};">${f.orderedBoards>0?Math.round(f.orderedBoards):'—'}</td>
           <td>${barHtml(f.orderedBoards, f.budgetBoards)}</td>
-          <td class="tbl-r">${f.budgetDollars>0?fmt(f.budgetDollars):'—'}</td>
           <td class="tbl-r" style="font-weight:700;">${f.orderedDollars>0?fmt(f.orderedDollars):'—'}</td>
           <td class="tbl-r" style="color:var(--ink3);">${f.orderedLines||'—'}</td>
         </tr>`;
-      }).join('') : `<tr><td colspan="8" class="no-data">No floor data yet — set up floors in the job structure and enter scope quantities in the Estimate tab.</td></tr>`}
+      }).join('') : `<tr><td colspan="7" class="no-data">No floor data yet — set up floors in the job structure.</td></tr>`}
       </tbody>
     </table>
     </div></div>`;
@@ -2526,25 +2607,11 @@ function renderJobSummaryTab(job) {
               ? `<button class="btn btn-ghost btn-sm" style="font-size:10px;" onclick="openMatAssignModal('${jsesc(job)}','${jsesc(name)}')">↔ Assign to estimate</button>`
               : (d.orderedQty > 0 ? '<span style="font-size:11px;color:var(--ink3);">No budget set</span>' : '—'));
         return `<tr>
-          <td><div style="font-weight:600;">${esc(it.label)}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px;">${esc([...it.rawNames].slice(0,3).join(' • '))}${it.rawNames.size>3?' +'+(it.rawNames.size-3)+' more':''}</div></td>
-          <td class="tbl-r">${it.budgetQty > 0 ? Math.round(it.budgetQty) : '—'}</td>
-          <td class="tbl-r" style="font-weight:700;color:${it.orderedQty>0?'var(--blue)':'var(--ink3)'};">${it.orderedQty > 0 ? Math.round(it.orderedQty) : '—'}</td>
-          <td>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <div style="flex:1;background:var(--surface3);border-radius:4px;height:8px;overflow:hidden;min-width:60px;">
-                ${qtyPct>0 ? '<div style="height:100%;width:' + Math.min(qtyPct,100).toFixed(0) + '%;background:' + barColor + ';border-radius:4px;"></div>' : ''}
-              </div>
-              <span style="font-size:11px;font-weight:700;color:${barColor};min-width:40px;text-align:right;">${qtyPct > 0 ? (qtyPct>999 ? '∞' : qtyPct.toFixed(0) + '%') : '—'}</span>
-            </div>
-          </td>
-          <td class="tbl-r">${it.budgetDollars > 0 ? fmt(it.budgetDollars) : '—'}</td>
-          <td class="tbl-r" style="font-weight:700;">${it.orderedDollars > 0 ? fmt(it.orderedDollars) : '—'}</td>
-          ${viewMode==='whole'?'<td class="tbl-r" style="color:var(--yellow);">' + (it.bfDollars > 0 ? fmt(it.bfDollars) : '—') + '</td>':''}
-          <td>${statusBadge}</td>
-          <td style="white-space:nowrap;">
-            ${firstRaw ? '<button class="btn btn-ghost btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(firstRaw) + '\')" title="Re-categorize">🏷</button>' : ''}
-            ${!it.budgeted && (it.orderedDollars > 0 || it.bfDollars > 0) ? ' <button class="btn btn-blue btn-sm" onclick="addToEstimateFromSummary(\'' + jsesc([...it.rawNames][0]||'') + '\',\'' + jsesc(it.label) + '\')" title="Add to Estimate">+ Est</button>' : ''}
-          </td>
+          <td>${nameCell}</td>
+          <td class="tbl-r">${d.budgetQty > 0 ? Math.round(d.budgetQty) : '—'}</td>
+          <td class="tbl-r" style="font-weight:700;color:${d.orderedQty>0?'var(--blue)':'var(--ink3)'};">${d.orderedQty > 0 ? Math.round(d.orderedQty) : '—'}</td>
+          <td>${statusCell}</td>
+          <td class="tbl-r" style="font-weight:700;">${d.orderedDollars > 0 ? fmt(d.orderedDollars) : '—'}</td>
         </tr>`;
       }).join('')}
       ${!matEntries.length?'<tr><td colspan="5" class="no-data">No budget or ordered data for this floor yet.</td></tr>':''}
@@ -3034,13 +3101,15 @@ function switchRawTab(tab) {
 function renderRawPO() {
   const el = document.getElementById('raw-tab-raw-po'); if (!el) return;
   if (!S.rows.length) { el.innerHTML = '<div class="no-data">No PO data. Click ⟳ Sync to load from Supabase.</div>'; return; }
-  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:11px;color:var(--ink3);">PO lines from Supabase po_pdfs — click ✏ to edit location/job overrides.</div><div style="font-size:11px;color:var(--ink3);">' + S.rows.length + ' lines</div></div>';
-  html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Job</th><th>Material</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Total</th><th>Bldg</th><th>Fl</th><th>Unit</th><th>Vendor</th><th>Actions</th></tr></thead><tbody>';
-  S.rows.slice(0, 300).forEach((r, idx) => {
-    html += '<tr><td>' + esc(r['PO NUMBER']||'') + '</td><td>' + esc((r['JOB']||'').replace('JOB ','')) + '</td><td>' + esc(r['MATERIAL']||'') + '</td><td class="tbl-r">' + (r['QTY']||'') + '</td><td>' + esc(r['UOM']||'') + '</td><td class="tbl-r">' + fmt(parseFloat(r['LINE TOTAL']||0)) + '</td><td>' + esc(r['BUILDING']||'') + '</td><td>' + esc(r['FLOOR']||'') + '</td><td>' + esc(r['UNIT']||'') + '</td><td>' + esc(r['VENDOR']||'') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editPORow(' + idx + ')">✏</button> <button class="btn btn-danger btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(r['MATERIAL']||'') + '\')">🏷</button></td></tr>';
+  // Sort newest date first while keeping the original index for edit/delete
+  const sortedWithIdx = S.rows.map((r,i)=>({r,i})).sort((a,b) => String(b.r['DATE']||'').localeCompare(String(a.r['DATE']||'')) || String(a.r['PO NUMBER']||'').localeCompare(String(b.r['PO NUMBER']||'')));
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:11px;color:var(--ink3);">PO lines from Supabase po_pdfs (newest first) — click ✏ to edit.</div><div style="font-size:11px;color:var(--ink3);">' + S.rows.length + ' lines</div></div>';
+  html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Date</th><th>Job</th><th>Material</th><th class="tbl-r">Qty</th><th>UOM</th><th class="tbl-r">Total</th><th>Bldg</th><th>Fl</th><th>Unit</th><th>Vendor</th><th>Actions</th></tr></thead><tbody>';
+  sortedWithIdx.slice(0, 300).forEach(({r, i: idx}) => {
+    html += '<tr><td>' + esc(r['PO NUMBER']||'') + '</td><td style="color:var(--ink3);white-space:nowrap;">' + esc(r['DATE']||'') + '</td><td>' + esc((r['JOB']||'').replace('JOB ','')) + '</td><td>' + esc(r['MATERIAL']||'') + '</td><td class="tbl-r">' + (r['QTY']||'') + '</td><td>' + esc(r['UOM']||'') + '</td><td class="tbl-r">' + fmt(parseFloat(r['LINE TOTAL']||0)) + '</td><td>' + esc(r['BUILDING']||'') + '</td><td>' + esc(r['FLOOR']||'') + '</td><td>' + esc(r['UNIT']||'') + '</td><td>' + esc(r['VENDOR']||'') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editPORow(' + idx + ')">✏</button> <button class="btn btn-danger btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(r['MATERIAL']||'') + '\')">🏷</button></td></tr>';
   });
   html += '</tbody></table></div>';
-  if (S.rows.length > 300) html += '<div class="no-data">Showing first 300 of ' + S.rows.length + ' rows</div>';
+  if (S.rows.length > 300) html += '<div class="no-data">Showing first 300 of ' + S.rows.length + ' rows (newest first)</div>';
   el.innerHTML = html;
 }
 function editPORow(idx) {
