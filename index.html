@@ -308,10 +308,12 @@ a{color:var(--accent);}
     <button class="tab-btn active" data-tab="bills" onclick="switchInboxTab('bills')">🆕 Review Queue</button>
     <button class="tab-btn" data-tab="pos" onclick="switchInboxTab('pos')">📦 Unassigned POs</button>
     <button class="tab-btn" data-tab="pdfs" onclick="switchInboxTab('pdfs')">📄 All Extractions</button>
+    <button class="tab-btn" data-tab="history" onclick="switchInboxTab('history')">📋 History</button>
   </div>
   <div id="inbox-tab-bills" class="tab-panel active"></div>
   <div id="inbox-tab-pos" class="tab-panel"></div>
   <div id="inbox-tab-pdfs" class="tab-panel"></div>
+  <div id="inbox-tab-history" class="tab-panel"></div>
 </div>
 
 <!-- PAGE: JOBS -->
@@ -1525,6 +1527,7 @@ function switchInboxTab(tab) {
   if (tab === 'bills') renderInboxBills();
   else if (tab === 'pos') renderInboxPOs();
   else if (tab === 'pdfs') renderInboxPDFs();
+  else if (tab === 'history') renderInboxHistory();
 }
 function renderInboxBills() {
   // "Bills" tab now shows email-extracted POs needing review (needs_review status)
@@ -1608,6 +1611,33 @@ function renderInboxPDFs() {
   const el = document.getElementById('inbox-tab-pdfs'); if (!el) return;
   el.innerHTML = '<div id="pending-pos-list"><div style="color:var(--ink3);font-size:13px;">Loading...</div></div>';
   loadPendingPOs();
+}
+function renderInboxHistory() {
+  const el = document.getElementById('inbox-tab-history'); if (!el) return;
+  const assigned = Object.entries(S.assignments||{});
+  const matched = Object.entries(S.billAssignments||{});
+  let html = `<div style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <span style="font-weight:700;font-size:15px;">All Tracked Items</span>
+    <span class="badge badge-blue">${assigned.length} PO${assigned.length!==1?'s':''}</span>
+    <span class="badge badge-green">${matched.length} Bill${matched.length!==1?'s':''}</span>
+  </div>`;
+  if (!assigned.length && !matched.length) { el.innerHTML = html + '<div class="no-data">Nothing tracked yet.</div>'; return; }
+  if (assigned.length) {
+    html += '<div class="section-title" style="margin-bottom:8px;">📦 Tracked POs</div><div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>PO#</th><th>Job</th><th>Vendor</th><th>Location</th><th class="tbl-r">Total</th><th>Actions</th></tr></thead><tbody>';
+    assigned.sort((a,b)=>String(b[1].date||'').localeCompare(String(a[1].date||''))).forEach(([po,a]) => {
+      const loc = [a.building||a.bldg, a.floor?'Fl '+a.floor:'', a.unit?'U '+a.unit:''].filter(Boolean).join(' ');
+      html += `<tr><td style="font-weight:700;">#${esc(po)}</td><td>${esc((a.job||'').replace('JOB ',''))}</td><td>${esc(a.vendor||'')}</td><td>${loc ? esc(loc) : '<span style="color:var(--yellow);font-size:11px;">No location</span>'}</td><td class="tbl-r">${fmt(a.total||0)}</td><td style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" onclick="editAssignedPO('${jsesc(po)}')">✏</button> <button class="btn btn-danger btn-sm" onclick="deleteAssignment('po','${jsesc(po)}');renderInboxHistory()">🗑</button></td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  if (matched.length) {
+    html += '<div class="section-title" style="margin-top:20px;margin-bottom:8px;">💰 Matched Bills</div><div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Invoice</th><th>Job</th><th>Vendor</th><th>Category</th><th class="tbl-r">Total</th><th>Actions</th></tr></thead><tbody>';
+    matched.forEach(([inv,ba]) => {
+      html += `<tr><td style="font-weight:700;">#${esc(inv)}</td><td>${esc((ba.job||'').replace('JOB ',''))}</td><td>${esc(ba.vendor||'')}</td><td>${esc(ba.category||'Material')}</td><td class="tbl-r">${fmt(ba.total||0)}</td><td><button class="btn btn-danger btn-sm" onclick="deleteAssignment('bill','${jsesc(inv)}');renderInboxHistory()">🗑 Unmatch</button></td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  el.innerHTML = html;
 }
 // ═══════════════════════════════════════════════════════════
 // JOBS PAGE
@@ -1915,7 +1945,7 @@ function renderEstimateTab(job) {
   const el = document.getElementById('jobs-tab-estimate'); if (!el) return;
   const items = getJobEstimate(job);
   const rows = S.rows.filter(r => (r['JOB']||'') === job);
-  let html = '<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Line</button></div></div><div class="card-body" style="overflow-x:auto;">';
+  let html = '<div class="card" style="margin-bottom:16px;"><div class="card-hdr"><span class="card-title">Material Estimate</span><div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="addEstLine()">+ Add Line</button><button class="btn btn-danger btn-sm" onclick="resetEstimate()">↺ Reset</button></div></div><div class="card-body" style="overflow-x:auto;">';
   html += '<table class="tbl"><thead><tr><th>Cat</th><th>Material</th><th>UOM</th><th class="tbl-r">Price</th><th class="tbl-r" style="min-width:80px;">Qty</th><th class="tbl-r">Total</th><th class="tbl-r">Ordered</th><th></th></tr></thead><tbody>';
   let lastCat = '', grandTotal = 0;
   items.forEach((it, i) => {
@@ -1973,6 +2003,28 @@ function updateEstCat(i, val) {
   const items = getJobEstimate(_currentJob);
   items[i].cat = val;
   saveJobEstimate(_currentJob);
+}
+function resetEstimate() {
+  if (!_currentJob) return;
+  if (!confirm('Reset estimate for ' + _currentJob.replace('JOB ','') + ' to template defaults? All quantities you entered will be cleared.')) return;
+  const key = _currentJob + '_est2';
+  S.matBanks[key] = ESTIMATE_TEMPLATE.map(t => ({cat:t.cat, name:t.name, uom:t.uom, qty:0, price:t.price||0}));
+  saveJobEstimate(_currentJob);
+  renderEstimateTab(_currentJob);
+  showToast('✓ Estimate reset to defaults');
+}
+function addToEstimateFromSummary(rawName, label) {
+  const catSel = ['Metal 20GA','Metal 25GA','Wood','Drywall','Finish','Fasteners','Other'];
+  const cat = prompt('Category for "' + label + '":\n' + catSel.map((c,i)=>(i+1)+'. '+c).join('\n') + '\n\nType the category name:', 'Other') || 'Other';
+  const priceStr = prompt('Unit price for "' + label + '":', '0');
+  if (priceStr === null) return;
+  const qtyStr = prompt('Estimated qty for "' + label + '":', '0');
+  if (qtyStr === null) return;
+  const items = getJobEstimate(_currentJob);
+  items.push({cat, name: label, uom: 'EA', qty: parseFloat(qtyStr)||0, price: parseFloat(priceStr)||0});
+  saveJobEstimate(_currentJob);
+  showToast('✓ Added to estimate: ' + label);
+  renderEstimateTab(_currentJob);
 }
 function saveJobEstimate(job) { saveSharedData('matBanks'); }
 function updateGrandTotal() {
@@ -2185,7 +2237,10 @@ function renderJobSummaryTab(job) {
           <td class="tbl-r" style="font-weight:700;">${it.orderedDollars > 0 ? fmt(it.orderedDollars) : '—'}</td>
           ${viewMode==='whole'?'<td class="tbl-r" style="color:var(--yellow);">' + (it.bfDollars > 0 ? fmt(it.bfDollars) : '—') + '</td>':''}
           <td>${statusBadge}</td>
-          <td>${firstRaw ? '<button class="btn btn-ghost btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(firstRaw) + '\')" title="Re-categorize this item">🏷</button>' : ''}</td>
+          <td style="white-space:nowrap;">
+            ${firstRaw ? '<button class="btn btn-ghost btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(firstRaw) + '\')" title="Re-categorize">🏷</button>' : ''}
+            ${!it.budgeted && (it.orderedDollars > 0 || it.bfDollars > 0) ? ' <button class="btn btn-blue btn-sm" onclick="addToEstimateFromSummary(\'' + jsesc([...it.rawNames][0]||'') + '\',\'' + jsesc(it.label) + '\')" title="Add to Estimate">+ Est</button>' : ''}
+          </td>
         </tr>`;
       }).join('')}
       ${allItems.length === 0 ? '<tr><td colspan="' + (viewMode==='whole'?9:8) + '" class="no-data" style="text-align:center;">No items tracked yet. Add estimate items or sync POs.</td></tr>' : ''}
@@ -2843,7 +2898,51 @@ function renderJobSetupBody() {
     });
     html += '</div>';
   });
+  // Floor copy UI
+  if ((_editStruct.floors||[]).length > 1) {
+    const floorOpts = (_editStruct.floors||[]).map((f,fi) => `<option value="${fi}">${f.bldg?'Bldg '+f.bldg+' · ':''}Floor ${f.floor}</option>`).join('');
+    html += `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:16px;">
+      <div style="font-size:12px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">📋 Copy Floor Setup to Other Floors</div>
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;">
+        <div><div style="font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:3px;">COPY FROM</div><select id="copy-src" class="inp inp-sm">${floorOpts}</select></div>
+        <div style="display:flex;gap:10px;align-items:center;padding-bottom:2px;">
+          <label style="font-size:11px;font-weight:600;color:var(--ink3);cursor:pointer;"><input type="checkbox" id="copy-boards" checked style="margin-right:4px;accent-color:var(--accent);"/>Boards budget</label>
+          <label style="font-size:11px;font-weight:600;color:var(--ink3);cursor:pointer;"><input type="checkbox" id="copy-units" checked style="margin-right:4px;accent-color:var(--accent);"/>Unit list</label>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:8px;font-weight:600;">COPY TO (check floors):</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+        ${(_editStruct.floors||[]).map((f,fi) => `<label style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;"><input type="checkbox" class="copy-dest-cb" data-fi="${fi}" style="margin:0;accent-color:var(--accent);"/>${f.bldg?'B'+f.bldg+' ':''}Fl ${f.floor}</label>`).join('')}
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="copyFloorSetup()">📋 Copy to Checked</button>
+    </div>`;
+  }
   el.innerHTML = html;
+}
+function copyFloorSetup() {
+  const srcFi = parseInt(document.getElementById('copy-src')?.value);
+  const copyBoards = document.getElementById('copy-boards')?.checked;
+  const copyUnits = document.getElementById('copy-units')?.checked;
+  const src = _editStruct.floors[srcFi]; if (!src) return;
+  const dests = [...document.querySelectorAll('.copy-dest-cb:checked')].map(cb => parseInt(cb.dataset.fi)).filter(fi => fi !== srcFi);
+  if (!dests.length) { showToast('Check at least one destination floor'); return; }
+  dests.forEach(fi => {
+    if (copyBoards) _editStruct.floors[fi].budgetBoards = src.budgetBoards || 0;
+    if (copyUnits) {
+      const srcFlNum = parseInt(src.floor) || 0;
+      const dstFlNum = parseInt(_editStruct.floors[fi].floor) || 0;
+      _editStruct.floors[fi].units = (src.units||[]).map(u => {
+        const uNum = parseInt(u.unit);
+        if (!isNaN(uNum) && srcFlNum > 0 && dstFlNum > 0) {
+          const suffix = uNum - (srcFlNum * 100);
+          if (suffix >= 0 && suffix < 100) return {...u, unit: String(dstFlNum * 100 + suffix)};
+        }
+        return {...u};
+      });
+    }
+  });
+  renderJobSetupBody();
+  showToast('✓ Copied to ' + dests.length + ' floor' + (dests.length !== 1 ? 's' : ''));
 }
 function addFloorToStruct() {
   const fl = document.getElementById('js-fl')?.value.trim(); if (!fl) { showToast('Enter floor #'); return; }
