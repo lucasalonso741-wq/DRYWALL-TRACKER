@@ -586,7 +586,12 @@ function isLaborVendor(vendor) {
 }
 
 function getJobs() {
-  const fromSheet = [...new Set(S.rows.map(r => r['JOB'] || r['Job'] || '').filter(Boolean))];
+  const fromSheet = S.rows.map(r => r['JOB'] || r['Job'] || '').filter(Boolean).map(raw => {
+    const tNorm = normalizeJobName(raw);
+    for (const [alias, job] of Object.entries(JOB_ALIASES)) { if (raw.toUpperCase().includes(alias)) return job; }
+    for (const job of S.jobs) { const jNorm = normalizeJobName(job); if (tNorm.includes(jNorm) || jNorm.includes(tNorm)) return job; }
+    return raw;
+  });
   const all = [...new Set([...S.jobs, ...fromSheet])];
   return all.filter(Boolean).sort();
 }
@@ -613,9 +618,9 @@ function fuzzyDetectJob(text) {
   for (const job of jobs) {
     const jNorm = normalizeJobName(job);
     if (tNorm.includes(jNorm) || jNorm.includes(tNorm)) return job;
-    // Word-level match
-    const words = job.replace(/^JOB\s+/i,'').split(/\s+/).filter(w => w.length > 3);
-    if (words.length > 0 && words.every(w => t.includes(w))) return job;
+    // Word-level match (normalized, case-insensitive)
+    const words = jNorm.split(/\s+/).filter(w => w.length > 3);
+    if (words.length > 0 && words.every(w => tNorm.includes(w))) return job;
   }
   return null;
 }
@@ -661,6 +666,8 @@ function findBestPOMatch(billRow) {
   return bestScore >= 5 ? best : null;
 }
 function normalizeJobName(s) { return String(s||'').toUpperCase().replace(/^JOB\s+/g,'').replace(/\s*@\s*/g,' AT ').replace(/[^A-Z0-9]+/g,' ').trim(); }
+// Strip model-type letter suffix: "101A" → "101", "205B" → "205". Leaves "CORRIDORS", "PARTY WALLS" unchanged.
+function canonUnit(u) { return String(u||'').trim().replace(/^(\d+)[A-Za-z]$/, '$1'); }
 function getBackfillForJob(job) {
   // Backfill data is an object: {jobName: {materialItems:{}, laborVendors:{}, materialTotal, laborTotal, taxTotal}}
   const bf = S._backfillJobs;
@@ -818,6 +825,15 @@ async function fetchRawData() {
       if (!row['BUILDING'] || row['BUILDING'] === '') row['BUILDING'] = a.building || a.bldg || '';
       if (!row['FLOOR'] || row['FLOOR'] === '') row['FLOOR'] = a.floor;
       if (!row['UNIT'] || row['UNIT'] === '') row['UNIT'] = a.unit;
+    }
+    // Normalize JOB field to canonical name so all exact-match filters work
+    const rawJob = String(row['JOB'] || row['Job'] || '').trim();
+    if (rawJob) {
+      const tNorm = normalizeJobName(rawJob);
+      let canonical = null;
+      for (const [alias, job] of Object.entries(JOB_ALIASES)) { if (rawJob.toUpperCase().includes(alias)) { canonical = job; break; } }
+      if (!canonical) { for (const job of S.jobs) { const jNorm = normalizeJobName(job); if (tNorm.includes(jNorm) || jNorm.includes(tNorm)) { canonical = job; break; } } }
+      if (canonical) row['JOB'] = canonical;
     }
   });
 }
@@ -1747,11 +1763,26 @@ function renderMapMaterial(job, el) {
       const genBoards = genRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
       const genSpend = genRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
       if (genBoards > 0 || genSpend > 0) html += buildUnitCard(job, fl.floor, fl.bldg, 'General', genBoards, 0, genSpend, true);
+      const definedUnitSet = new Set(fl.units.map(u => String(u.unit)));
       fl.units.forEach(u => {
-        const uRows = flRows.filter(r => String(r['UNIT']||'').trim() === String(u.unit));
+        // Match exact unit OR unit with a stripped model-type letter suffix (e.g. "101A" → "101")
+        const uRows = flRows.filter(r => { const ru = String(r['UNIT']||'').trim(); return ru === String(u.unit) || canonUnit(ru) === String(u.unit); });
         const uBoards = uRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
         const uSpend = uRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
         html += buildUnitCard(job, fl.floor, fl.bldg, u.unit, uBoards, parseFloat(u.budgetBoards||0), uSpend, false);
+      });
+      // Orphan units: have a unit value but don't match any defined unit — create a card so data isn't lost
+      const orphanByUnit = {};
+      flRows.forEach(r => {
+        const ru = String(r['UNIT']||'').trim();
+        if (!ru || ru === 'N/A') return;
+        if (definedUnitSet.has(ru) || definedUnitSet.has(canonUnit(ru))) return;
+        if (!orphanByUnit[ru]) orphanByUnit[ru] = { boards: 0, spend: 0 };
+        orphanByUnit[ru].boards += isBoard(r['MATERIAL']||'') ? parseFloat(r['QTY']||0) : 0;
+        orphanByUnit[ru].spend += parseFloat(r['LINE TOTAL']||0);
+      });
+      Object.entries(orphanByUnit).sort(([a],[b]) => String(a).localeCompare(String(b))).forEach(([unit, d]) => {
+        html += buildUnitCard(job, fl.floor, fl.bldg, unit, d.boards, 0, d.spend, false);
       });
       html += '</div></div></div>';
     });
