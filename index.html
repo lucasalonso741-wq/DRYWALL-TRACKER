@@ -490,7 +490,7 @@ const CAT_TEXT={'Metal 20GA':'var(--blue)','Metal 25GA':'var(--yellow)','Wood':'
 // HELPERS
 // ═══════════════════════════════════════════════════════════
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function jsesc(s) { return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function jsesc(s) { return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
 function fmt(n) { const v=parseFloat(n)||0; return v>=0?'$'+v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}):'-$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function showToast(msg, isErr) { const t=document.getElementById('toast'); t.innerHTML='<div class="toast-item" style="'+(isErr?'border-color:var(--red);color:var(--red);':'')+'">' + msg + '</div>'; setTimeout(()=>t.innerHTML='',3500); }
 function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
@@ -633,7 +633,12 @@ function deepMergeMatBanks(base, local) {
 function normBldg(s) { return String(s||'').trim().replace(/^(?:BLDG?|BUILDING)\s*/i,'').trim().toLowerCase(); }
 function normFloor(s) { return String(s||'').trim().replace(/^0+/,'').replace(/(?:ST|ND|RD|TH|FL(?:OOR)?)$/i,'').trim().toLowerCase(); }
 function getJobs() {
-  const fromSheet = [...new Set(S.rows.map(r => r['JOB'] || r['Job'] || '').filter(Boolean))];
+  const fromSheet = S.rows.map(r => r['JOB'] || r['Job'] || '').filter(Boolean).map(raw => {
+    const tNorm = normalizeJobName(raw);
+    for (const [alias, job] of Object.entries(JOB_ALIASES)) { if (raw.toUpperCase().includes(alias)) return job; }
+    for (const job of S.jobs) { const jNorm = normalizeJobName(job); if (tNorm.includes(jNorm) || jNorm.includes(tNorm)) return job; }
+    return raw;
+  });
   const all = [...new Set([...S.jobs, ...fromSheet])];
   return all.filter(Boolean).sort();
 }
@@ -660,9 +665,9 @@ function fuzzyDetectJob(text) {
   for (const job of jobs) {
     const jNorm = normalizeJobName(job);
     if (tNorm.includes(jNorm) || jNorm.includes(tNorm)) return job;
-    // Word-level match
-    const words = job.replace(/^JOB\s+/i,'').split(/\s+/).filter(w => w.length > 3);
-    if (words.length > 0 && words.every(w => t.includes(w))) return job;
+    // Word-level match (normalized, case-insensitive)
+    const words = jNorm.split(/\s+/).filter(w => w.length > 3);
+    if (words.length > 0 && words.every(w => tNorm.includes(w))) return job;
   }
   return null;
 }
@@ -1781,6 +1786,19 @@ function renderMapMaterial(job, el) {
         // Collect any model suffixes seen in real PO data (e.g. "A" from "106A")
         const models = [...new Set(uRows.map(r => parseUnitModel(String(r['UNIT']||'').trim()).model).filter(Boolean))];
         html += buildUnitCard(job, fl.floor, fl.bldg, u.unit, uBoards, parseFloat(u.budgetBoards||0), uSpend, false, models);
+      });
+      // Orphan units: rows with a unit value that doesn't match any defined unit — show cards so nothing is lost
+      const orphanByUnit = {};
+      flRows.forEach(r => {
+        const ru = String(r['UNIT']||'').trim();
+        if (!ru || ru === 'N/A') return;
+        if (fl.units.some(u => unitsMatch(ru, String(u.unit)))) return;
+        if (!orphanByUnit[ru]) orphanByUnit[ru] = { boards: 0, spend: 0 };
+        orphanByUnit[ru].boards += isBoard(r['MATERIAL']||'') ? parseFloat(r['QTY']||0) : 0;
+        orphanByUnit[ru].spend += parseFloat(r['LINE TOTAL']||0);
+      });
+      Object.entries(orphanByUnit).sort(([a],[b]) => String(a).localeCompare(String(b))).forEach(([unit, d]) => {
+        html += buildUnitCard(job, fl.floor, fl.bldg, unit, d.boards, 0, d.spend, false, []);
       });
       html += '</div></div></div>';
     });
