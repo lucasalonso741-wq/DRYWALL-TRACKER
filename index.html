@@ -550,6 +550,8 @@ function categorize(desc) {
   const d = raw.toUpperCase();
   // TAX
   if (/^TAX$|^SALES.?TAX$/.test(d)) return 'tax';
+  // BOARDS pre-check — mold defense / MR board must win over 2X patterns below
+  if (/MOLD.?DEFENSE|MOLD.?RES|MR.?BOARD|MR.?BRD|SHAFT.?LINER/.test(d)) return 'boards';
   // WOOD — user rule: anything with PT or plywood/lumber is wood
   if (/\bPT\b|PLYWOOD|\bSPRUCE\b|\bLUMBER\b|2X[0-9]|1X[0-9]|FIRE.?TREATED/.test(d)) return 'wood';
   // METAL — user rule: anything with 20GA or 25GA is metal; also studs, track, runner, furring, channel
@@ -753,6 +755,14 @@ const MATERIAL_GROUPS = {
   'DENSGLASS': { label: 'Densglass', patterns: [/DENS.?GLASS|DENSGLASS/i] },
   'MR_BOARD': { label: 'MR Board (Mold Defense)', patterns: [/MR\s*BOARD|MOLD.?DEFENSE|MR\s*BRD/i] },
   'SHAFT_LINER': { label: 'Shaft Liner', patterns: [/SHAFT.?LINER/i] },
+  'STUD_358_25GA': { label: '3 5/8 STUD 25GA', patterns: [/3[\s\-]*5\/8.*STUD.*25\s*GA/i, /3[\s\-]*5\/8.*25\s*GA.*STUD/i, /25\s*GA.*3[\s\-]*5\/8.*STUD/i] },
+  'STUD_358_20GA': { label: '3 5/8 STUD 20GA', patterns: [/3[\s\-]*5\/8.*STUD.*20\s*GA/i, /3[\s\-]*5\/8.*20\s*GA.*STUD/i, /20\s*GA.*3[\s\-]*5\/8.*STUD/i] },
+  'TRAC_358_25GA': { label: '3 5/8 TRAC 25GA', patterns: [/3[\s\-]*5\/8.*(?:TRAC|TRACK).*25\s*GA/i, /3[\s\-]*5\/8.*25\s*GA.*(?:TRAC|TRACK)/i, /25\s*GA.*3[\s\-]*5\/8.*(?:TRAC|TRACK)/i] },
+  'TRAC_358_20GA': { label: '3 5/8 TRAC 20GA', patterns: [/3[\s\-]*5\/8.*(?:TRAC|TRACK).*20\s*GA/i, /3[\s\-]*5\/8.*20\s*GA.*(?:TRAC|TRACK)/i, /20\s*GA.*3[\s\-]*5\/8.*(?:TRAC|TRACK)/i] },
+  'STUD_6_25GA': { label: '6" STUD 25GA', patterns: [/\b6\s*(?:IN|INCH|")?[\s\-]*STUD.*25\s*GA/i, /25\s*GA.*\b6\s*STUD/i] },
+  'STUD_6_20GA': { label: '6" STUD 20GA', patterns: [/\b6\s*STUD.*20\s*GA/i, /20\s*GA.*\b6\s*STUD/i] },
+  'TRAC_6_25GA': { label: '6" TRAC 25GA', patterns: [/\b6\s*(?:TRAC|TRACK).*25\s*GA/i, /25\s*GA.*\b6\s*(?:TRAC|TRACK)/i] },
+  'TRAC_6_20GA': { label: '6" TRAC 20GA', patterns: [/\b6\s*(?:TRAC|TRACK).*20\s*GA/i, /20\s*GA.*\b6\s*(?:TRAC|TRACK)/i] },
   'STUD_358': { label: '3-5/8 Stud', patterns: [/3\s*5\/8.*STUD/i] },
   'STUD_158': { label: '1-5/8 Stud', patterns: [/1\s*5\/8.*STUD/i] },
   'STUD_6': { label: '6" Stud', patterns: [/^6\s*STUD|\b6\s*STUD/i] },
@@ -828,9 +838,10 @@ async function saveSharedData(key) {
   catch(e) { console.error('Failed to save', key, ':', e); showToast('⚠ Save failed', true); }
 }
 async function loadSharedData() {
-  const [budgets, targets, matBanks, assignments, billAssignments, actuals, logo, jobs, floorBudgets, jobStructure, appPrefs, backfillJobs, materialMap] = await Promise.all([
+  const [budgets, targets, matBanks, assignments, billAssignments, actuals, logo, jobs, floorBudgets, jobStructure, appPrefs, backfillJobs, materialMap, unitRemap, matBudgetMap] = await Promise.all([
     sbGet('budgets'), sbGet('targets'), sbGet('matBanks'), sbGet('assignments'), sbGet('billAssignments'), sbGet('actuals'),
-    sbGet('logo'), sbGet('jobs'), sbGet('floorBudgets'), sbGet('jobStructure'), sbGet('appPrefs'), sbGet('backfill_jobs'), sbGet('materialMap')
+    sbGet('logo'), sbGet('jobs'), sbGet('floorBudgets'), sbGet('jobStructure'), sbGet('appPrefs'), sbGet('backfill_jobs'), sbGet('materialMap'),
+    sbGet('unitRemap'), sbGet('matBudgetMap')
   ]);
   if (budgets) S.budgets = budgets;
   if (targets) S.targets = targets;
@@ -856,6 +867,8 @@ async function loadSharedData() {
   if (appPrefs) S.appPrefs = Object.assign({ useBackfill: true }, appPrefs);
   if (backfillJobs) S._backfillJobs = backfillJobs;
   if (materialMap) S.materialMap = materialMap;
+  if (unitRemap) S.unitRemap = unitRemap;
+  if (matBudgetMap) S.matBudgetMap = matBudgetMap;
   if (logo) localStorage.setItem('dw_logo', logo);
   loadLogo();
   console.log('Shared data loaded from Supabase ✓');
@@ -1779,8 +1792,15 @@ function renderMapMaterial(job, el) {
       const genBoards = genRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
       const genSpend = genRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
       if (genBoards > 0 || genSpend > 0) html += buildUnitCard(job, fl.floor, fl.bldg, 'General', genBoards, 0, genSpend, true);
+      const unitRemapMap = S.unitRemap?.[job] || {};
       fl.units.forEach(u => {
-        const uRows = flRows.filter(r => { const ru = String(r['UNIT']||'').trim(); return ru && unitsMatch(ru, String(u.unit)); });
+        const uRows = flRows.filter(r => {
+          const ru = String(r['UNIT']||'').trim(); if (!ru) return false;
+          if (unitsMatch(ru, String(u.unit))) return true;
+          const remapKey = (fl.floor||'') + ':' + (fl.bldg||'') + ':' + ru.toUpperCase();
+          const remapped = unitRemapMap[remapKey];
+          return remapped && unitsMatch(remapped, String(u.unit));
+        });
         const uBoards = uRows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
         const uSpend = uRows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
         // Collect any model suffixes seen in real PO data (e.g. "A" from "106A")
@@ -1792,13 +1812,15 @@ function renderMapMaterial(job, el) {
       flRows.forEach(r => {
         const ru = String(r['UNIT']||'').trim();
         if (!ru || ru === 'N/A') return;
+        const remapKey = (fl.floor||'') + ':' + (fl.bldg||'') + ':' + ru.toUpperCase();
+        if (unitRemapMap[remapKey]) return;
         if (fl.units.some(u => unitsMatch(ru, String(u.unit)))) return;
         if (!orphanByUnit[ru]) orphanByUnit[ru] = { boards: 0, spend: 0 };
         orphanByUnit[ru].boards += isBoard(r['MATERIAL']||'') ? parseFloat(r['QTY']||0) : 0;
         orphanByUnit[ru].spend += parseFloat(r['LINE TOTAL']||0);
       });
       Object.entries(orphanByUnit).sort(([a],[b]) => String(a).localeCompare(String(b))).forEach(([unit, d]) => {
-        html += buildUnitCard(job, fl.floor, fl.bldg, unit, d.boards, 0, d.spend, false, []);
+        html += buildOrphanUnitCard(job, fl.floor, fl.bldg, unit, d.boards, d.spend, fl.units);
       });
       html += '</div></div></div>';
     });
@@ -1815,6 +1837,49 @@ function buildUnitCard(job, floor, bldg, unit, boards, budBoards, spend, isGen, 
     ${boards > 0 ? '<div class="unit-boards">' + Math.round(boards) + ' boards' + (budBoards > 0 ? ' / ' + Math.round(budBoards) : '') + '</div>' : ''}
     ${spend > 0 ? '<div class="unit-spend">' + fmt(spend) + '</div>' : '<div class="unit-spend" style="color:var(--ink3);">No data</div>'}
   </div>`;
+}
+
+function buildOrphanUnitCard(job, floor, bldg, unit, boards, spend, structUnits) {
+  const cls = boards > 0 ? 'has-data' : (spend > 0 ? 'has-data' : 'no-data');
+  const hasUnits = structUnits && structUnits.length > 0;
+  return `<div class="unit-card ${cls}" style="border-style:dashed;" onclick="openUnitDetail('${jsesc(job)}','${floor}','${jsesc(unit)}','${jsesc(bldg||'')}')">
+    <div class="unit-num" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">${esc(unit)} <span style="font-size:9px;background:rgba(251,191,36,.2);padding:1px 5px;border-radius:4px;color:var(--yellow);font-weight:700;">Unmatched</span></div>
+    ${boards > 0 ? '<div class="unit-boards">' + Math.round(boards) + ' boards</div>' : ''}
+    ${spend > 0 ? '<div class="unit-spend">' + fmt(spend) + '</div>' : '<div class="unit-spend" style="color:var(--ink3);">No data</div>'}
+    ${hasUnits ? '<div onclick="event.stopPropagation();openUnitRemapModal(\''+jsesc(job)+'\',\''+floor+'\',\''+jsesc(bldg||'')+'\',\''+jsesc(unit)+'\',this.closest(\'.unit-card\'))" style="margin-top:6px;font-size:10px;font-weight:700;color:var(--blue);cursor:pointer;text-decoration:underline;">↔ Assign to unit</div>' : ''}
+  </div>`;
+}
+function openUnitRemapModal(job, floor, bldg, rawUnit) {
+  const struct = S.jobStructure?.[job];
+  const floorStruct = struct?.floors?.find(f => normFloor(String(f.floor)) === normFloor(String(floor)) && (!bldg || normBldg(String(f.bldg||'')) === normBldg(bldg)));
+  const units = floorStruct?.units || [];
+  document.getElementById('po-modal-title').textContent = 'Assign Unmatched Unit';
+  document.getElementById('po-modal-body').innerHTML = `
+    <div style="margin-bottom:14px;font-size:13px;color:var(--ink2);">PO unit <strong style="color:var(--ink);">${esc(rawUnit)}</strong> doesn't match any defined unit on Floor ${esc(floor)}${bldg?' · Bldg '+esc(bldg):''}.
+    <br>Which unit should this data count toward?</div>
+    <div class="form-group"><label>Assign to Unit</label>
+      <select id="unit-remap-target" class="inp">
+        <option value="">— Select a unit —</option>
+        ${units.map(u => '<option value="'+esc(u.unit)+'">Unit '+esc(u.unit)+'</option>').join('')}
+      </select>
+    </div>
+    <div style="font-size:11px;color:var(--ink3);margin-top:8px;">This mapping will be remembered so future POs with the same unit value are automatically counted correctly.</div>`;
+  document.getElementById('po-modal-footer').innerHTML = `
+    <button class="btn btn-ghost" onclick="closeModal('po-modal')">Cancel</button>
+    <button class="btn btn-primary" onclick="saveUnitRemap('${jsesc(job)}','${jsesc(floor)}','${jsesc(bldg||'')}','${jsesc(rawUnit)}')">Save Assignment</button>`;
+  document.getElementById('po-modal').classList.add('open');
+}
+async function saveUnitRemap(job, floor, bldg, rawUnit) {
+  const toUnit = document.getElementById('unit-remap-target')?.value;
+  if (!toUnit) { showToast('Please select a unit', true); return; }
+  if (!S.unitRemap) S.unitRemap = {};
+  if (!S.unitRemap[job]) S.unitRemap[job] = {};
+  const remapKey = (floor||'') + ':' + (bldg||'') + ':' + rawUnit.toUpperCase();
+  S.unitRemap[job][remapKey] = toUnit;
+  await saveSharedData('unitRemap');
+  closeModal('po-modal');
+  showToast('✓ Unit ' + rawUnit + ' → Unit ' + toUnit);
+  setMapView('material');
 }
 
 function renderAutoFloors(job, rows, parentEl) {
@@ -2270,24 +2335,40 @@ function renderJobSummaryTab(job) {
       if (!matMap[name]) matMap[name] = { budgetQty:0, orderedQty:0, orderedDollars:0, uom:'EA' };
       matMap[name].budgetQty += q;
     });
-    // Ordered from PO rows
+    // Ordered from PO rows — use matBudgetMap to resolve raw descriptions to estimate line names
+    const jobBudgetMap = S.matBudgetMap?.[job] || {};
     selectedFlRows.forEach(r => {
-      const mat = (r['MATERIAL']||'').trim(); if (!mat) return;
-      if (!matMap[mat]) matMap[mat] = { budgetQty:0, orderedQty:0, orderedDollars:0, uom:r['UOM']||'EA' };
-      matMap[mat].orderedQty += parseFloat(r['QTY']||0);
-      matMap[mat].orderedDollars += parseFloat(r['LINE TOTAL']||0);
+      const rawMat = (r['MATERIAL']||'').trim(); if (!rawMat) return;
+      const mapped = jobBudgetMap[rawMat.toUpperCase()] || null;
+      const key = mapped || rawMat;
+      if (!matMap[key]) matMap[key] = { budgetQty:0, orderedQty:0, orderedDollars:0, uom:r['UOM']||'EA', _rawMat: mapped ? rawMat : null, _isUnmatched: !mapped };
+      matMap[key].orderedQty += parseFloat(r['QTY']||0);
+      matMap[key].orderedDollars += parseFloat(r['LINE TOTAL']||0);
     });
     const matEntries = Object.entries(matMap).sort((a,b)=>b[1].orderedDollars-a[1].orderedDollars);
-    html += `<div class="card"><div class="card-hdr"><span class="card-title">Floor ${esc(fl)}${bldg?' · Bldg '+esc(bldg):''} — Material Detail</span><button class="btn btn-ghost btn-sm" onclick="clearSummaryFilter('${jsesc(job)}')">✕ Clear floor</button></div>
+    html += `<div class="card"><div class="card-hdr"><span class="card-title">Floor ${esc(fl)}${bldg?' · Bldg '+esc(bldg):''} — Material Detail</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span style="font-size:11px;color:var(--ink3);">Click <strong>Assign</strong> on unmatched items to link to an estimate line</span>
+        <button class="btn btn-ghost btn-sm" onclick="clearSummaryFilter('${jsesc(job)}')">✕ Clear floor</button>
+      </div></div>
       <div class="card-body" style="padding:0;overflow-x:auto;">
-      <table class="tbl" style="border:none;"><thead><tr><th>Material</th><th class="tbl-r">Budget Qty</th><th class="tbl-r">Ordered Qty</th><th style="min-width:120px;">Progress</th><th class="tbl-r">Ordered $</th></tr></thead><tbody>
+      <table class="tbl" style="border:none;"><thead><tr><th>Material</th><th class="tbl-r">Budget Qty</th><th class="tbl-r">Ordered Qty</th><th style="min-width:140px;">Progress / Status</th><th class="tbl-r">Ordered $</th></tr></thead><tbody>
       ${matEntries.map(([name, d]) => {
         const pct = d.budgetQty > 0 ? d.orderedQty/d.budgetQty*100 : 0;
         const c = pct > 100 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : pct > 0 ? 'var(--green)' : 'var(--ink3)';
-        return `<tr><td style="font-weight:500;">${esc(name)}</td>
+        const nameCell = d._rawMat
+          ? `<span style="font-weight:500;">${esc(name)}</span><br><span style="font-size:10px;color:var(--ink3);">from: ${esc(d._rawMat)}</span>`
+          : `<span style="font-weight:500;">${esc(name)}</span>`;
+        const statusCell = d.budgetQty > 0
+          ? barHtml(d.orderedQty, d.budgetQty)
+          : (d.orderedQty > 0 && d._isUnmatched
+              ? `<button class="btn btn-ghost btn-sm" style="font-size:10px;" onclick="openMatAssignModal('${jsesc(job)}','${jsesc(name)}')">↔ Assign to estimate</button>`
+              : (d.orderedQty > 0 ? '<span style="font-size:11px;color:var(--ink3);">No budget set</span>' : '—'));
+        return `<tr>
+          <td>${nameCell}</td>
           <td class="tbl-r">${d.budgetQty>0?Math.round(d.budgetQty):'—'}</td>
           <td class="tbl-r" style="color:${d.orderedQty>0?'var(--blue)':'var(--ink3)'};font-weight:700;">${d.orderedQty>0?Math.round(d.orderedQty):'—'}</td>
-          <td>${d.budgetQty>0?barHtml(d.orderedQty,d.budgetQty):(d.orderedQty>0?'<span style="font-size:11px;color:var(--ink3);">No budget</span>':'—')}</td>
+          <td>${statusCell}</td>
           <td class="tbl-r">${d.orderedDollars>0?fmt(d.orderedDollars):'—'}</td>
         </tr>`;
       }).join('')}
@@ -2389,6 +2470,43 @@ function openRemapModal(rawName, currentGroup) {
   document.getElementById('po-modal-body').innerHTML = body;
   document.getElementById('po-modal-footer').innerHTML = `<button class="btn btn-ghost" onclick="closeModal('po-modal')">Cancel</button><button class="btn btn-primary" onclick="saveRemap('${jsesc(rawName)}')">Save Mapping</button>`;
   document.getElementById('po-modal').classList.add('open');
+}
+function openMatAssignModal(job, rawMat) {
+  const items = getJobEstimate(job);
+  let lastCat = '';
+  const options = items.map(it => {
+    let optHtml = '';
+    if (it.cat !== lastCat) { lastCat = it.cat; optHtml += `<option disabled>── ${it.cat} ──</option>`; }
+    optHtml += `<option value="${esc(it.name)}">${esc(it.name)}</option>`;
+    return optHtml;
+  }).join('');
+  document.getElementById('po-modal-title').textContent = 'Assign to Estimate Line';
+  document.getElementById('po-modal-body').innerHTML = `
+    <div style="margin-bottom:14px;font-size:13px;color:var(--ink2);">
+      PO material: <strong style="color:var(--ink);">${esc(rawMat)}</strong><br>
+      Select the estimate line this item should count toward. This mapping will be remembered for future POs.
+    </div>
+    <div class="form-group"><label>Estimate Line</label>
+      <select id="mat-assign-target" class="inp">
+        <option value="">— Select estimate line —</option>
+        ${options}
+      </select>
+    </div>`;
+  document.getElementById('po-modal-footer').innerHTML = `
+    <button class="btn btn-ghost" onclick="closeModal('po-modal')">Cancel</button>
+    <button class="btn btn-primary" onclick="saveMatAssign('${jsesc(job)}','${jsesc(rawMat)}')">Save Mapping</button>`;
+  document.getElementById('po-modal').classList.add('open');
+}
+async function saveMatAssign(job, rawMat) {
+  const estLine = document.getElementById('mat-assign-target')?.value;
+  if (!estLine) { showToast('Please select an estimate line', true); return; }
+  if (!S.matBudgetMap) S.matBudgetMap = {};
+  if (!S.matBudgetMap[job]) S.matBudgetMap[job] = {};
+  S.matBudgetMap[job][rawMat.toUpperCase()] = estLine;
+  await saveSharedData('matBudgetMap');
+  closeModal('po-modal');
+  showToast('✓ Mapped: ' + rawMat.substring(0,30) + ' → ' + estLine);
+  if (_currentJob) renderJobSummaryTab(_currentJob);
 }
 async function saveRemap(rawName) {
   const group = document.getElementById('remap-group')?.value;
