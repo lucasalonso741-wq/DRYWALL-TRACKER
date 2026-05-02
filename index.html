@@ -2841,38 +2841,216 @@ function renderMaterialStats(job) {
   const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
   if (!rows.length) { showToast('No PO data for this job yet'); return; }
   const estItems = getJobEstimate(job);
-  const estByName = {}; estItems.forEach(it => { estByName[it.name.toUpperCase()] = it; });
-  const matMap = {};
-  rows.forEach(r => { const mat=(r['MATERIAL']||'').trim(); if(!mat) return; const cat=categorize(mat); if(!matMap[mat]) matMap[mat]={mat,cat,ordQty:0,spend:0}; matMap[mat].ordQty+=parseFloat(r['QTY']||0); matMap[mat].spend+=parseFloat(r['LINE TOTAL']||0); });
-  const totalBoards = Object.values(matMap).filter(m => m.cat==='boards').reduce((s,m) => s+m.ordQty, 0);
-  const totalSpend = Object.values(matMap).reduce((s,m) => s+m.spend, 0);
-  const CAT_ORDER = ['boards','metal','finish','supplies','tax','other'];
-  const CAT_LABEL = {boards:'🟦 Boards',metal:'📐 Metal',finish:'🪣 Finish',supplies:'🔩 Supplies',tax:'💲 Tax',other:'📦 Other'};
-  const CAT_BG2 = {boards:'rgba(79,142,247,.08)',metal:'rgba(251,191,36,.08)',finish:'rgba(52,211,153,.08)',supplies:'var(--surface2)',tax:'rgba(248,113,113,.08)',other:'var(--surface2)'};
-  const CAT_TC2 = {boards:'var(--blue)',metal:'var(--yellow)',finish:'var(--green)',supplies:'var(--ink2)',tax:'var(--red)',other:'var(--ink2)'};
+  const matBudMap = (S.matBudgetMap||{})[job] || {};
 
-  let html = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
-    <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin-bottom:4px;">Boards</div><div style="font-size:24px;font-weight:800;color:var(--blue);">${Math.round(totalBoards)}</div></div>
+  // Step 1: explicit est-line buckets (user-defined via matBudgetMap)
+  const explicitBuckets = {}; // estLineName → { ordQty, spend, rawDescs }
+  const explicitRaws = new Set();
+  rows.forEach(r => {
+    const raw = (r['MATERIAL']||'').trim(); if (!raw) return;
+    const estLine = matBudMap[raw.toUpperCase()];
+    if (!estLine) return;
+    explicitRaws.add(raw.toUpperCase());
+    if (!explicitBuckets[estLine]) explicitBuckets[estLine] = { ordQty:0, spend:0, rawDescs:[] };
+    explicitBuckets[estLine].ordQty += parseFloat(r['QTY']||0);
+    explicitBuckets[estLine].spend  += parseFloat(r['LINE TOTAL']||0);
+    if (!explicitBuckets[estLine].rawDescs.includes(raw)) explicitBuckets[estLine].rawDescs.push(raw);
+  });
+
+  // Step 2: group buckets via normalizeMaterial (for remaining rows)
+  const groupBuckets = {}; // groupKey → { ordQty, spend, rawDescs, label }
+  rows.forEach(r => {
+    const raw = (r['MATERIAL']||'').trim(); if (!raw) return;
+    if (explicitRaws.has(raw.toUpperCase())) return;
+    const { group, label } = normalizeMaterial(raw);
+    if (!groupBuckets[group]) groupBuckets[group] = { ordQty:0, spend:0, rawDescs:[], label };
+    groupBuckets[group].ordQty += parseFloat(r['QTY']||0);
+    groupBuckets[group].spend  += parseFloat(r['LINE TOTAL']||0);
+    if (!groupBuckets[group].rawDescs.includes(raw)) groupBuckets[group].rawDescs.push(raw);
+  });
+
+  // Step 3: map each estimate item to its MATERIAL_GROUPS key using same normalizeMaterial logic
+  // This ensures "3 5/8 STUD 25GA" (estimate) and "3-5/8 STUD 25GA 10FT" (PO) both → STUD_358_25GA
+  const claimedGroups = new Set();
+  const totalOrdBoards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
+  const totalSpend = rows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
+  const estGrandTotal = estItems.reduce((s,it) => s+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0), 0);
+
+  const sBar = (ord, bud) => {
+    if (!bud || !ord) return '';
+    const pct = Math.min(ord/bud*100, 150);
+    const c = pct>110?'var(--red)':pct>80?'var(--yellow)':'var(--green)';
+    return `<div style="display:flex;align-items:center;gap:5px;"><div style="flex:1;height:6px;border-radius:3px;background:var(--surface3);overflow:hidden;"><div style="height:100%;width:${Math.min(pct,100).toFixed(0)}%;background:${c};border-radius:3px;"></div></div><span style="font-size:10px;font-weight:700;color:${c};min-width:30px;">${Math.round(pct)}%</span></div>`;
+  };
+
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div style="font-size:11px;color:var(--ink3);">Budget vs ordered by estimate line — ${esc(job)}</div>
+    <button class="btn btn-ghost btn-sm" onclick="renderMatMappingsModal('${jsesc(job)}')">🔧 Edit Mappings</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+    <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin-bottom:4px;">Boards Ordered</div><div style="font-size:24px;font-weight:800;color:var(--blue);">${Math.round(totalOrdBoards)}</div></div>
     <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin-bottom:4px;">Total Spend</div><div style="font-size:20px;font-weight:800;color:var(--accent);">${fmt(totalSpend)}</div></div>
-    <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin-bottom:4px;">Items</div><div style="font-size:20px;font-weight:800;">${Object.keys(matMap).length}</div></div>
+    <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin-bottom:4px;">Est. Budget</div><div style="font-size:20px;font-weight:800;">${estGrandTotal>0?fmt(estGrandTotal):'—'}</div></div>
   </div>`;
-  CAT_ORDER.forEach(catKey => {
-    const catItems = Object.values(matMap).filter(m => m.cat===catKey).sort((a,b) => b.ordQty-a.ordQty);
-    if (!catItems.length) return;
-    html += '<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:'+CAT_TC2[catKey]+';text-transform:uppercase;letter-spacing:.05em;background:'+CAT_BG2[catKey]+';padding:5px 8px;border-radius:5px;margin-bottom:6px;">'+(CAT_LABEL[catKey]||catKey)+'</div>';
-    catItems.forEach(m => {
-      let estQty = 0;
-      for (const [eName, eItem] of Object.entries(estByName)) { if (eName.includes(m.mat.toUpperCase().substring(0,6)) || m.mat.toUpperCase().includes(eName.substring(0,6))) { estQty = parseFloat(eItem.qty)||0; break; } }
-      const pct = estQty > 0 ? Math.min((m.ordQty/estQty)*100, 150) : 0;
-      const barColor = pct > 110 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : pct > 0 ? 'var(--green)' : 'var(--ink3)';
-      html += '<div style="display:grid;grid-template-columns:1fr 90px 80px 70px;gap:8px;align-items:center;padding:6px 2px;border-bottom:1px solid rgba(255,255,255,.04);"><div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + m.mat + '</div><div style="text-align:right;"><span style="font-size:13px;font-weight:700;">' + Math.round(m.ordQty) + '</span>' + (estQty>0?' <span style="font-size:10px;color:var(--ink3);">/ '+Math.round(estQty)+'</span>':'') + '</div><div style="background:var(--surface3);border-radius:4px;height:6px;overflow:hidden;">' + (pct>0?'<div style="height:100%;width:'+Math.min(pct,100).toFixed(0)+'%;background:'+barColor+';border-radius:4px;"></div>':'') + '</div><div style="font-size:11px;color:'+barColor+';font-weight:700;text-align:right;">' + (estQty>0?pct.toFixed(0)+'%':'—') + '</div></div>';
+
+  const cats = [...new Set(estItems.map(it => it.cat))];
+  cats.forEach(cat => {
+    const catItems = estItems.filter(it => it.cat === cat);
+    html += `<div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:var(--surface2);padding:5px 8px;border-radius:5px;margin-bottom:4px;">${esc(cat)}</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="color:var(--ink3);font-size:10px;">
+      <th style="padding:4px 6px;text-align:left;font-weight:600;">Item</th>
+      <th style="padding:4px 6px;text-align:right;font-weight:600;">Budget</th>
+      <th style="padding:4px 6px;text-align:right;font-weight:600;">Ordered</th>
+      <th style="padding:4px 6px;min-width:90px;font-weight:600;">Progress</th>
+      <th style="padding:4px 6px;text-align:right;font-weight:600;">Spend</th>
+    </tr></thead><tbody>`;
+    catItems.forEach(it => {
+      const grpKey = normalizeMaterial(it.name).group;
+      claimedGroups.add(grpKey);
+      let ordQty = explicitBuckets[it.name]?.ordQty || 0;
+      let spend   = explicitBuckets[it.name]?.spend   || 0;
+      let descs   = [...(explicitBuckets[it.name]?.rawDescs || [])];
+      const hasExplicit = ordQty > 0;
+      if (groupBuckets[grpKey]) {
+        ordQty += groupBuckets[grpKey].ordQty;
+        spend  += groupBuckets[grpKey].spend;
+        descs   = [...descs, ...groupBuckets[grpKey].rawDescs.filter(d => !descs.includes(d))];
+      }
+      const budQty = parseFloat(it.qty)||0;
+      const descNote = descs.length ? '↳ ' + descs.slice(0,2).map(d=>esc(d)).join(', ') + (descs.length>2?' +' + (descs.length-2) + ' more':'') : '';
+      html += `<tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+        <td style="padding:6px 6px;">
+          <div style="font-weight:500;">${esc(it.name)}</div>
+          <div style="font-size:10px;color:${descs.length?'var(--ink3)':'rgba(248,113,113,.7)'};margin-top:1px;">${descs.length?descNote:'no PO data matched'}</div>
+        </td>
+        <td style="padding:6px 6px;text-align:right;">${budQty>0?Math.round(budQty):'—'}</td>
+        <td style="padding:6px 6px;text-align:right;font-weight:700;color:${ordQty>0?'var(--blue)':'var(--ink3)'};">${ordQty>0?Math.round(ordQty):'—'}</td>
+        <td style="padding:6px 6px;">${sBar(ordQty, budQty)}</td>
+        <td style="padding:6px 6px;text-align:right;">${spend>0?fmt(spend):'—'}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  });
+
+  // Unmatched PO groups — materials from POs that don't correspond to any estimate item
+  const unmatched = Object.entries(groupBuckets).filter(([k]) => !claimedGroups.has(k));
+  if (unmatched.length) {
+    html += `<div style="margin-bottom:12px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:rgba(248,113,113,.12);color:var(--red);padding:5px 8px;border-radius:5px;margin-bottom:4px;">⚠️ Unmatched PO Materials</div>
+    <div style="font-size:11px;color:var(--ink3);padding:4px 8px 8px;">These items arrived in POs but don't map to any estimate line. Click Assign to fix.</div>`;
+    unmatched.forEach(([grpKey, b]) => {
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid rgba(255,255,255,.04);">
+        <div>
+          <div style="font-size:12px;font-weight:600;">${esc(b.label||grpKey)}</div>
+          <div style="font-size:10px;color:var(--ink3);">Qty: ${Math.round(b.ordQty)} · Spend: ${fmt(b.spend)}</div>
+          <div style="font-size:10px;color:var(--ink3);">${b.rawDescs.slice(0,2).map(d=>esc(d)).join(' / ')}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="font-size:10px;" onclick="openMatReassignModal('${jsesc(job)}','${jsesc(b.rawDescs[0]||'')}')">Assign →</button>
+      </div>`;
     });
     html += '</div>';
-  });
-  document.getElementById('po-modal-title').textContent = '📊 ' + job.replace('JOB ','') + ' — Material Overview';
-  document.getElementById('po-modal-footer').innerHTML = '<button class="btn btn-ghost" onclick="closeModal(\'po-modal\')">Close</button>';
+  }
+
+  document.getElementById('po-modal-title').textContent = '📊 ' + job.replace('JOB ','') + ' — Material Stats';
+  document.getElementById('po-modal-footer').innerHTML = `<button class="btn btn-ghost btn-sm" onclick="renderMatMappingsModal('${jsesc(job)}')">🔧 Edit Mappings</button><button class="btn btn-ghost" onclick="closeModal('po-modal')">Close</button>`;
   document.getElementById('po-modal-body').innerHTML = html;
   document.getElementById('po-modal').classList.add('open');
+}
+
+function renderMatMappingsModal(job) {
+  const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const matBudMap = (S.matBudgetMap||{})[job] || {};
+  const matStats = {};
+  rows.forEach(r => {
+    const raw = (r['MATERIAL']||'').trim(); if (!raw) return;
+    if (!matStats[raw]) {
+      const { group, label } = normalizeMaterial(raw);
+      matStats[raw] = { qty:0, spend:0, group, label, manualGroup: S.materialMap?.[raw.toUpperCase()], estLine: matBudMap[raw.toUpperCase()] };
+    }
+    matStats[raw].qty   += parseFloat(r['QTY']||0);
+    matStats[raw].spend += parseFloat(r['LINE TOTAL']||0);
+  });
+  const sorted = Object.entries(matStats).sort((a,b) => {
+    const aUnmatch = a[1].group==='OTHER' && !a[1].estLine;
+    const bUnmatch = b[1].group==='OTHER' && !b[1].estLine;
+    if (aUnmatch !== bUnmatch) return aUnmatch ? -1 : 1;
+    return a[0].localeCompare(b[0]);
+  });
+  let html = `<div style="font-size:12px;color:var(--ink3);margin-bottom:12px;">All PO material descriptions for this job and their current classification. Click <strong>Reassign</strong> to correct mismatches.</div>
+  <table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:var(--surface2);color:var(--ink3);font-size:10px;">
+    <th style="padding:6px 8px;text-align:left;">PO Description</th>
+    <th style="padding:6px 8px;text-align:right;">Qty</th>
+    <th style="padding:6px 8px;text-align:left;">Matched To</th>
+    <th style="padding:6px 8px;"></th>
+  </tr></thead><tbody>`;
+  sorted.forEach(([raw, st]) => {
+    const isManual = !!(st.manualGroup || st.estLine);
+    const matchLabel = st.estLine ? st.estLine + ' (exact)' : (MATERIAL_GROUPS[st.group]?.label || st.group);
+    const matchColor = st.group==='OTHER'&&!st.estLine ? 'var(--red)' : isManual ? 'var(--green)' : 'var(--ink2)';
+    html += `<tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+      <td style="padding:6px 8px;">${esc(raw)}${isManual?'<span style="margin-left:6px;font-size:9px;background:rgba(52,211,153,.15);color:var(--green);padding:1px 5px;border-radius:8px;font-weight:700;">MANUAL</span>':''}</td>
+      <td style="padding:6px 8px;text-align:right;color:var(--ink3);">${Math.round(st.qty)}</td>
+      <td style="padding:6px 8px;color:${matchColor};">${esc(matchLabel)}</td>
+      <td style="padding:6px 8px;"><button class="btn btn-ghost btn-sm" style="font-size:10px;" onclick="openMatReassignModal('${jsesc(job)}','${jsesc(raw)}')">Reassign</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('po-modal-title').textContent = '🔧 Material Mappings — ' + job;
+  document.getElementById('po-modal-footer').innerHTML = `<button class="btn btn-ghost" onclick="renderMaterialStats('${jsesc(job)}')">← Back to Stats</button><button class="btn btn-ghost" onclick="closeModal('po-modal')">Close</button>`;
+  document.getElementById('po-modal-body').innerHTML = html;
+  document.getElementById('po-modal').classList.add('open');
+}
+
+function openMatReassignModal(job, rawMat) {
+  const estItems = getJobEstimate(job);
+  const current = normalizeMaterial(rawMat);
+  const manualGroup = S.materialMap?.[rawMat.toUpperCase()];
+  const estLine = (S.matBudgetMap||{})[job]?.[rawMat.toUpperCase()];
+  const groupOpts = Object.entries(MATERIAL_GROUPS).map(([k,v]) => `<option value="${k}"${k===(manualGroup||current.group)?' selected':''}>${esc(v.label)}</option>`).join('');
+  let lastCat = '';
+  const estOpts = estItems.map(it => {
+    let o = it.cat!==lastCat ? `<option disabled>── ${it.cat} ──</option>` : '';
+    lastCat = it.cat;
+    return o + `<option value="${esc(it.name)}"${it.name===estLine?' selected':''}>${esc(it.name)}</option>`;
+  }).join('');
+  document.getElementById('po-modal-title').textContent = 'Reassign Material';
+  document.getElementById('po-modal-body').innerHTML = `
+    <div style="margin-bottom:14px;padding:10px;background:var(--surface2);border-radius:8px;">
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:4px;">PO DESCRIPTION</div>
+      <div style="font-weight:700;font-size:14px;">${esc(rawMat)}</div>
+      <div style="font-size:11px;color:var(--ink3);margin-top:6px;">Auto-detected: <strong style="color:var(--ink);">${esc(MATERIAL_GROUPS[current.group]?.label||current.group)}</strong>${manualGroup?' · <span style="color:var(--green);">Manual override active</span>':''}</div>
+      ${estLine?`<div style="font-size:11px;color:var(--green);margin-top:2px;">Exact est. line: ${esc(estLine)}</div>`:''}
+    </div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.03em;">1. Assign to material group</label>
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">Controls which category this appears under in stats (e.g. 25GA vs 20GA stud)</div>
+      <select id="reassign-group" class="inp">${groupOpts}</select>
+    </div>
+    <div class="form-group">
+      <label style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.03em;">2. Also pin to exact estimate line (optional)</label>
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">Use when the group alone isn't specific enough (e.g. multiple screw types)</div>
+      <select id="reassign-est" class="inp"><option value="">— none —</option>${estOpts}</select>
+    </div>`;
+  document.getElementById('po-modal-footer').innerHTML = `
+    <button class="btn btn-ghost" onclick="renderMatMappingsModal('${jsesc(job)}')">Cancel</button>
+    <button class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="clearMatMapping('${jsesc(job)}','${jsesc(rawMat)}')">Clear Override</button>
+    <button class="btn btn-primary" onclick="saveMatReassign('${jsesc(job)}','${jsesc(rawMat)}')">Save</button>`;
+  document.getElementById('po-modal').classList.add('open');
+}
+async function saveMatReassign(job, rawMat) {
+  const grpVal = document.getElementById('reassign-group')?.value;
+  const estVal = document.getElementById('reassign-est')?.value;
+  const key = rawMat.toUpperCase().trim();
+  if (grpVal) { if (!S.materialMap) S.materialMap={}; S.materialMap[key]=grpVal; await saveSharedData('materialMap'); }
+  if (estVal) { if (!S.matBudgetMap) S.matBudgetMap={}; if (!S.matBudgetMap[job]) S.matBudgetMap[job]={}; S.matBudgetMap[job][key]=estVal; await saveSharedData('matBudgetMap'); }
+  showToast('✓ Mapping saved');
+  renderMatMappingsModal(job);
+}
+async function clearMatMapping(job, rawMat) {
+  const key = rawMat.toUpperCase().trim();
+  if (S.materialMap?.[key]) { delete S.materialMap[key]; await saveSharedData('materialMap'); }
+  if (S.matBudgetMap?.[job]?.[key]) { delete S.matBudgetMap[job][key]; await saveSharedData('matBudgetMap'); }
+  showToast('✓ Override cleared — auto-detection restored');
+  renderMatMappingsModal(job);
 }
 
 // ═══════════════════════════════════════════════════════════
