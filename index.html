@@ -636,13 +636,19 @@ function deepMergeMatBanks(base, local) {
 }
 function normBldg(s) { return String(s||'').trim().replace(/^(?:BLDG?|BUILDING)\s*/i,'').trim().toLowerCase(); }
 function normFloor(s) { return String(s||'').trim().replace(/^0+/,'').replace(/(?:ST|ND|RD|TH|FL(?:OOR)?)$/i,'').trim().toLowerCase(); }
+// Resolve any raw job_name variant (e.g. "PINE ISLAND", "JOB PINE ISLAND PARK") to the
+// canonical job name used in dropdowns/job pages (e.g. "PINE ISLAND PARK"), via aliases
+// and substring matching against the known jobs list.
+function canonicalJob(raw) {
+  raw = raw || '';
+  if (!raw) return '';
+  const tNorm = normalizeJobName(raw);
+  for (const [alias, job] of Object.entries(JOB_ALIASES)) { if (raw.toUpperCase().includes(alias)) return job; }
+  for (const job of S.jobs) { const jNorm = normalizeJobName(job); if (tNorm.includes(jNorm) || jNorm.includes(tNorm)) return job; }
+  return raw;
+}
 function getJobs() {
-  const fromSheet = S.rows.map(r => r['JOB'] || r['Job'] || '').filter(Boolean).map(raw => {
-    const tNorm = normalizeJobName(raw);
-    for (const [alias, job] of Object.entries(JOB_ALIASES)) { if (raw.toUpperCase().includes(alias)) return job; }
-    for (const job of S.jobs) { const jNorm = normalizeJobName(job); if (tNorm.includes(jNorm) || jNorm.includes(tNorm)) return job; }
-    return raw;
-  });
+  const fromSheet = S.rows.map(r => r['JOB'] || r['Job'] || '').filter(Boolean).map(canonicalJob);
   const all = [...new Set([...S.jobs, ...fromSheet])];
   return all.filter(Boolean).sort();
 }
@@ -701,7 +707,7 @@ function findBestPOMatch(billRow) {
   const billTotal = parseFloat(billRow['LINE TOTAL']||0);
   const billDesc = String(billRow['ITEM DESCRIPTION']||'').toUpperCase();
   const poGroups = {};
-  S.rows.forEach(r => { const po = String(r['PO NUMBER']||'').trim(); if (!po) return; if (!poGroups[po]) poGroups[po] = {po, rows:[], total:0, job:r['JOB']||'', building:r['BUILDING']||'', floor:r['FLOOR']||'', unit:r['UNIT']||''}; poGroups[po].rows.push(r); poGroups[po].total += parseFloat(r['LINE TOTAL']||0); });
+  S.rows.forEach(r => { const po = String(r['PO NUMBER']||'').trim(); if (!po) return; if (!poGroups[po]) poGroups[po] = {po, rows:[], total:0, job:canonicalJob(r['JOB']||''), building:r['BUILDING']||'', floor:r['FLOOR']||'', unit:r['UNIT']||''}; poGroups[po].rows.push(r); poGroups[po].total += parseFloat(r['LINE TOTAL']||0); });
   let best = null, bestScore = 0;
   for (const pg of Object.values(poGroups)) {
     if (S.billAssignments[pg.po]) continue;
@@ -1224,7 +1230,7 @@ function getFeedPOGroups() {
   const groups = {};
   S.rows.forEach(r => {
     const po = String(r['PO NUMBER']||'').trim(); if (!po) return;
-    if (!groups[po]) groups[po] = {po, job:r['JOB']||'', vendor:r['VENDOR']||'', date:r['DATE']||'', rows:[], total:0, building:r['BUILDING']||'', floor:r['FLOOR']||''};
+    if (!groups[po]) groups[po] = {po, job:canonicalJob(r['JOB']||''), vendor:r['VENDOR']||'', date:r['DATE']||'', rows:[], total:0, building:r['BUILDING']||'', floor:r['FLOOR']||''};
     groups[po].rows.push(r); groups[po].total += parseFloat(r['LINE TOTAL']||0);
   });
   return Object.values(groups).sort((a,b) => String(b.date).localeCompare(String(a.date)));
@@ -1635,7 +1641,7 @@ async function applyFeedBulkAssign() {
 function renderDashboard() {
   const jobs = getJobs();
   const filterJob = document.getElementById('dash-job-select')?.value || '';
-  const rows = filterJob ? S.rows.filter(r => (r['JOB']||'') === filterJob) : S.rows;
+  const rows = filterJob ? S.rows.filter(r => canonicalJob(r['JOB']||'') === filterJob) : S.rows;
   const totalSpend = rows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
   const totalBoards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
   const uniquePOs = [...new Set(rows.map(r => String(r['PO NUMBER']||'').trim()).filter(Boolean))];
@@ -1654,7 +1660,7 @@ function renderDashboard() {
   const jobsToShow = filterJob ? [filterJob] : jobs;
   const jobData = [];
   jobsToShow.forEach(j => {
-    const jr = S.rows.filter(r => (r['JOB']||'') === j);
+    const jr = S.rows.filter(r => canonicalJob(r['JOB']||'') === j);
     const pos = [...new Set(jr.map(r => String(r['PO NUMBER']||'')).filter(Boolean))].length;
     const boards = jr.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
     const matSpend = jr.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
@@ -1837,7 +1843,7 @@ function switchJobTab(tab) {
 // PPB Cards
 function renderJobPPBCards(job) {
   const el = document.getElementById('jobs-ppb-cards'); if (!el) return;
-  const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const rows = S.rows.filter(r => canonicalJob(r['JOB']||r['Job']||'') === job);
   const boards = rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s + parseFloat(r['QTY']||0), 0);
   const matSpend = rows.reduce((s,r) => s + parseFloat(r['LINE TOTAL']||0), 0);
   const laborSpend = Object.values(S.billAssignments||{}).filter(ba => ba.job === job && LABOR_CATS.some(lc => (ba.category||'').includes(lc))).reduce((s,ba) => s + parseFloat(ba.total||0), 0);
@@ -1890,7 +1896,7 @@ function setMapView(v) {
 
 function renderMapMaterial(job, el) {
   const struct = S.jobStructure?.[job];
-  const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const rows = S.rows.filter(r => canonicalJob(r['JOB']||r['Job']||'') === job);
   if (!struct?.floors?.length) {
     el.innerHTML = '<div class="alert alert-y">No floors set up yet. Click <strong>⚙ Floors &amp; Units</strong> above.</div><div class="section-title" style="margin-top:16px;">PO Data by Building &amp; Floor (auto-detected)</div>';
     renderAutoFloors(job, rows, el); return;
@@ -2087,7 +2093,7 @@ function renderAutoFloors(job, rows, parentEl) {
 }
 
 function renderMapLabor(job, el) {
-  const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const rows = S.rows.filter(r => canonicalJob(r['JOB']||r['Job']||'') === job);
   const bills = Object.entries(S.billAssignments||{}).filter(([inv,ba]) => ba.job === job && LABOR_CATS.some(lc => (ba.category||'').includes(lc))).map(([inv,ba]) => ({inv,...ba}));
   if (!bills.length) { el.innerHTML = '<div class="alert alert-y">No labor bills matched to this job yet.</div>'; return; }
   // Group by Building first, then Floor
@@ -2193,7 +2199,7 @@ function openUnitDetail(job, floor, unit, bldg) {
 function renderEstimateTab(job) {
   const el = document.getElementById('jobs-tab-estimate'); if (!el) return;
   const items = getJobEstimate(job);
-  const rows = S.rows.filter(r => (r['JOB']||'') === job);
+  const rows = S.rows.filter(r => canonicalJob(r['JOB']||'') === job);
   const grandTotal = items.reduce((s,it) => s + (parseFloat(it.qty)||0)*(parseFloat(it.price)||0), 0);
   const linesFilled = items.filter(it => (parseFloat(it.qty)||0) > 0).length;
 
@@ -2325,7 +2331,7 @@ function renderFloorBudgetSection(job) {
   if (!struct?.floors?.length) { el.innerHTML = '<div class="no-data">Set up floors first.</div>'; return; }
   el.innerHTML = struct.floors.map((fl,fi) => {
     const actualBoards = S.rows.filter(r =>
-      (r['JOB']||'') === job &&
+      canonicalJob(r['JOB']||'') === job &&
       String(r['FLOOR']||'').trim() === String(fl.floor) &&
       (!fl.bldg || String(r['BUILDING']||'').trim() === fl.bldg) &&
       isBoard(r['MATERIAL']||'')
@@ -2435,7 +2441,7 @@ function renderJobSummaryTab(job) {
   const scopeData = (S.matBanks || {})[job+'_scopes'] || {};
   const estItems = getJobEstimate(job); // [{name, qty, price, uom, cat}]
   const priceMap = {}; estItems.forEach(it => { priceMap[it.name] = parseFloat(it.price)||0; });
-  const allJobRows = (S.rows||[]).filter(r => (r['JOB']||r['Job']||'') === job);
+  const allJobRows = (S.rows||[]).filter(r => canonicalJob(r['JOB']||r['Job']||'') === job);
   // Collect all buildings from both structure and PO rows
   const structBuildings = struct?.floors ? [...new Set(struct.floors.map(f => String(f.bldg||'').trim()).filter(Boolean))] : [];
   const rowBuildings = [...new Set(allJobRows.map(r => String(r['BUILDING']||'').trim()).filter(Boolean))];
@@ -2841,7 +2847,7 @@ function confirmBillMatch(inv, isLabor) {
 // ═══════════════════════════════════════════════════════════
 function renderMaterialStats(job) {
   if (!job) { showToast('Select a job first'); return; }
-  const rows = S.rows.filter(r => (r['JOB']||r['Job']||'') === job);
+  const rows = S.rows.filter(r => canonicalJob(r['JOB']||r['Job']||'') === job);
   if (!rows.length) { showToast('No PO data for this job yet'); return; }
   const estItems = getJobEstimate(job);
   const estByName = {}; estItems.forEach(it => { estByName[it.name.toUpperCase()] = it; });
@@ -3120,7 +3126,7 @@ function editPORow(idx) {
   const currentCat = categorize(r['MATERIAL']||'');
   document.getElementById('po-modal-body').innerHTML = `
     <div class="form-row"><div class="form-group"><label>PO Number</label><input id="pe-po" value="${esc(r['PO NUMBER']||'')}"/></div>
-    <div class="form-group"><label>Job</label><select id="pe-job">${jobs.map(j=>'<option value="'+esc(j)+'"'+((r['JOB']||'')===j?' selected':'')+'>'+esc(j.replace('JOB ',''))+'</option>').join('')}<option value="">— unassigned —</option></select></div></div>
+    <div class="form-group"><label>Job</label><select id="pe-job">${jobs.map(j=>'<option value="'+esc(j)+'"'+(canonicalJob(r['JOB']||'')===j?' selected':'')+'>'+esc(j.replace('JOB ',''))+'</option>').join('')}<option value="">— unassigned —</option></select></div></div>
     <div class="form-group"><label>Material Description</label><input id="pe-mat" value="${esc(r['MATERIAL']||'')}"/></div>
     <div class="form-row"><div class="form-group"><label>Category <span style="color:var(--ink3);font-size:10px;">(currently: ${currentCat})</span></label><select id="pe-cat"><option value="">(auto-detect)</option><option value="boards"${currentCat==='boards'?' selected':''}>Boards/Drywall</option><option value="metal"${currentCat==='metal'?' selected':''}>Metal</option><option value="wood"${currentCat==='wood'?' selected':''}>Wood</option><option value="finish"${currentCat==='finish'?' selected':''}>Finish</option><option value="supplies"${currentCat==='supplies'?' selected':''}>Supplies/Fasteners</option><option value="labor"${currentCat==='labor'?' selected':''}>Labor</option><option value="tax"${currentCat==='tax'?' selected':''}>Tax</option><option value="other"${currentCat==='other'?' selected':''}>Other</option></select></div>
     <div class="form-group"><label>Qty</label><input id="pe-qty" type="number" step="any" value="${r['QTY']||0}"/></div>
@@ -3452,7 +3458,7 @@ async function sendAI() {
   const jobs = getJobs();
   const totalSpend = S.rows.reduce((s,r) => s+parseFloat(r['LINE TOTAL']||0), 0);
   const totalBoards = S.rows.filter(r => isBoard(r['MATERIAL']||'')).reduce((s,r) => s+parseFloat(r['QTY']||0), 0);
-  const jobBreakdown = jobs.map(j => { const jr=S.rows.filter(r=>(r['JOB']||'')===j); const spend=jr.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0); const boards=jr.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0); return j+': $'+spend.toFixed(0)+', '+Math.round(boards)+' boards'; }).join('\n');
+  const jobBreakdown = jobs.map(j => { const jr=S.rows.filter(r=>canonicalJob(r['JOB']||'')===j); const spend=jr.reduce((s,r)=>s+parseFloat(r['LINE TOTAL']||0),0); const boards=jr.filter(r=>isBoard(r['MATERIAL']||'')).reduce((s,r)=>s+parseFloat(r['QTY']||0),0); return j+': $'+spend.toFixed(0)+', '+Math.round(boards)+' boards'; }).join('\n');
   const context = 'You are an AI for A.A. DRYWALL FINISH PAINT LLC. Answer concisely.\n\nJOBS:\n' + jobBreakdown + '\n\nTOTALS: Spend=$'+totalSpend.toFixed(0)+' Boards='+Math.round(totalBoards)+' Bills='+S.bills.length;
   const EDGE_URL = SB_URL + '/functions/v1/ai-chat';
   try {
