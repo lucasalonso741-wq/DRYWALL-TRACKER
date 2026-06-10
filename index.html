@@ -937,7 +937,7 @@ async function loadBillPDFs() {
     if (!Array.isArray(rows) || !rows.length) return;
     const sbBills = rows.flatMap(p => {
       const lines = Array.isArray(p.lines) ? p.lines : [];
-      const base = { 'INVOICE NUMBER': p.invoice_number || p.qb_bill_id || '', 'REFERANCE NUMBER': p.invoice_number || '', 'VENDOR': p.vendor || '', 'JOB': p.job_name || '', 'BILL DATE': p.bill_date || '', '_sb_id': p.id, '_sb_source': 'bill_pdfs' };
+      const base = { 'INVOICE NUMBER': p.invoice_number || p.qb_bill_id || '', 'REFERANCE NUMBER': p.invoice_number || '', 'VENDOR': p.vendor || '', 'JOB': p.job_name || '', 'BILL DATE': p.bill_date || '', '_sb_id': p.id, '_sb_source': 'bill_pdfs', '_source': p.source || 'upload' };
       if (lines.length > 1) return lines.map(l => ({...base, 'ITEM DESCRIPTION': l.description || '', 'QUANTITY': l.qty || '', 'LINE TOTAL': l.amount || 0, '_customer_job': l.customer || p.job_name || '' }));
       return [{...base, 'ITEM DESCRIPTION': lines[0]?.description || '', 'QUANTITY': lines[0]?.qty || '', 'LINE TOTAL': p.total || 0, '_customer_job': lines[0]?.customer || p.job_name || '' }];
     });
@@ -1198,7 +1198,7 @@ function getFeedBillGroups() {
   const groups = {};
   S.bills.forEach(b => {
     const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim(); if (!inv) return;
-    if (!groups[inv]) groups[inv] = {inv, vendor:b['VENDOR']||b['Vendor']||'', job:b['_customer_job']||b['JOB']||b['Job']||'', rows:[], total:0, fromSB:!!b['_sb_source']};
+    if (!groups[inv]) groups[inv] = {inv, vendor:b['VENDOR']||b['Vendor']||'', job:b['_customer_job']||b['JOB']||b['Job']||'', rows:[], total:0, fromSB:!!b['_sb_source'], source:b['_source']};
     else if (!groups[inv].job && (b['_customer_job']||b['JOB'])) groups[inv].job = b['_customer_job']||b['JOB']||'';
     groups[inv].rows.push(b); groups[inv].total += parseFloat(b['LINE TOTAL']||0);
   });
@@ -1226,7 +1226,7 @@ function renderActivityFeed() {
   });
   billGroups.forEach(g => {
     const matched = !!S.billAssignments[g.inv];
-    const obj = {type:'bill', id:g.inv, job:g.job, vendor:g.vendor, total:g.total, matched, isLabor:isLaborVendor(g.vendor), rows:g.rows};
+    const obj = {type:'bill', id:g.inv, job:g.job, vendor:g.vendor, total:g.total, matched, isLabor:isLaborVendor(g.vendor), rows:g.rows, source:g.source};
     (matched ? doneItems : actionItems).push(obj);
   });
 
@@ -1278,6 +1278,7 @@ function renderActivityFeed() {
       ? (item.assigned ? '<span class="badge badge-green">Assigned</span>' : '<span class="badge badge-blue">Unassigned</span>')
       : (item.matched ? '<span class="badge badge-green">Matched</span>' : '<span class="badge badge-yellow">Needs Match</span>');
     const boardsBadge = item.boards > 0 ? ' <span class="badge badge-blue">' + Math.round(item.boards) + ' boards</span>' : '';
+    const qbBadge = item.type === 'bill' && item.source === 'make' ? ' <span class="badge badge-green" title="Synced from QuickBooks">🔄 QB</span>' : '';
     const editBtn = item.type === 'po'
       ? `<button onclick="event.stopPropagation();openPODetailModal('${esc(item.id)}')" class="btn btn-ghost btn-sm">✏ Edit</button>`
       : `<button onclick="event.stopPropagation();openSmartBillModal('${esc(item.id)}')" class="btn btn-ghost btn-sm">✏ Edit</button>`;
@@ -1290,7 +1291,7 @@ function renderActivityFeed() {
       <div style="flex:1;min-width:0;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span style="font-weight:700;font-size:13px;">${label}</span>
-          ${status}${boardsBadge}
+          ${status}${boardsBadge}${qbBadge}
         </div>
         <div style="font-size:12px;color:var(--ink2);margin-top:2px;">
           ${esc(item.vendor)}${item.job ? ' · ' + esc(item.job.replace('JOB ','')) : ''}${item.building ? ' · Bldg ' + esc(item.building) : ''}${item.floor ? ' · Fl ' + esc(item.floor) : ''}
@@ -1343,20 +1344,12 @@ function renderActivityFeed() {
 
 function deleteFeedPO(poNum) {
   if (!confirm('Remove assignment for PO #' + poNum + '? This will unassign it from any job.')) return;
-  delete S.assignments[poNum];
-  saveSharedData('assignments');
-  renderActivityFeed();
-  updateInboxBadge();
-  showToast('PO #' + poNum + ' unassigned');
+  deleteAssignment('po', poNum);
 }
 
 function deleteFeedBill(invNum) {
   if (!confirm('Remove match for Bill #' + invNum + '?')) return;
-  delete S.billAssignments[invNum];
-  saveSharedData('billAssignments');
-  renderActivityFeed();
-  updateInboxBadge();
-  showToast('Bill #' + invNum + ' unmatched');
+  deleteAssignment('bill', invNum);
 }
 
 // Open a review modal for an email-extracted PO
@@ -3105,16 +3098,24 @@ async function setManualCategoryFromRaw(desc) {
   showToast('✓ "' + desc + '" now categorized as: ' + cat);
   renderRawPO();
 }
+function billSourceBadge(source) {
+  if (source === 'make') return '<span class="badge badge-green" title="Synced from QuickBooks">🔄 QuickBooks</span>';
+  if (typeof source === 'string' && source.startsWith('email')) return '<span class="badge badge-blue" title="'+esc(source)+'">📧 Email</span>';
+  if (source === 'upload') return '<span class="badge badge-gray">📎 Upload</span>';
+  return '<span class="badge badge-gray">📊 Sheet</span>';
+}
 function renderRawBills() {
   const el = document.getElementById('raw-tab-raw-bills'); if (!el) return;
   if (!S.bills.length) { el.innerHTML = '<div class="no-data">No bill data. Click Sync first.</div>'; return; }
   let html = '<div style="font-size:11px;color:var(--ink3);margin-bottom:12px;">Click ✏ to edit a bill line, or 🏷 to change material category.</div>';
-  html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Invoice</th><th>Vendor</th><th>Description</th><th class="tbl-r">Qty</th><th class="tbl-r">Total</th><th>Job</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+  html += '<div style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Invoice</th><th>Vendor</th><th>Description</th><th class="tbl-r">Qty</th><th class="tbl-r">Total</th><th>Job</th><th>Source</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
   S.bills.slice(0, 300).forEach((b, idx) => {
     const inv = String(b['INVOICE NUMBER']||b['REFERANCE NUMBER']||'').trim();
     const matched = S.billAssignments[inv];
-    const desc = b['ITEM DESCRIPTION']||b['Item Description']||'';
-    html += '<tr><td>' + esc(inv) + '</td><td>' + esc(b['VENDOR']||b['Vendor']||'') + '</td><td>' + esc(desc) + '</td><td class="tbl-r">' + (b['QUANTITY']||'') + '</td><td class="tbl-r">' + fmt(parseFloat(b['LINE TOTAL']||0)) + '</td><td>' + esc((b['JOB']||b['Job']||'').replace('JOB ','')) + '</td><td>' + (matched?'<span class="badge badge-green">Matched</span>':'<span class="badge badge-yellow">Unmatched</span>') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editBillRow(' + idx + ')">✏</button> <button class="btn btn-danger btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(desc) + '\')">🏷</button></td></tr>';
+    let desc = b['ITEM DESCRIPTION']||b['Item Description']||'';
+    if (!desc && b['_source'] === 'make') desc = '<em style="color:var(--ink3);">QuickBooks bill — no line items</em>';
+    else desc = esc(desc);
+    html += '<tr><td>' + esc(inv) + '</td><td>' + esc(b['VENDOR']||b['Vendor']||'') + '</td><td>' + desc + '</td><td class="tbl-r">' + (b['QUANTITY']||'') + '</td><td class="tbl-r">' + fmt(parseFloat(b['LINE TOTAL']||0)) + '</td><td>' + esc((b['JOB']||b['Job']||'').replace('JOB ','')) + '</td><td>' + billSourceBadge(b['_source']) + '</td><td>' + (matched?'<span class="badge badge-green">Matched</span>':'<span class="badge badge-yellow">Unmatched</span>') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editBillRow(' + idx + ')">✏</button> <button class="btn btn-danger btn-sm" onclick="setManualCategoryFromRaw(\'' + jsesc(b['ITEM DESCRIPTION']||b['Item Description']||'') + '\')">🏷</button></td></tr>';
   });
   html += '</tbody></table></div>';
   if (S.bills.length > 300) html += '<div class="no-data">Showing first 300 of ' + S.bills.length + ' rows</div>';
