@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AA Drywall — Submittal Package Rev.1 — The Residences at Claude Pepper</title>
+<style>
+  @page { size: letter; margin: 0.6in 0.65in 0.7in 0.65in; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; color: #1a2332; font-size: 10.5px; line-height: 1.45; }
+  .page { page-break-after: always; position: relative; min-height: 9.4in; }
+  .page:last-child { page-break-after: auto; }
+
+  /* ---------- shared ---------- */
+  h1,h2,h3 { font-family: Arial, sans-serif; }
+  .rule { border: none; border-top: 2.5px solid #14304f; margin: 8px 0 14px; }
+  .tag { display:inline-block; background:#14304f; color:#fff; font-size:9px; font-weight:bold; letter-spacing:1.2px; padding:3px 10px; border-radius:2px; text-transform:uppercase; }
+  .tag.gold { background:#b07d2b; }
+  table.data { width:100%; border-collapse: collapse; margin: 6px 0 14px; }
+  table.data th { background:#14304f; color:#fff; text-align:left; padding:5px 7px; font-size:9.5px; text-transform:uppercase; letter-spacing:.5px; }
+  table.data td { border:1px solid #c5cdd8; padding:4.5px 7px; vertical-align:top; }
+  table.data tr:nth-child(even) td { background:#f2f5f9; }
+  table.data td.c { text-align:center; }
+  .loc { font-weight:bold; color:#0d4f2b; }
+  .pgref { white-space:nowrap; font-weight:bold; color:#7a4b00; }
+  .small { font-size:9px; color:#4a5568; }
+  .note-box { border:1.5px solid #b07d2b; background:#fdf6e8; padding:8px 12px; margin:10px 0; font-size:10px; }
+  .note-box b:first-child { color:#7a4b00; }
+  .footer { position:absolute; bottom:0; left:0; right:0; border-top:1px solid #c5cdd8; padding-top:5px; font-size:8.5px; color:#5a6675; display:flex; justify-content:space-between; }
+  .sechead { background:#14304f; color:#fff; padding:10px 14px; margin-bottom:4px; }
+  .sechead h2 { font-size:16px; letter-spacing:.5px; }
+  .sechead .sub { font-size:10px; color:#bcd0e6; margin-top:2px; letter-spacing:1px; text-transform:uppercase; }
+  .twocol { display:flex; gap:16px; }
+  .twocol > div { flex:1; }
+
+  /* ---------- cover ---------- */
+  .cover { display:flex; flex-direction:column; min-height:9.6in; border:3px double #14304f; padding:0.45in 0.5in; }
+  .cover .band { background:#14304f; color:#fff; margin:0 -0.5in; padding:22px 0.5in; }
+  .cover .band .co { font-size:26px; font-weight:900; letter-spacing:1px; }
+  .cover .band .co span { color:#e8b54d; }
+  .cover .band .co-sub { font-size:10.5px; letter-spacing:2.5px; color:#bcd0e6; text-transform:uppercase; margin-top:3px; }
+  .cover h1 { font-size:30px; color:#14304f; line-height:1.15; margin:26px 0 2px; }
+  .cover .addr { font-size:14px; color:#3d4a5c; margin-bottom:20px; }
+  .covergrid { width:100%; border-collapse:collapse; margin-top:14px; }
+  .covergrid td { border:1px solid #c5cdd8; padding:7px 10px; font-size:11px; }
+  .covergrid td.k { background:#eef2f7; font-weight:bold; width:32%; color:#14304f; text-transform:uppercase; font-size:9.5px; letter-spacing:.8px; }
+  .rev-badge { margin-top:22px; text-align:center; }
+  .rev-badge .inner { display:inline-block; border:2.5px solid #a83232; color:#a83232; font-weight:900; font-size:15px; letter-spacing:2px; padding:9px 26px; transform:rotate(-2deg); text-transform:uppercase; }
+  .cover .spacer { flex:1; }
+  .cover .foot { font-size:9.5px; color:#5a6675; border-top:1.5px solid #14304f; padding-top:8px; }
+
+  /* ---------- toc ---------- */
+  .toc-row { display:flex; align-items:baseline; padding:5.5px 2px; border-bottom:1px dotted #9aa7b8; font-size:11px; }
+  .toc-row .n { font-weight:900; color:#b07d2b; width:52px; }
+  .toc-row .t { flex:1; }
+  .toc-row .t b { color:#14304f; }
+  .toc-row .p { font-weight:bold; white-space:nowrap; }
+  .toc-sub { padding:2.5px 2px 2.5px 62px; font-size:10px; color:#4a5568; display:flex; border-bottom:1px dotted #d7dee8; }
+  .toc-sub .t { flex:1; }
+  .toc-sub .p { white-space:nowrap; font-weight:bold; color:#7a4b00; }
+
+  /* ---------- assemblies ---------- */
+  .asm { border:1.5px solid #14304f; margin-bottom:14px; page-break-inside:avoid; }
+  .asm-head { background:#eef2f7; border-bottom:1.5px solid #14304f; padding:6px 10px; display:flex; align-items:center; gap:12px; }
+  .asm-head .wt { background:#14304f; color:#fff; font-weight:900; font-size:13px; padding:5px 11px; border-radius:50%; }
+  .asm-head .wt.sq { border-radius:2px; }
+  .asm-head h3 { font-size:12.5px; color:#14304f; text-transform:uppercase; letter-spacing:.4px; }
+  .asm-head .where { margin-left:auto; font-size:9.5px; font-weight:bold; color:#0d4f2b; text-align:right; max-width:38%; }
+  .asm-body { display:flex; gap:10px; padding:8px 10px; }
+  .asm-fig { flex:0 0 240px; }
+  .asm-fig svg { width:100%; height:auto; display:block; }
+  .asm-fig .cap { font-size:8px; color:#5a6675; text-align:center; margin-top:2px; }
+  .asm-mat { flex:1; }
+  table.mat { width:100%; border-collapse:collapse; font-size:9.5px; }
+  table.mat th { background:#3d5a7a; color:#fff; padding:3.5px 6px; text-align:left; font-size:8.5px; text-transform:uppercase; }
+  table.mat td { border:1px solid #c5cdd8; padding:3.5px 6px; vertical-align:top; }
+  table.mat td.n { text-align:center; font-weight:900; color:#b07d2b; width:18px; }
+  .ul-line { font-size:9px; margin-top:5px; color:#4a5568; }
+  .ul-line b { color:#a83232; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ COVER -->
+<div class="page">
+  <div class="cover">
+    <div class="band">
+      <div class="co">AA <span>DRYWALL</span> CONSTRUCTION, LLC</div>
+      <div class="co-sub">Drywall &bull; Metal Framing &bull; Insulation &bull; Finishes</div>
+    </div>
+    <h1>The Residences at Claude&nbsp;Pepper</h1>
+    <div class="addr">750 NW 18th Terrace &bull; Miami, Florida 33136</div>
+
+    <div style="margin-bottom:6px;"><span class="tag">Material Submittal Package</span> &nbsp;<span class="tag gold">Revision 1 &mdash; Job-Specific Resubmittal</span></div>
+
+    <table class="covergrid">
+      <tr><td class="k">Project</td><td>The Residences at Claude Pepper (RACP) &mdash; 15-Story Multifamily Residential, 428 Units + Community Center</td></tr>
+      <tr><td class="k">Owner / Developer</td><td>Related Urban Development Group</td></tr>
+      <tr><td class="k">Construction Manager</td><td>Related Group &mdash; Attn: Juan Caffroni, Sr. Construction Manager<br><span class="small">2850 Tigertail Ave., Suite 800, Miami, FL 33133</span></td></tr>
+      <tr><td class="k">Architect</td><td>Cohen &bull; Freedman &bull; Encinosa &amp; Assoc. Architects, P.A.<br><span class="small">8085 NW 155th Street, Miami Lakes, FL 33016</span></td></tr>
+      <tr><td class="k">Subcontractor</td><td><b>AA Drywall Construction, LLC</b><br><span class="small">12951 SW 124th Street, Miami, FL 33186 &bull; Office (305) 238-7900</span></td></tr>
+      <tr><td class="k">Scope / Spec Sections</td><td>09&nbsp;22&nbsp;16 Non-Structural Metal Framing &bull; 09&nbsp;29&nbsp;00 Gypsum Board &bull; 07&nbsp;21&nbsp;00 Thermal Insulation &bull; 07&nbsp;84&nbsp;00 Firestopping</td></tr>
+      <tr><td class="k">Drawing References</td><td>A8.01 Wall Types &ndash; Concrete &bull; A8.02 Wall Types &ndash; Framing &bull; Level Plans (Permit Set 09/15/2025)</td></tr>
+      <tr><td class="k">Submittal No. / Date</td><td>09&nbsp;29&nbsp;00&ndash;01, Rev. 1 &nbsp;&bull;&nbsp; July 14, 2026</td></tr>
+    </table>
+
+    <div class="rev-badge"><div class="inner">Revised &amp; Resubmitted per CM Review Comments</div></div>
+
+    <div class="spacer"></div>
+    <div class="foot">
+      All products in this package are tagged with their specific location of use (residential units, corridors, wet walls, showers/tubs, ceilings, exterior walls) and keyed to the project wall types. Manufacturer data sheets follow each section divider. Only products intended for installation on this project are included.
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ TRANSMITTAL / RESPONSE -->
+<div class="page">
+  <div class="sechead"><h2>Submittal Transmittal &amp; Response to Review Comments</h2>
+  <div class="sub">The Residences at Claude Pepper &mdash; Submittal 09 29 00&ndash;01, Rev. 1</div></div>
+  <hr class="rule">
+  <p style="margin-bottom:10px;"><b>To:</b> Juan Caffroni, Sr. Construction Manager &mdash; Related Group<br>
+  <b>From:</b> AA Drywall Construction, LLC<br>
+  <b>Re:</b> Drywall / Metal Framing / Insulation / Firestopping Material Submittal &mdash; Revised &amp; Resubmitted</p>
+
+  <p style="margin-bottom:12px;">This package has been reorganized in response to the review comments received. The table below summarizes each comment and where it is addressed in this revision:</p>
+
+  <table class="data">
+    <tr><th style="width:46%">CM Review Comment</th><th>Response / Where Addressed</th></tr>
+    <tr>
+      <td>Information should be grouped per <b>Residential Units</b> and <b>Corridors</b>.</td>
+      <td>Package is now organized by location. Section 2 covers Residential Unit assemblies; Section 3 covers Corridor assemblies; Section 4 covers exterior/masonry furring common to both. See Table of Contents.</td>
+    </tr>
+    <tr>
+      <td>Do not include every item in the supplier brochures &mdash; only actual products to be used, tagged with location (wet walls, showers, bathrooms, regular areas, corridors, ceilings, etc.).</td>
+      <td>Section 1 &mdash; <b>Master Material Location Schedule</b> lists only the products to be installed on this project. Every product line carries its specific location(s) of use and the wall type tag(s) where it occurs. Every gypsum panel type states exactly where it goes.</td>
+    </tr>
+    <tr>
+      <td>No information was provided for <b>insulation</b>.</td>
+      <td>Tab 5 &mdash; Insulation: CertainTeed R-19 unfaced sound attenuation batts (corridor walls &amp; unit demising walls) and Fi-Foil AA2 Vapor Shield reflective insulation (&ldquo;ALFOIL&rdquo; per A8.01, at furred exterior masonry walls). Manufacturer data sheets are bound in this package.</td>
+    </tr>
+    <tr>
+      <td>No information was provided for <b>fire stopping</b> (fire caulk / putty).</td>
+      <td>Tab 6 &mdash; Firestopping: USG Sheetrock&reg; Brand Firecode&reg; Smoke-Sound Sealant at rated partition perimeters, joints and cutouts, and intumescent firestop putty pads at electrical boxes in demising partitions (per General Notes). Product data included.</td>
+    </tr>
+    <tr>
+      <td>Show what will be installed in the building, properly marked for reviewer/consultant reference.</td>
+      <td>Section 2&ndash;4 provide an <b>assembly cut sheet for each wall type</b> with a section diagram, numbered material callouts, and a page reference into the manufacturer data portion of this book for every component. Wall type tags match the architectural plans (A8.01/A8.02).</td>
+    </tr>
+  </table>
+
+  <div class="note-box"><b>How this book is organized:</b> Sections 1&ndash;4 (this front book) are job-specific schedules and assembly cut sheets. Tabs 1&ndash;6 contain manufacturer product data, in the same order and page numbering as referenced from the assembly cut sheets (&ldquo;Book pg.&rdquo; column). Appendices reproduce the governing architectural references (wall type sheet and a typical residential level plan).</div>
+
+  <div class="footer"><span>AA Drywall Construction, LLC &mdash; Submittal 09 29 00-01 Rev. 1</span><span>The Residences at Claude Pepper &mdash; 750 NW 18th Terrace, Miami, FL</span></div>
+</div>
+
+<!-- ============================================================ TOC -->
+<div class="page">
+  <div class="sechead"><h2>Table of Contents</h2>
+  <div class="sub">Submittal 09 29 00&ndash;01 Rev. 1 &mdash; organized by location &amp; system</div></div>
+  <hr class="rule">
+
+  <div class="toc-row"><span class="n">&mdash;</span><span class="t"><b>Cover Sheet &mdash; Project &amp; Contact Information</b></span><span class="p">i</span></div>
+  <div class="toc-row"><span class="n">&mdash;</span><span class="t"><b>Transmittal &amp; Response to Review Comments</b></span><span class="p">ii</span></div>
+  <div class="toc-row"><span class="n">S-1</span><span class="t"><b>Master Material Location Schedule</b> &mdash; every product tagged with where it is used</span><span class="p">iv</span></div>
+  <div class="toc-row"><span class="n">S-2</span><span class="t"><b>Wall Type Index &amp; Location Key</b> &mdash; plan tags &rarr; assemblies &rarr; products</span><span class="p">vi</span></div>
+  <div class="toc-row"><span class="n">S-3</span><span class="t"><b>Residential Unit Assemblies</b> &mdash; unit partitions, wet walls, tub/shower walls, demising walls, unit ceilings</span><span class="p">vii</span></div>
+  <div class="toc-row"><span class="n">S-4</span><span class="t"><b>Corridor Assemblies</b> &mdash; corridor walls &amp; corridor ceilings</span><span class="p">ix</span></div>
+  <div class="toc-row"><span class="n">S-5</span><span class="t"><b>Exterior &amp; Masonry Wall Furring Assemblies</b> &mdash; furred CMU walls, shafts &amp; stairs</span><span class="p">x</span></div>
+
+  <div style="height:10px"></div>
+
+  <div class="toc-row"><span class="n">TAB 1</span><span class="t"><b>Metal Framing</b> &mdash; manufacturer data</span><span class="p">Book pg. 1&ndash;41</span></div>
+  <div class="toc-sub"><span class="t">Steel-Con studs, tracks, hat channel, angle &amp; accessories &mdash; <span class="loc">all framed walls, furring &amp; ceilings, units + corridors</span></span><span class="p">pg. 1&ndash;36</span></div>
+  <div class="toc-sub"><span class="t">Rescue Metal framing &amp; accessories (alternate supplier, same profiles)</span><span class="p">pg. 37&ndash;41</span></div>
+
+  <div class="toc-row"><span class="n">TAB 2</span><span class="t"><b>Gypsum Panels &mdash; Drywall &amp; Finishing</b> &mdash; manufacturer data</span><span class="p">Book pg. 42&ndash;106</span></div>
+  <div class="toc-sub"><span class="t">United States Gypsum (USG) &mdash; primary panels &amp; joint treatment &mdash; <span class="loc">see S-1 for location of each panel type</span></span><span class="p">pg. 42&ndash;78</span></div>
+  <div class="toc-sub"><span class="t">CertainTeed Gypsum &mdash; approved alternate, non-rated unit partitions/ceilings only</span><span class="p">pg. 79&ndash;100</span></div>
+  <div class="toc-sub"><span class="t">Georgia-Pacific Gypsum &mdash; approved alternate, same locations as USG equivalents</span><span class="p">pg. 101&ndash;102</span></div>
+  <div class="toc-sub"><span class="t">National Gypsum &mdash; approved alternate, same locations as USG equivalents</span><span class="p">pg. 103&ndash;106</span></div>
+
+  <div class="toc-row"><span class="n">TAB 3</span><span class="t"><b>Corner Bead &amp; Trim</b> &mdash; <span class="loc">all outside corners &amp; exposed edges, units + corridors</span></span><span class="p">Book pg. 107&ndash;114</span></div>
+  <div class="toc-sub"><span class="t">American Cornerbead Company</span><span class="p">pg. 107&ndash;113</span></div>
+  <div class="toc-sub"><span class="t">Rescue Metal trims</span><span class="p">pg. 114</span></div>
+
+  <div class="toc-row"><span class="n">TAB 4</span><span class="t"><b>Fasteners</b> &mdash; <span class="loc">all board &amp; framing attachment, units + corridors</span></span><span class="p">Book pg. 115&ndash;123</span></div>
+  <div class="toc-sub"><span class="t">Building Products of America drywall screws</span><span class="p">pg. 115&ndash;116</span></div>
+  <div class="toc-sub"><span class="t">Starborn Industries fasteners</span><span class="p">pg. 117&ndash;123</span></div>
+
+  <div class="toc-row"><span class="n">TAB 5</span><span class="t"><b>Insulation</b> &mdash; <span class="loc">corridor walls, unit demising walls, exterior furred masonry walls</span></span><span class="p">Appendix C</span></div>
+  <div class="toc-sub"><span class="t">CertainTeed NoiseReducer&trade; R-19 unfaced sound attenuation batts &mdash; <span class="loc">corridor walls &amp; unit demising walls</span></span><span class="p">C-1</span></div>
+  <div class="toc-sub"><span class="t">Fi-Foil AA2 Vapor Shield&trade; reflective insulation (&ldquo;ALFOIL&rdquo; per A8.01) &mdash; <span class="loc">furred exterior masonry walls</span></span><span class="p">C-2</span></div>
+
+  <div class="toc-row"><span class="n">TAB 6</span><span class="t"><b>Firestopping &mdash; Fire Caulk &amp; Putty</b> &mdash; <span class="loc">all rated partition perimeters, joints, penetrations &amp; boxes</span></span><span class="p">Sect. S-6</span></div>
+  <div class="toc-sub"><span class="t">USG Sheetrock&reg; Brand Firecode&reg; Smoke-Sound Sealant &mdash; <span class="loc">rated walls: corridors, demising, shafts</span></span><span class="p">S-6</span></div>
+  <div class="toc-sub"><span class="t">Intumescent firestop putty pads &mdash; <span class="loc">electrical boxes in demising partitions (per General Notes)</span></span><span class="p">S-6</span></div>
+
+  <div style="height:10px"></div>
+  <div class="toc-row"><span class="n">APP. A</span><span class="t"><b>Architectural Reference &mdash; Wall Types (A8.01, Concrete)</b></span><span class="p">A-1</span></div>
+  <div class="toc-row"><span class="n">APP. B</span><span class="t"><b>Architectural Reference &mdash; Typical Residential Level Plan (Level 7, Stack A105)</b></span><span class="p">B-1</span></div>
+  <div class="toc-row"><span class="n">APP. C</span><span class="t"><b>Insulation Manufacturer Data Sheets (bound herein)</b></span><span class="p">C-1&ndash;C-3</span></div>
+
+  <div class="note-box" style="margin-top:14px;"><b>Note to reviewer:</b> &ldquo;Book pg.&rdquo; numbers refer to the manufacturer product data portion of this submittal book. Products shown in supplier literature but <u>not</u> listed in Schedule S-1 are not proposed for this project.</div>
+
+  <div class="footer"><span>AA Drywall Construction, LLC &mdash; Submittal 09 29 00-01 Rev. 1</span><span>Table of Contents &mdash; pg. iii</span></div>
+</div>
+
+<!-- ============================================================ S-1 MASTER SCHEDULE p1 -->
+<div class="page">
+  <div class="sechead"><h2>S-1 &nbsp;Master Material Location Schedule</h2>
+  <div class="sub">Only products to be installed at Claude Pepper &mdash; each tagged with its location of use</div></div>
+  <hr class="rule">
+
+  <h3 style="color:#14304f; margin-bottom:4px;">A. Gypsum Panels &mdash; where every sheet goes</h3>
+  <table class="data">
+    <tr><th style="width:24%">Product</th><th style="width:10%">Mfr.</th><th style="width:11%">Size / Type</th><th style="width:38%">Location of Use (tagged)</th><th style="width:9%">Wall Tags</th><th>Book pg.</th></tr>
+    <tr>
+      <td><b>Sheetrock&reg; Firecode&reg; X</b> (UL Type SCX)</td><td>USG</td><td>5/8&rdquo; Type X</td>
+      <td><span class="loc">Regular areas in units</span> (bedrooms, living, closets &mdash; both faces of interior partitions); <span class="loc">both faces of demising walls</span>; <span class="loc">both faces of corridor walls</span>; <span class="loc">corridor ceilings</span>; <span class="loc">interior face of furred exterior walls (dry areas)</span></td>
+      <td class="c">20, 21, 25, 10/15</td><td class="pgref">42&ndash;78</td>
+    </tr>
+    <tr>
+      <td><b>Sheetrock&reg; Mold Tough&reg; Firecode&reg; X</b> (UL Type SCX)</td><td>USG</td><td>5/8&rdquo; Type X, mold/moisture-resistant</td>
+      <td><span class="loc">Bathrooms &amp; wet walls</span> (all bathroom walls &amp; ceilings, kitchen sink walls, laundry/washer walls, plumbing chases) &mdash; in lieu of standard panels per A8.01 note &ldquo;Aqua Tough at shower and tub locations&rdquo;</td>
+      <td class="c">21a, 21b</td><td class="pgref">42&ndash;78</td>
+    </tr>
+    <tr>
+      <td><b>Durock&reg; Cement Board w/ EdgeGuard&trade;</b></td><td>USG</td><td>1/2&rdquo; cement board</td>
+      <td><span class="loc">Showers &amp; tub surrounds</span> &mdash; tile backer at all unit shower/tub wet zones, full height of tile</td>
+      <td class="c">21b</td><td class="pgref">42&ndash;78</td>
+    </tr>
+    <tr>
+      <td><b>Sheetrock&reg; UltraLight</b></td><td>USG</td><td>1/2&rdquo; sag-resistant</td>
+      <td><span class="loc">Unit ceilings</span> (non-rated furred/suspended GWB ceilings within dwelling units, dry areas only; bathrooms use Mold Tough)</td>
+      <td class="c">RCP</td><td class="pgref">42&ndash;78</td>
+    </tr>
+    <tr>
+      <td><b>Sheetrock&reg; Glass-Mat Liner Mold Tough&reg;</b> (UL Type SLX)</td><td>USG</td><td>1&rdquo; shaftliner</td>
+      <td><span class="loc">Shaft walls</span> &mdash; elevator shafts, stair shafts and MEP shaft enclosures where cavity shaft wall is indicated</td>
+      <td class="c">per plan</td><td class="pgref">42&ndash;78</td>
+    </tr>
+    <tr>
+      <td><b>Securock&reg; UltraLight Glass-Mat Sheathing</b></td><td>USG</td><td>5/8&rdquo; Type X</td>
+      <td><span class="loc">Exterior soffits &amp; covered exterior ceilings</span> where glass-mat sheathing substrate is required</td>
+      <td class="c">per plan</td><td class="pgref">42&ndash;78</td>
+    </tr>
+    <tr>
+      <td><b>Easi-Lite&trade; Lightweight Drywall</b> <span class="small">(approved alternate only)</span></td><td>CertainTeed</td><td>1/2&rdquo;</td>
+      <td>Alternate to USG UltraLight at <span class="loc">non-rated unit ceilings / non-rated unit partitions</span> only; not used in rated assemblies</td>
+      <td class="c">RCP</td><td class="pgref">79&ndash;100</td>
+    </tr>
+    <tr>
+      <td><b>Type X panels</b> <span class="small">(approved alternates only)</span></td><td>Georgia-Pacific / National Gypsum</td><td>5/8&rdquo; Type X</td>
+      <td>Approved equal alternates for the same tagged locations as USG Firecode X, subject to matching UL type in rated assemblies</td>
+      <td class="c">20, 21, 25</td><td class="pgref">101&ndash;106</td>
+    </tr>
+  </table>
+
+  <h3 style="color:#14304f; margin-bottom:4px;">B. Metal Framing <span class="small" style="font-weight:normal;">(Steel-Con primary &mdash; Rescue Metal, book pg. 37&ndash;41, approved alternate for the same profiles &amp; locations)</span></h3>
+  <table class="data">
+    <tr><th style="width:24%">Product</th><th style="width:12%">Member</th><th style="width:47%">Location of Use (tagged)</th><th style="width:8%">Wall Tags</th><th>Book pg.</th></tr>
+    <tr><td>Studs 362S125 / 362SFS (25 ga eq. / D20)</td><td>3-5/8&rdquo; stud</td><td><span class="loc">Unit interior partitions, demising walls, corridor walls</span> @ 24&rdquo; o.c. max (20 ga where over 10&rsquo;-0&rdquo; per GN)</td><td class="c">20, 21, 25</td><td class="pgref">14&ndash;20</td></tr>
+    <tr><td>Studs 600S125 / 600SFS</td><td>6&rdquo; stud</td><td><span class="loc">Wet walls / plumbing walls in units</span> and where 6&rdquo; studs noted on plan (WT 3a/3c)</td><td class="c">21a</td><td class="pgref">14&ndash;20</td></tr>
+    <tr><td>Studs 162S125 / 162SFS</td><td>1-5/8&rdquo; stud</td><td><span class="loc">Furring at exterior masonry walls, columns &amp; shear walls</span> (interior face, units &amp; corridors)</td><td class="c">10, 15</td><td class="pgref">14&ndash;20</td></tr>
+    <tr><td>Tracks 162T / 362T / 600T (&amp; SFT)</td><td>Top &amp; bottom track</td><td>Matching size at <span class="loc">top/bottom of every framed wall above</span>, fastened 24&rdquo; o.c. max per A8.01</td><td class="c">all</td><td class="pgref">6&ndash;13</td></tr>
+    <tr><td>Hat channel 087F125, angle &amp; flat stock</td><td>7/8&rdquo; hat channel + accessories</td><td><span class="loc">Unit &amp; corridor GWB ceilings; furring at CMU; ceiling perimeters, blocking/backing &amp; bracing</span></td><td class="c">RCP</td><td class="pgref">21&ndash;26</td></tr>
+  </table>
+
+  <div class="footer"><span>AA Drywall Construction, LLC &mdash; Submittal 09 29 00-01 Rev. 1</span><span>S-1 Master Material Location Schedule &mdash; pg. iv</span></div>
+</div>
+
+<!-- ============================================================ S-1 p2 -->
+<div class="page">
+  <div class="sechead"><h2>S-1 &nbsp;Master Material Location Schedule (cont.)</h2>
+  <div class="sub">Finishing, insulation &amp; firestopping</div></div>
+  <hr class="rule">
+
+  <h3 style="color:#14304f; margin-bottom:4px;">C. Joint Treatment, Trim &amp; Fasteners</h3>
+  <table class="data">
+    <tr><th style="width:26%">Product</th><th style="width:12%">Mfr.</th><th style="width:44%">Location of Use (tagged)</th><th>Book pg.</th></tr>
+    <tr><td>Sheetrock&reg; All Purpose Joint Compound</td><td>USG</td><td><span class="loc">Taping &amp; finishing of all GWB surfaces</span> &mdash; units, corridors &amp; ceilings (Levels of finish per GA-214)</td><td class="pgref">42&ndash;78</td></tr>
+    <tr><td>Sheetrock&reg; Easy Sand&trade; Setting-Type Compound</td><td>USG</td><td><span class="loc">Fire-taping of rated assemblies, prefill &amp; patches</span> &mdash; corridors, demising, shafts</td><td class="pgref">42&ndash;78</td></tr>
+    <tr><td>Sheetrock&reg; Heavy Joint Tape</td><td>USG</td><td><span class="loc">All GWB joints</span> &mdash; units + corridors</td><td class="pgref">42&ndash;78</td></tr>
+    <tr><td>Corner bead &amp; trims</td><td>American Cornerbead / Rescue</td><td><span class="loc">All outside corners, exposed board edges &amp; control joints</span> &mdash; units + corridors</td><td class="pgref">107&ndash;114</td></tr>
+    <tr><td>Drywall screws (Type S, S-12) &amp; framing fasteners</td><td>BPA / Starborn</td><td><span class="loc">All board-to-stud &amp; framing attachment</span>; cement-board screws at Durock (showers/tubs)</td><td class="pgref">115&ndash;123</td></tr>
+  </table>
+
+  <h3 style="color:#14304f; margin-bottom:4px;">D. Insulation <span class="small">(Tab 5 / Appendix C &mdash; data sheets bound in this package)</span></h3>
+  <table class="data">
+    <tr><th style="width:26%">Product</th><th style="width:12%">Mfr.</th><th style="width:44%">Location of Use (tagged)</th><th>Ref.</th></tr>
+    <tr>
+      <td><b>NoiseReducer&trade; R-19 Unfaced Sound Attenuation Batts</b> (6-1/4&rdquo; &times; 24&rdquo;, ASTM C665 Type I, unfaced &mdash; FS 25 / SD 50)</td><td>CertainTeed</td>
+      <td><span class="loc">Corridor walls</span> (tag 20) and <span class="loc">unit-to-unit demising walls</span> (tag 25) &mdash; friction-fit full height between studs, full coverage, both for STC performance and per plan</td>
+      <td class="pgref">C-1</td>
+    </tr>
+    <tr>
+      <td><b>AA2 Vapor Shield&trade; Reflective Insulation</b> (&ldquo;ALFOIL INSULATION&rdquo; per A8.01; tape-tab for metal framing)</td><td>Fi-Foil</td>
+      <td><span class="loc">Furred exterior masonry walls</span> &mdash; between 1-5/8&rdquo; furring/studs at interior face of exterior CMU, units &amp; corridors (WT 5a/5b, 9a &amp; similar); FBC-compliant reflective insulation, R-5.1+ at 1-1/2&rdquo;&ndash;1-5/8&rdquo; cavity</td>
+      <td class="pgref">C-2</td>
+    </tr>
+  </table>
+
+  <h3 style="color:#14304f; margin-bottom:4px;">E. Firestopping &mdash; Fire Caulk &amp; Putty <span class="small">(Tab 6 / Section S-6)</span></h3>
+  <table class="data">
+    <tr><th style="width:26%">Product</th><th style="width:12%">Mfr.</th><th style="width:44%">Location of Use (tagged)</th><th>Ref.</th></tr>
+    <tr>
+      <td><b>Sheetrock&reg; Brand Firecode&reg; Smoke-Sound Sealant</b> (acrylic latex; ASTM C834; E84 FS 0 / SD 0)</td><td>USG</td>
+      <td><span class="loc">All rated &amp; sound-rated partitions</span>: continuous beads at top-of-wall &amp; bottom-of-wall runners, partition perimeters &amp; intersections, and around all cutouts (boxes, penetrations) at <span class="loc">corridor walls, demising walls &amp; shaft walls</span>, per listed joint systems</td>
+      <td class="pgref">S-6</td>
+    </tr>
+    <tr>
+      <td><b>Intumescent Firestop Putty Pads</b></td><td>UL-listed (STI SpecSeal&reg; SSP or equal)</td>
+      <td><span class="loc">Electrical outlet boxes in demising partitions</span> &mdash; wrap all boxes per project General Notes; membrane-penetration protection in rated walls</td>
+      <td class="pgref">S-6</td>
+    </tr>
+    <tr>
+      <td>GrabberGard firecaulk <span class="small">(superseded)</span></td><td>Grabber</td>
+      <td>Included in original book pg. 124&ndash;127 &mdash; <b>replaced in this revision by USG Firecode Smoke-Sound Sealant above</b>; retained only as approved-equal reference</td>
+      <td class="pgref">124&ndash;127</td>
+    </tr>
+  </table>
+
+  <div class="note-box"><b>Fire-safing per General Notes:</b> Fire and smoke barrier caulk or putty, fire barrier partitions and covers, complete with necessary clips, supports and fastenings, shall meet a 2-hour fire rating for floors/roofs and the rating of the fire wall. All materials are UL Building Materials Directory listed (fill/void/cavity materials and through-penetration firestop systems).</div>
+
+  <div class="footer"><span>AA Drywall Construction, LLC &mdash; Submittal 09 29 00-01 Rev. 1</span><span>S-1 Master Material Location Schedule &mdash; pg. v</span></div>
+</div>
+
+<!-- ============================================================ S-2 WALL TYPE INDEX -->
+<div class="page">
+  <div class="sechead"><h2>S-2 &nbsp;Wall Type Index &amp; Location Key</h2>
+  <div class="sub">Plan tags &rarr; location &rarr; assembly cut sheet (matches A8.01 / A8.02 &amp; level plans)</div></div>
+  <hr class="rule">
+
+  <table class="data">
+    <tr><th style="width:9%">Plan Tag</th><th style="width:25%">Assembly</th><th style="width:22%">Where It Occurs</th><th style="width:14%">Rating</th><th style="width:12%">Insulation</th><th>Cut Sheet</th></tr>
+    <tr><td class="c"><b>21</b></td><td>Unit interior partition &mdash; 3-5/8&rdquo; (or 1-5/8&rdquo; per plan) studs, 5/8&rdquo; GWB e.s.</td><td><span class="loc">Residential units</span> &mdash; regular areas</td><td class="c">Non-rated</td><td class="c">&mdash;</td><td class="c">S-3.1</td></tr>
+    <tr><td class="c"><b>21a</b></td><td>Unit wet wall &mdash; 6&rdquo; studs at plumbing, Mold Tough panels</td><td><span class="loc">Units</span> &mdash; bathrooms, kitchen sink &amp; laundry walls</td><td class="c">Non-rated</td><td class="c">&mdash;</td><td class="c">S-3.2</td></tr>
+    <tr><td class="c"><b>21b</b></td><td>Tub/shower wall &mdash; Durock at tile, Mold Tough balance</td><td><span class="loc">Units</span> &mdash; showers &amp; tub surrounds</td><td class="c">Non-rated</td><td class="c">&mdash;</td><td class="c">S-3.3</td></tr>
+    <tr><td class="c"><b>25</b></td><td>Unit demising wall &mdash; studs, 5/8&rdquo; Firecode X e.s., sound batts</td><td><span class="loc">Unit-to-unit separation</span></td><td class="c">1-hr / STC per plan</td><td class="c">R-19 SAB</td><td class="c">S-3.4</td></tr>
+    <tr><td class="c"><b>20</b></td><td>Corridor wall &mdash; studs, 5/8&rdquo; Firecode X e.s., sound batts</td><td><span class="loc">Unit-to-corridor separation</span></td><td class="c">1-hr / STC per plan</td><td class="c">R-19 SAB</td><td class="c">S-4.1</td></tr>
+    <tr><td class="c"><b>10 / 15</b></td><td>Furred exterior/masonry wall &mdash; 1-5/8&rdquo; furring, AA2, 5/8&rdquo; GWB</td><td><span class="loc">Exterior walls &amp; shear walls/columns</span> &mdash; units &amp; corridors</td><td class="c">CMU 2-hr (UL U905)</td><td class="c">Fi-Foil AA2</td><td class="c">S-5.1</td></tr>
+    <tr><td class="c"><b>WT 1&ndash;3</b></td><td>Interior framed partitions per A8.01 (1-5/8&rdquo;, 3-5/8&rdquo;, 6&rdquo; studs)</td><td><span class="loc">Common areas</span> per plan</td><td class="c">Per A8.01</td><td class="c">&mdash;</td><td class="c">S-3.1</td></tr>
+    <tr><td class="c"><b>WT 4&ndash;6, 9, 10</b></td><td>Masonry walls, exposed or furred, stucco where noted</td><td><span class="loc">Exterior, garage &amp; core</span></td><td class="c">2&ndash;3-hr (UL U905/U907)</td><td class="c">AA2 where furred</td><td class="c">S-5.1</td></tr>
+    <tr><td class="c"><b>Shafts</b></td><td>Cavity shaft wall &mdash; CT studs, 1&rdquo; SLX liner + 5/8&rdquo; Firecode X</td><td><span class="loc">Elevator/stair/MEP shafts</span></td><td class="c">2-hr</td><td class="c">&mdash;</td><td class="c">S-5.2</td></tr>
+  </table>
+
+  <div class="note-box"><b>Coordination note:</b> Framed wall type tags (15, 20, 21-series, 25) are per the architectural framing wall type sheet A8.02 and level plans; concrete/masonry types per A8.01 (reproduced in Appendix A). Stud gauge upgrades per General Notes: 20 ga where partitions exceed 10&rsquo;-0&rdquo; or support cabinetry/fixtures; 18 ga at exterior soffits @ 16&rdquo; o.c.</div>
+
+  <h3 style="color:#14304f; margin:10px 0 4px;">Location legend used throughout this package</h3>
+  <table class="data">
+    <tr><th style="width:22%">Location Tag</th><th>Meaning</th></tr>
+    <tr><td class="loc">Regular areas in units</td><td>Bedrooms, living/dining, closets, entry &mdash; dry interior partitions and walls within dwelling units</td></tr>
+    <tr><td class="loc">Wet walls</td><td>Walls containing or backing plumbing: bathroom walls, kitchen sink walls, laundry walls, plumbing chases</td></tr>
+    <tr><td class="loc">Showers / tubs</td><td>Walls enclosing shower stalls and tub surrounds, to full height of tile</td></tr>
+    <tr><td class="loc">Bathrooms</td><td>All walls &amp; ceilings within bathrooms (moisture-resistant panels throughout)</td></tr>
+    <tr><td class="loc">Demising walls</td><td>Unit-to-unit separation walls (tag 25)</td></tr>
+    <tr><td class="loc">Corridors</td><td>Unit-to-corridor walls (tag 20), corridor faces &amp; corridor ceilings</td></tr>
+    <tr><td class="loc">Ceilings</td><td>GWB ceilings: UltraLight in unit dry areas, Mold Tough in bathrooms, Firecode X at corridors &amp; where rated</td></tr>
+    <tr><td class="loc">Exterior walls</td><td>Furred interior face of exterior CMU walls (Fi-Foil AA2 + 5/8&rdquo; GWB per A8.01)</td></tr>
+  </table>
+
+  <div class="footer"><span>AA Drywall Construction, LLC &mdash; Submittal 09 29 00-01 Rev. 1</span><span>S-2 Wall Type Index &mdash; pg. vi</span></div>
+</div>
+
+<!-- ============================================================ S-3 RESIDENTIAL UNITS p1 -->
+<div class="page">
+  <div class="sechead"><h2>S-3 &nbsp;Residential Unit Assemblies</h2>
+  <div class="sub">Group 1 of 3 &mdash; everything installed inside the dwelling units</div></div>
+  <hr class="rule">
+
+  <!-- S-3.1 unit partition -->
+  <div class="asm">
+    <div class="asm-head"><span class="wt">21</span><h3>S-3.1 &nbsp;Unit Interior Partition &mdash; Regular Areas</h3>
+      <div class="where">BEDROOMS &bull; LIVING &bull; CLOSETS<br>ALL DWELLING UNITS, TYP. ALL LEVELS</div></div>
+    <div class="asm-body">
+      <div class="asm-fig">
+        <svg viewBox="0 0 240 120">
+          <rect x="0" y="0" width="240" height="120" fill="#fff"/>
+          <!-- gwb both sides -->
+          <rect x="20" y="20" width="8" height="80" fill="#e8e0d0" stroke="#333" stroke-width="1"/>
+          <rect x="92" y="20" width="8" height="80" fill="#e8e0d0" stroke="#333" stroke-width="1"/>
+          <!-- studs -->
+          <g stroke="#333" fill="none" stroke-width="1.2">
+            <path d="M30 30 h60 v8 h-60 z"/><path d="M30 62 h60 v8 h-60 z"/><path d="M30 92 h60 v8 h-60 z" opacity=".35"/>
+          </g>
+          <!-- callouts -->
+          <g font-size="9" font-weight="bold">
+            <circle cx="14" cy="28" r="7" fill="#b07d2b"/><text x="14" y="31" text-anchor="middle" fill="#fff">1</text>
+            <circle cx="120" cy="34" r="7" fill="#b07d2b"/><text x="120" y="37" text-anchor="middle" fill="#fff">2</text>
+            <line x1="98" y1="34" x2="112" y2="34" stroke="#b07d2b"/>
+            <circle cx="120" cy="66" r="7" fill="#b07d2b"/><text x="120" y="69" text-anchor="middle" fill="#fff">3</text>
+            <line x1="90" y1="66" x2="112" y2="66" stroke="#b07d2b"/>
+          </g>
+          <text x="60" y="114" text-anchor="middle" font-size="8" fill="#555">PLAN SECTION &mdash; N.T.S.</text>
+          <!-- track note -->
+          <g font-size="7.5" fill="#333">
+            <text x="140" y="90">Track top &amp; bottom,</text>
+            <text x="140" y="99">fasteners @ 24&rdquo; o.c. max</text>
+          </g>
+        </svg>
+        <div class="cap">Ref. A8.01 WT 2/3 &amp; plan tag 21</div>
+      </div>
+      <div class="asm-mat">
+        <table class="mat">
+          <tr><th style="width:18px">#</th><th>Component</th><th>Product Submitted</th><th style="width:58px">Book pg.</th></tr>
+          <tr><td class="n">1</td><td>Gypsum board, each side</td><td>(1) layer 5/8&rdquo; USG Sheetrock&reg; Firecode&reg; X</td><td class="pgref">42&ndash;78</td></tr>
+          <tr><td class="n">2</td><td>Studs @ 24&rdquo; o.c. max</td><td>Steel-Con 362S125 (3-5/8&rdquo;) or 162S125 (1-5/8&rdquo;) &mdash; size per plan; 25 ga eq. (&le;10&rsquo;-0&rdquo;), D20/20 ga (&gt;10&rsquo;-0&rdquo; or fixture support)</td><td class="pgref">14&ndash;20</td></tr>
+          <tr><td class="n">3</td><td>Top &amp; bottom track</td><td>Steel-Con 362T125 / 162T125, fastened to structure @ 24&rdquo; o.c. max</td><td class="pgref">6&ndash;13</td></tr>
+          <tr><td class="n">&bull;</td><td>Joint treatment</td><td>USG Heavy Joint Tape + All Purpose / Easy Sand&trade;</td><td class="pgref">42&ndash;78</td></tr>
+          <tr><td class="n">&bull;</td><td>Corner bead / fasteners</td><td>American Cornerbead; BPA/Starborn Type S screws</td><td class="pgref">107&ndash;123</td></tr>
+        </table>
+        <div class="ul-line">Base as scheduled. At shower/tub locations this assembly transitions to <b>S-3.3</b>.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S-3.2 wet wall -->
+  <div class="asm">
+    <div class="asm-head"><span class="wt">21a</span><h3>S-3.2 &nbsp;Unit Wet Wall / Plumbing Wall</h3>
+      <div class="where">BATHROOM &amp; KITCHEN SINK WALLS &bull; LAUNDRY<br>ALL DWELLING UNITS</div></div>
+    <div class="asm-body">
+      <div class="asm-fig">
+        <svg viewBox="0 0 240 120">
+          <rect x="0" y="0" width="240" height="120" fill="#fff"/>
+          <rect x="20" y="20" width="8" height="80" fill="#cfe3cf" stroke="#333" stroke-width="1"/>
+          <rect x="112" y="20" width="8" height="80" fill="#cfe3cf" stroke="#333" stroke-width="1"/>
+          <g stroke="#333" fill="none" stroke-width="1.2">
+            <path d="M30 30 h80 v8 h-80 z"/><path d="M30 62 h80 v8 h-80 z"/><path d="M30 92 h80 v8 h-80 z" opacity=".35"/>
+          </g>
+          <circle cx="70" cy="52" r="6" fill="none" stroke="#3d5a7a" stroke-width="1.5" stroke-dasharray="2 2"/>
+          <text x="80" y="55" font-size="7.5" fill="#3d5a7a">plumbing</text>
+          <g font-size="9" font-weight="bold">
+            <circle cx="14" cy="28" r="7" fill="#b07d2b"/><text x="14" y="31" text-anchor="middle" fill="#fff">1</text>
+            <circle cx="140" cy="34" r="7" fill="#b07d2b"/><text x="140" y="37" text-anchor="middle" fill="#fff">2</text>
+            <line x1="118" y1="34" x2="132" y2="34" stroke="#b07d2b"/>
+          </g>
+          <text x="70" y="114" text-anchor="middle" font-size="8" fill="#555">PLAN SECTION &mdash; N.T.S.</text>
+        </svg>
+        <div class="cap">6&rdquo; studs at plumbing runs per plan (WT 3a/3c)</div>
+      </div>
+      <div class="asm-mat">
+        <table class="mat">
+          <tr><th style="width:18px">#</th><th>Component</th><th>Product Submitted</th><th style="width:58px">Book pg.</th></tr>
+          <tr><td class="n">1</td><td>Gypsum board, each side</td><td>(1) layer 5/8&rdquo; USG Sheetrock&reg; <b>Mold Tough&reg;</b> Firecode&reg; X &mdash; all bathroom &amp; plumbing-side faces</td><td class="pgref">42&ndash;78</td></tr>
+          <tr><td class="n">2</td><td>Studs @ 24&rdquo; o.c. max</td><td>Steel-Con 600S125 (6&rdquo;) at plumbing walls; 362S125 elsewhere per plan</td><td class="pgref">14&ndash;20</td></tr>
+          <tr><td class="n">&bull;</td><td>Track / joint / trim / fasteners</td><td>Matching Steel-Con track; USG joint treatment; American Cornerbead; BPA/Starborn screws</td><td class="pgref">6&ndash;13, 42&ndash;78, 107&ndash;123</td></tr>
+        </table>
+        <div class="ul-line">Moisture-resistant panels carried throughout <b>bathrooms (walls &amp; ceilings)</b>, kitchen sink walls and laundry walls.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer"><span>AA Drywall Construction, LLC &mdash; Submittal 09 29 00-01 Rev. 1</span><span>S-3 Residential Unit Assemblies &mdash; pg. vii</span></div>
+</div>
+
+<!-- ============================================================ S-3 p2 -->
+<div class="page">
+  <div class="sechead"><h2>S-3 &nbsp;Residential Unit Assemblies (cont.)</h2>
+  <div class="sub">Showers/tubs &amp; unit-to-unit demising</div></div>
+  <hr class="rule">
+
+  <!-- S-3.3 shower -->
+  <div class="asm">
+    <div class="asm-head"><span class="wt">21b</span><h3>S-3.3 &nbsp;Tub &amp; Shower Walls</h3>
+      <div class="where">SHOWER STALLS &amp; TUB SURROUNDS<br>ALL UNIT BATHROOMS</div></div>
+    <div class="asm-body">
+      <div class="asm-fig">
+        <svg viewBox="0 0 240 120">
+          <rect x="0" y="0" width="240" height="120" fill="#fff"/>
+          <!-- tile+durock side -->
+          <rect x="12" y="20" width="5" height="80" fill="#9db8d2" stroke="#333" stroke-width="1"/>
+          <rect x="17" y="20" width="8" height="80" fill="#c9c9c9" stroke="#333" stroke-width="1"/>
+          <rect x="100" y="20" width="8" height="80" fill="#cfe3cf" stroke="#333" stroke-width="1"/>
+          <g stroke="#333" fill="none" stroke-width="1.2">
+            <path d="M27 30 h71 v8 h-71 z"/><path d="M27 62 h71 v8 h-71 z"/><path d="M27 92 h71 v8 h-71 z" opacity=".35"/>
+          </g>
+          <g font-size="9" font-weight="bold">
+            <circle cx="8" cy="14" r="7" fill="#b07d2b"/><text x="8" y="17" text-anchor="middle" fill="#fff">1</text>
+            <circle cx="30" cy="14" r="7" fill="#b07d2b"/><text x="30" y="17" text-anchor="middle" fill="#fff">2</text>
+            <line x1="21" y1="18" x2="21" y2="22" stroke="#b07d2b"/>
+            <circle cx="128" cy="34" r="7" fill="#b07d2b"/><text x="128" y="37" text-anchor="middle" fill="#fff">3</text>
+            <line x1="106" y1="34" x2="120" y2="34" stroke="#b07d2b"/>
+          </g>
+          <text x="70" y="114" text-anchor="middle" font-size="8" fill="#555">PLAN SECTION AT SHOWER &mdash; N.T.S.</text>
+        </svg>
+        <div class="cap">Per A8.01 note: moisture-resistant board at shower &amp; tub locations</div>
+      </div>
+      <div class="asm-mat">
+        <table class="mat">
+          <tr><th style="width:18px">#</th><th>Component</th><th>Product Submitted</th><th style="width:58px">Book pg.</th></tr>
+          <tr><td class="n">1</td><td>Tile (by others) over tile backer</td><td>&mdash;</td><td class="c">&mdash;</td></tr>
+          <tr><td class="n">2</td><td>Tile backer, wet-zone face</td><td>1/2&rdquo; USG Durock&reg; Cement Board w/ EdgeGuard&trade;, cement-board screws, joints per mfr.</td><td class="pgref">42&ndash;78</td></tr>
+          <tr><td class="n">3</td><td>Balance of wall / opposite face</td><td>5/8&rdquo; USG Sheetrock&reg; Mold Tough&reg; Firecode&reg; X</td><td class="pgref">42&ndash;78</td></tr>
+          <tr><td class="n">&bull;</td><td>Framing</td><td>Steel-Con studs &amp; track per S-3.1/S-3.2 (16&rdquo; o.c. at cement board)</td><td class="pgref">6&ndash;20</td></tr>
+        </table>
+        <div class="ul-line">A8.01 calls &ldquo;USG Aqua Tough drywall at shower and tub locations&rdquo; &mdash; submitted herein as USG&rsquo;s current equivalents: <b>Durock&reg; cement board at tiled wet zones</b> and <b>Mold Tough&reg; panels</b> at remaining bathroom surfaces.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S-3.4 demising -->
+  <div class="asm">
+    <div class="asm-head"><span class="wt">25</span><h3>S-3.4 &nbsp;Unit Demising Wall (Unit-to-Unit)</h3>
+      <div class="where">BETWEEN DWELLING UNITS, TYP.<br>ALL RESIDENTIAL LEVELS</div></div>
+    <div class="asm-body">
+      <div class="asm-fig">
+        <svg viewBox="0 0 240 120">
+          <rect x="0" y="0" width="240" height="120" fill="#fff"/>
+          <rect x="20" y="20" width="8" height="80" fill="#f2c9c9" stroke="#333" stroke-width="1"/>
+          <rect x="92" y="20" width="8" height="80" fill="#f2c9c9" stroke="#333" stroke-width="1"/>
+          <g stroke="#333" fill="none" stroke-width="1.2">
+            <path d="M30 30 h60 v8 h-60 z"/><path d="M30 92 h60 v8 h-60 z" opacity=".35"/>
+          </g>
+          <!-- batt zigzag -->
+          <path d="M32 50 l8 8 l-8 8 l8 8 M40 50 l8 8 l-8 8 l8 8 M48 50 l8 8 l-8 8 l8 8 M56 50 l8 8 l-8 8 l8 8 M64 50 l8 8 l-8 8 l8 8 M72 50 l8 8 l-8 8 l8 8 M80 50 l8 8 l-8 8 l8 8" stroke="#b07d2b" fill="none" stroke-width="1.4"/>
+          <g font-size="9" font-weight="bold">
+            <circle cx="14" cy="28" r="7" fill="#b07d2b"/><text x="14" y="31" text-anchor="middle" fill="#fff">1</text>
+            <circle cx="120" cy="34" r="7" fill="#b07d2b"/><text x="120" y="37" text-anchor="middle" fill="#fff">2</text>
+            <line x1="98" y1="34" x2="112" y2="34" stroke="#b07d2b"/>
+            <circle cx="120" cy="62" r="7" fill="#b07d2b"/><text x="120" y="65" text-anchor="middle" fill="#fff">3</text>
+            <line x1="90" y1="62" x2="112" y2="62" stroke="#b07d2b"/>
+            <circle cx="14" cy="96" r="7" fill="#b07d2b"/><text x="14" y="99" text-anchor="middle" fill="#fff">4</text>
+          </g>
+          <text x="60" y="114" text-anchor="middle" font-size="8" fill="#555">PLAN SECTION &mdash; N.T.S.</text>
+        </svg>
+        <div class="cap">Rated + sound-insulated; see plan for rating &amp; UL design</div>
+      </div>
+      <div class="asm-mat">
+        <table class="mat">
+          <tr><th style="width:18px">#</th><th>Component</th><th>Product Submitted</th><th style="width:58px">Book pg.</th></tr>
+          <tr><td class="n">1</td><td>Gypsum board, each side</td><td>(1) layer 5/8&rdquo; USG Sheetrock&reg; Firecode&reg; X (UL Type SCX), fire-taped; layers per UL design on plan</td><td class="pgref">42&ndash;78</td></tr>
+          <tr><td class="n">2</td><td>Studs @ 24&rdquo; o.c. max</td><td>Steel-Con 362S125 / 362SFS-D20, size per plan</td><td class="pgref">14&ndash;20</td></tr>
+          <tr><td class="n">3</td><td>Sound attenuation insulation</td><td><b>CertainTeed NoiseReducer&trade; R-19 unfaced batts</b>, 24&rdquo; wide, friction-fit full height &mdash; full coverage</td><td class="pgref">C-1</td></tr>
+          <tr><td class="n">4</td><td>Perimeter seal &amp; boxes</td><td><b>USG Firecode&reg; Smoke-Sound Sealant</b> at runners/perimeter/cutouts; <b>putty pads</b> at electrical boxes (per GN)</td><td class="pgref">S-6</td></tr>
+        </table>
+        <div class="ul-line"><b>UL:</b> assembly rating &amp; design number per plan wall schedule (Type SCX panels usable in any UL design listing SCX). Electrical outlets in demising partitions receive firestop putty pads &mdash; no exclusions.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer"><span>AA Drywall Construction, LLC &mdash; Submittal 09 29 00-01 Rev. 1</span><span>S-3 Residential Unit Assemblies &mdash; pg. viii</span></div>
+</div>
+
+<!-- ============================================================ S-4 CORRIDORS -->
+<div class="page">
+  <div class="sechead"><h2>S-4 &nbsp;Corridor Assemblies</h2>
+  <div class="sub">Group 2 of 3 &mdash; unit-to-corridor walls &amp; corridor ceilings</div></div>
+  <hr class="rule">
+
+  <!-- S-4.1 corridor wall -->
+  <div class="asm">
+    <div class="asm-head"><span class="wt">20</span><h3>S-4.1 &nbsp;Corridor Wall (Unit-to-Corridor)</h3>
+      <div class="where">BOTH SIDES OF ALL RESIDENTIAL CORRIDORS<br>TYP. ALL LEVELS</div></div>
+    <div class="asm-body">
+      <div class="asm-fig">
+        <svg viewBox="0 0 240 120">
+          <rect x="0" y="0" width="240" height="120" fill="#fff"/>
+          <rect x="20" y="20" width="8" height="80" fill="#f2c9c9" stroke="#333" stroke-width="1"/>
+          <rect x="92" y="20" width="8" height="80" fill="#f2c9c9" stroke="#333" stroke-width="1"/>
+          <g stroke="#333" fill="none" stroke-width="1.2">
+            <path d="M30 30 h60 v8 h-60 z"/><path d="M30 92 h60 v8 h-60 z" opacity=".35"/>
+          </g>
+          <path d="M32 50 l8 8 l-8 8 l8 8 M40 50 l8 8 l-8 8 l8 8 M48 50 l8 8 l-8 8 l8 8 M56 50 l8 8 l-8 8 l8 8 M64 50 l8 8 l-8 8 l8 8 M72 50 l8 8 l-8 8 l8 8 M80 50 l8 8 l-8 8 l8 8" stroke="#b07d2b" fill="none" stroke-width="1.4"/>
+          <text x="10" y="16" font-size="8" fill="#333">UNIT SIDE</text>
+          <text x="104" y="16" font-size="8" fill="#333">CORRIDOR SIDE</text>
+          <g font-size="9" font-weight="bold">
+            <circle cx="14" cy="28" r="7" fill="#b07d2b"/><text x="14" y="31" text-anchor="middle" fill="#fff">1</text>
+            <circle cx="120" cy="34" r="7" fill="#b07d2b"/><text x="120" y="37" text-anchor="middle" fill="#fff">2</text>
+            <line x1="98" y1="34" x2="112" y2="34" stroke="#b07d2b"/>
+            <circle cx="120" cy="62" r="7" fill="#b07d2b"/><text x="120" y="65" text-anchor="middle" fill="#fff">3</text>
+            <line x1="90" y1="62" x2="112" y2="62" stroke="#b07d2b"/>
+            <circle cx="14" cy="96" r="7" fill="#b07d2b"/><text x="14" y="99" text-anchor="middle" fill="#fff">4</text>
+          </g>
+          <text x="60" y="114" text-anchor="middle" font-size="8" fill="#555">PLAN SECTION &mdash; N.T.S.</text>
+        </svg>
+        <div class="cap">Rated corridor separation w/ sound batts (per TruTeam insulation submittal)</div>
+      </div>
+      <div class="asm-mat">
+        <table class="mat">
+          <tr><th style="width:18px">#</th><th>Component</th><th>Product Submitted</th><th style="width:58px">Book pg.</th></tr>
+          <tr><td class="n">1</td><td>Gypsum board, each side</td><td>(1) layer 5/8&rdquo; USG Sheetrock&reg; Firecode&reg; X (UL Type SCX), fire-taped; layers per UL design on plan</td><td class="pgref">42&ndash;78</td></tr>
+          <tr><td class="n">2</td><td>Studs @ 24&rdquo; o.c. max</td><td>Steel-Con 362S125 / 362SFS-D20 (20 ga where &gt;10&rsquo;-0&rdquo;)</td><td class="pgref">14&ndash;20</td></tr>
+          <tr><td class="n">3</td><td>Sound attenuation insulation</td><td><b>CertainTeed NoiseReducer&trade; R-19 unfaced batts</b>, friction-fit full height &mdash; full coverage</td><td class="pgref">C-1</td></tr>
+          <tr><td class="n">4</td><td>Perimeter seal</td><td><b>USG Firecode&reg; Smoke-Sound Sealant</b> continuous at top/bottom runners, perimeter &amp; all cutouts</td><td class="pgref">S-6</td></tr>
+        </table>
+        <div class="ul-line">Corridor walls maintain continuity to deck; head-of-wall joints sealed per listed joint system.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S-4.2 corridor ceiling -->
+  <div class="asm">
+    <div class="asm-head"><span class="wt sq">CLG</span><h3>S-4.2 &nbsp;Corridor Ceiling</h3>
+      <div class="where">ALL RESIDENTIAL CORRIDORS<br>PER RCP</div></div>
+    <div class="asm-body">
+      <div class="asm-fig">
+        <svg viewBox="0 0 240 120">
+          <rect x="0" y="0" width="240" height="120" fill="#fff"/>
+          <!-- deck -->
+          <rect x="15" y="14" width="210" height="10" fill="#d9d9d9" stroke="#333" stroke-width="1"/>
+          <text x="120" y="10" text-anchor="middle" font-size="7.5" fill="#333">CONC. DECK ABOVE</text>
+          <!-- hangers -->
+          <g stroke="#333" stroke-width="1"><line x1="50" y1="24" x2="50" y2="58"/><line x1="120" y1="24" x2="120" y2="58"/><line x1="190" y1="24" x2="190" y2="58"/></g>
+          <!-- hat channels -->
+          <g stroke="#333" fill="#fff" stroke-width="1.2">
+            <path d="M40 58 h20 l3 8 h-26 z"/><path d="M110 58 h20 l3 8 h-26 z"/><path d="M180 58 h20 l3 8 h-26 z"/>
+          </g>
+          <!-- gwb -->
+          <rect x="15" y="68" width="210" height="8" fill="#f2c9c9" stroke="#333" stroke-width="1"/>
+          <g font-size="9" font-weight="bold">
+            <circle cx="228" cy="62" r="7" fill="#b07d2b"/><text x="228" y="65" text-anchor="middle" fill="#fff">1</text>
+            <circle cx="228" cy="80" r="7" fill="#b07d2b"/><text x="228" y="83" text-anchor="middle" fill="#fff">2</text>
+          </g>
+          <text x="120" y="100" text-anchor="middle" font-size="8" fill="#555">SECTION &mdash; N.T.S.</text>
+        </svg>
+        <div class="cap">Framing &amp; suspension per plan/RCP details</div>
+      </div>
+      <div class="asm-mat">
+        <table class="mat">
+          <tr><th style="width:18px">#</th><th>Component</th><th>Product Submitted</th><th style="width:58px">Book pg.</th></tr>
+          <tr><td class="n">1</td><td>Furring / suspension</td><td>Steel-Con 087F125 hat channel &amp; angle, spacing per RCP details</td><td class="pgref">21&ndash;26</td></tr>
+          <tr><td class="n">2</td><td>Ceiling board</td><td>5/8&rdquo; USG Sheetrock&reg; Firecode&reg; X, finished per GA-214</td><td class="pgref">42&ndash;78</td></tr>
+        </table>
+        <div class="ul-line"><b>Unit ceilings (for comparison):</b> 1/2&rdquo; USG Sheetrock&reg; UltraLight at dry areas; 5/8&rdquo; Mold Tough&reg; at bathroom ceilings; rated ceilings per RCP keep 5/8&rdquo; Firecode X.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer"><span>AA Drywall Construction, LLC &mdash; Submittal 09 29 00-01 Rev. 1</span><span>S-4 Corridor Assemblies &mdash; pg. ix</span></div>
+</div>
+
+<!-- ============================================================ S-5 EXTERIOR/MASONRY -->
+<div class="page">
+  <div class="sechead"><h2>S-5 &nbsp;Exterior &amp; Masonry Wall Furring Assemblies</h2>
+  <div class="sub">Group 3 of 3 &mdash; furred CMU walls (units &amp; corridors) and shaft walls</div></div>
+  <hr class="rule">
+
+  <!-- S-5.1 furred exterior -->
+  <div class="asm">
+    <div class="asm-head"><span class="wt">10/15</span><h3>S-5.1 &nbsp;Furred Exterior / Masonry Wall</h3>
+      <div class="where">INTERIOR FACE OF EXTERIOR CMU WALLS, SHEAR WALLS &amp; COLUMNS &mdash; UNITS &amp; CORRIDORS</div></div>
+    <div class="asm-body">
+      <div class="asm-fig">
+        <svg viewBox="0 0 240 130">
+          <rect x="0" y="0" width="240" height="130" fill="#fff"/>
+          <!-- cmu -->
+          <g fill="#d9d9d9" stroke="#333" stroke-width="1">
+            <rect x="16" y="16" width="30" height="100"/>
+          </g>
+          <g stroke="#666" stroke-width=".7">
+            <line x1="16" y1="36" x2="46" y2="36"/><line x1="16" y1="56" x2="46" y2="56"/><line x1="16" y1="76" x2="46" y2="76"/><line x1="16" y1="96" x2="46" y2="96"/>
+            <line x1="31" y1="16" x2="31" y2="36"/><line x1="31" y1="56" x2="31" y2="76"/><line x1="31" y1="96" x2="31" y2="116"/>
+          </g>
+          <text x="31" y="12" text-anchor="middle" font-size="7.5" fill="#333">EXTERIOR CMU</text>
+          <!-- foil -->
+          <polyline points="52,16 52,116" stroke="#b07d2b" stroke-width="2.5" fill="none"/>
+          <!-- furring studs -->
+          <g stroke="#333" fill="none" stroke-width="1.2">
+            <rect x="56" y="26" width="14" height="7"/><rect x="56" y="60" width="14" height="7"/><rect x="56" y="94" width="14" height="7"/>
+          </g>
+          <!-- gwb -->
+          <rect x="74" y="16" width="8" height="100" fill="#e8e0d0" stroke="#333" stroke-width="1"/>
+          <text x="96" y="66" font-size="7.5" fill="#333">INTERIOR</text>
+          <g font-size="9" font-weight="bold">
+            <circle cx="120" cy="26" r="7" fill="#b07d2b"/><text x="120" y="29" text-anchor="middle" fill="#fff">1</text><line x1="82" y1="26" x2="112" y2="26" stroke="#b07d2b"/>
+            <circle cx="120" cy="46" r="7" fill="#b07d2b"/><text x="120" y="49" text-anchor="middle" fill="#fff">2</text><line x1="53" y1="46" x2="112" y2="46" stroke="#b07d2b"/>
+            <circle cx="120" cy="64" r="7" fill="#b07d2b"/><text x="120" y="67" text-anchor="middle" fill="#fff">3</text><line x1="70" y1="64" x2="112" y2="64" stroke="#b07d2b"/>
+          </g>
+          <text x="70" y="126" text-anchor="middle" font-size="8" fill="#555">PLAN SECTION &mdash; N.T.S.</text>
+        </svg>
+        <div class="cap">Per A8.01 WT 5a/5b, 9a &mdash; CMU UL U905 (2-hr) / U907 (3-hr at B-4 filled cell)</div>
+      </div>
+      <div class="asm-mat">
+        <table class="mat">
+          <tr><th style="width:18px">#</th><th>Component</th><th>Product Submitted</th><th style="width:58px">Book pg.</th></tr>
+          <tr><td class="n">1</td><td>Gypsum board</td><td>(1) layer 5/8&rdquo; USG Sheetrock&reg; Firecode&reg; X (dry areas); <b>Mold Tough&reg;</b> at bathrooms; per A8.01 note, moisture-resistant board at shower/tub locations</td><td class="pgref">42&ndash;78</td></tr>
+          <tr><td class="n">2</td><td>Reflective insulation (&ldquo;ALFOIL&rdquo;)</td><td><b>Fi-Foil AA2 Vapor Shield&trade;</b>, tape-tab, installed across furring per mfr. (R-5.1+ at 1-1/2&rdquo;&ndash;1-5/8&rdquo; cavity, 24&rdquo; o.c.)</td><td class="pgref">C-2</td></tr>
+          <tr><td class="n">3</td><td>Furring @ 24&rdquo; o.c. max</td><td>Steel-Con 162S125 (1-5/8&rdquo;) or 362S125 (3-5/8&rdquo;) per plan; matching track top &amp; bottom @ 24&rdquo; o.c.</td><td class="pgref">6&ndash;20</td></tr>
+        </table>
+        <div class="ul-line"><b>UL:</b> masonry wall bearing/nonbearing rating 2-HR &mdash; <b>UL U905</b>; 8&rdquo; B-4 filled-cell block 3-HR &mdash; <b>UL U907</b> (per A8.01). Stucco at exterior face by others.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S-5.2 shaft -->
+  <div class="asm">
+    <div class="asm-head"><span class="wt sq">SHAFT</span><h3>S-5.2 &nbsp;Cavity Shaft Wall (Where Framed Shafts Occur)</h3>
+      <div class="where">ELEVATOR &bull; STAIR &bull; MEP SHAFTS<br>PER PLAN</div></div>
+    <div class="asm-body">
+      <div class="asm-fig">
+        <svg viewBox="0 0 240 120">
+          <rect x="0" y="0" width="240" height="120" fill="#fff"/>
+          <rect x="20" y="20" width="10" height="80" fill="#bfd8bf" stroke="#333" stroke-width="1"/>
+          <text x="25" y="14" text-anchor="middle" font-size="7">1&rdquo; LINER</text>
+          <g stroke="#333" fill="none" stroke-width="1.2">
+            <path d="M34 30 h44 v8 h-44 z"/><path d="M34 62 h44 v8 h-44 z"/><path d="M34 92 h44 v8 h-44 z" opacity=".35"/>
+          </g>
+          <rect x="82" y="20" width="8" height="80" fill="#f2c9c9" stroke="#333" stroke-width="1"/>
+          <text x="14" y="112" font-size="7.5" fill="#333">SHAFT SIDE</text>
+          <text x="96" y="112" font-size="7.5" fill="#333">OCC. SIDE</text>
+          <g font-size="9" font-weight="bold">
+            <circle cx="120" cy="30" r="7" fill="#b07d2b"/><text x="120" y="33" text-anchor="middle" fill="#fff">1</text><line x1="30" y1="30" x2="112" y2="30" stroke="#b07d2b"/>
+            <circle cx="120" cy="52" r="7" fill="#b07d2b"/><text x="120" y="55" text-anchor="middle" fill="#fff">2</text><line x1="78" y1="52" x2="112" y2="52" stroke="#b07d2b"/>
+            <circle cx="120" cy="74" r="7" fill="#b07d2b"/><text x="120" y="77" text-anchor="middle" fill="#fff">3</text><line x1="90" y1="74" x2="112" y2="74" stroke="#b07d2b"/>
+          </g>
+        </svg>
+        <div class="cap">Only where framed shaft walls are indicated; masonry shafts per S-5.1</div>
+      </div>
+      <div class="asm-mat">
+        <table class="mat">
+          <tr><th style="width:18px">#</th><th>Component</th><th>Product Submitted</th><th style="width:58px">Book pg.</th></tr>
+          <tr><td class="n">1</td><td>Shaft liner</td><td>1&rdquo; USG Sheetrock&reg; Glass-Mat Liner Mold Tough&reg; (UL Type SLX) or Mold Tough&reg; Gypsum Liner</td><td class="pgref">42&ndash;78</td></tr>
+          <tr><td class="n">2</td><td>C-T / C-H studs &amp; J-runners</td><td>USG shaft wall framing components (with SLX-listed systems)</td><td class="pgref">42&ndash;78</td></tr>
+          <tr><td class="n">3</td><td>Face layer(s), occupied side</td><td>5/8&rdquo; USG Sheetrock&reg; Firecode&reg; X, layers per UL design (2-hr)</td><td class="pgref">42&ndash;78</td></tr>
+        </table>
+        <div class="ul-line">Perimeter joints sealed with USG Firecode&reg; Smoke-Sound Sealant per S-6.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer"><span>AA Drywall Construction, LLC &mdash; Submittal 09 29 00-01 Rev. 1</span><span>S-5 Exterior &amp; Masonry Assemblies &mdash; pg. x</span></div>
+</div>
+
+<!-- ============================================================ S-6 FIRESTOPPING -->
+<div class="page">
+  <div class="sechead"><h2>S-6 &nbsp;Firestopping &mdash; Fire Caulk &amp; Putty (Tab 6)</h2>
+  <div class="sub">Product data &mdash; USG Sheetrock&reg; Brand Firecode&reg; Smoke-Sound Sealant &amp; firestop putty pads</div></div>
+  <hr class="rule">
+
+  <div class="twocol">
+    <div>
+      <h3 style="color:#14304f;">USG Sheetrock&reg; Brand Firecode&reg; Smoke-Sound Sealant</h3>
+      <p class="small" style="margin:2px 0 8px;">One-product acrylic latex sealant for fire, smoke and sound control in rated partitions, smoke barriers and sound-rated assemblies. (USG submittal J2042 &mdash; official manufacturer sheet to accompany this tab.)</p>
+      <table class="data">
+        <tr><th style="width:42%">Property</th><th>Value</th></tr>
+        <tr><td>Type</td><td>Acrylic, latex-based fire/smoke/sound sealant</td></tr>
+        <tr><td>Color</td><td>Rust red (easy identification by inspectors)</td></tr>
+        <tr><td>Specification compliance</td><td>ASTM C834 (latex sealing compounds); tested per ASTM C731, C732, C734, C736, D2202, D2203, D2377</td></tr>
+        <tr><td>Surface burning (ASTM E84)</td><td><b>Flame spread 0 &bull; Smoke developed 0</b> (UL Classified)</td></tr>
+        <tr><td>Sound (ASTM E90)</td><td>Maintains high STC ratings as sound-flanking sealant in rated partitions</td></tr>
+        <tr><td>Joint systems (ASTM E1966 / UL 2079)</td><td>For use in listed head-of-wall / perimeter joint systems</td></tr>
+        <tr><td>Sustainability</td><td>GREENGUARD Gold certified, low-VOC</td></tr>
+        <tr><td>Packaging</td><td>29 oz. cartridges (standard caulking gun; vertical or horizontal beads, non-sag)</td></tr>
+      </table>
+      <h3 style="color:#14304f; margin-top:6px;">Where used on this project</h3>
+      <table class="data">
+        <tr><th>Location</th><th>Application</th></tr>
+        <tr><td class="loc">Corridor walls (tag 20)</td><td>Continuous bead at top &amp; bottom runners, wall perimeter, intersections, all cutouts</td></tr>
+        <tr><td class="loc">Demising walls (tag 25)</td><td>Same as above; plus bead around boxes ahead of putty pads</td></tr>
+        <tr><td class="loc">Shaft walls</td><td>Perimeter joints at J-runners &amp; deck</td></tr>
+        <tr><td class="loc">Sound-rated assemblies</td><td>All assembly cutouts (electrical boxes, penetrations) per USG sound-control details</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3 style="color:#14304f;">Intumescent Firestop Putty Pads</h3>
+      <p class="small" style="margin:2px 0 8px;">UL-listed moldable intumescent putty pads (STI SpecSeal&reg; SSP or approved equal), applied to the exterior of electrical boxes in rated walls.</p>
+      <table class="data">
+        <tr><th style="width:42%">Property</th><th>Value</th></tr>
+        <tr><td>Use</td><td>Membrane-penetration protection at outlet/switch boxes in rated gypsum assemblies</td></tr>
+        <tr><td>Listing</td><td>UL Classified, fill/void/cavity material &mdash; UL Building Materials Directory</td></tr>
+        <tr><td>Project requirement</td><td>Per General Notes: <b>&ldquo;Electrical outlets in demising partitions shall have fire stop putty pads installed&rdquo;</b> &mdash; no exclusions</td></tr>
+      </table>
+      <h3 style="color:#14304f; margin-top:6px;">General Notes compliance (fire safing)</h3>
+      <div class="note-box" style="margin-top:4px;">Fire &amp; smoke barrier caulk or putty, fire barrier partitions and covers, complete with clips, supports and fastenings, meet a <b>2-hour rating for floors and roofs</b> and the <b>rating of the fire wall</b>. All materials listed in the <b>UL Building Materials Directory</b>: fill, void or cavity materials, and through-penetration firestop systems. All penetrations located within rated partitions are fire-rated &mdash; no exclusions.</div>
+      <div class="note-box"><b>Supersedes:</b> Grabber firecaulking data at book pg. 124&ndash;127 (Rev. 0). USG Firecode&reg; Smoke-Sound Sealant is the product to be installed; Grabber retained as approved-equal reference only.</div>
+    </div>
+  </div>
+
+  <div class="footer"><span>AA Drywall Construction, LLC &mdash; Submittal 09 29 00-01 Rev. 1</span><span>S-6 Firestopping &mdash; pg. xi</span></div>
+</div>
+
+<!-- ============================================================ APPENDIX DIVIDER -->
+<div class="page">
+  <div style="display:flex; flex-direction:column; justify-content:center; min-height:9in; text-align:center;">
+    <div class="tag" style="align-self:center; font-size:12px; padding:8px 22px;">Appendices</div>
+    <h1 style="color:#14304f; font-size:26px; margin:18px 0 26px;">Architectural References &amp; Insulation Data Sheets</h1>
+    <table class="data" style="max-width:6.2in; margin:0 auto;">
+      <tr><th style="width:18%">Appendix</th><th>Contents</th></tr>
+      <tr><td class="c"><b>A</b></td><td style="text-align:left;">Wall Types &mdash; Concrete (Sheet A8.01, Cohen-Freedman-Encinosa &amp; Assoc.) &mdash; governing assembly details &amp; UL designs referenced by cut sheets S-3 to S-5</td></tr>
+      <tr><td class="c"><b>B</b></td><td style="text-align:left;">Typical Residential Level Plan &mdash; Level 7, Stack A105 &mdash; showing wall type tags (20, 21, 21a, 21b, 25) at Units A1 / B1-R and corridor</td></tr>
+      <tr><td class="c"><b>C</b></td><td style="text-align:left;">Insulation manufacturer data: C-1 CertainTeed NoiseReducer&trade; R-19 unfaced sound attenuation batts (corridor &amp; demising walls) &bull; C-2 Fi-Foil AA2 Vapor Shield&trade; (furred exterior masonry walls)</td></tr>
+    </table>
+    <p class="small" style="margin-top:26px;">Manufacturer product data for framing, gypsum panels, trims and fasteners follows under Tabs 1&ndash;4 (book pages 1&ndash;123).</p>
+  </div>
+</div>
+
+</body>
+</html>
