@@ -50,7 +50,7 @@ function jobCard(m) {
     </div>
     <div class="hero"><span class="big">${cpb ? money(cpb, 2) : '<span class="faint">no boards yet</span>'}</span><span class="u">per board, all in</span>
       ${target && cpb ? `<span class="vs ${cpb > target ? 'bad' : 'good'}">${cpb > target ? '+' : '-'}${money(Math.abs(cpb - target), 2)} vs target</span>` : ''}</div>
-    <div class="tiny muted">${qty(Math.round(n0(m.boards_used)))} boards used${m.material_per_board ? ` &middot; material ${money(m.material_per_board, 2)} &middot; labor ${money(m.labor_per_board, 2)}` : ''}</div>
+    <div class="tiny muted">${qty(Math.round(n0(m.boards_used)))} boards billed${n0(m.open_po_boards) ? ` + ${qty(Math.round(n0(m.open_po_boards)))} on order (est ${qty(Math.round(n0(m.est_boards)))})` : ''}${m.material_per_board ? ` &middot; material ${money(m.material_per_board, 2)} &middot; labor ${money(m.labor_per_board, 2)}` : ''}</div>
     <div class="kv">
       <div><div class="l">Cost so far</div><div class="v">${money(m.total_cost)}</div></div>
       <div><div class="l">Contract</div><div class="v">${n0(m.contract_value) ? money(m.contract_value) : '<span class="faint">not set</span>'}</div></div>
@@ -142,7 +142,7 @@ async function renderJob(id, tab, sub) {
           m.projected_profit != null ? (margin != null ? Math.round(margin) + '% margin if costs keep pace' : 'needs a contract amount') : 'needs a contract and 10% or more complete',
           m.projected_profit != null ? (m.projected_profit < 0 ? 'bad' : 'good') : '')}
         ${moneyTile('Open POs', money(m.open_po_total), m.open_po_count + ' ordered, not billed yet')}
-        ${moneyTile('Cost per board', m.cost_per_board ? money(m.cost_per_board, 2) : '', qty(Math.round(n0(m.boards_used))) + ' boards used' + (n0(m.target_price_per_board) ? ', target ' + money(m.target_price_per_board, 2) : ''))}
+        ${moneyTile('Cost per board', m.cost_per_board ? money(m.cost_per_board, 2) : '', qty(Math.round(n0(m.boards_used))) + ' boards billed' + (n0(m.open_po_boards) ? ', ' + qty(Math.round(n0(m.open_po_boards))) + ' more on order' : '') + (n0(m.target_price_per_board) ? ', target ' + money(m.target_price_per_board, 2) : ''))}
       </div>
     </div>
 
