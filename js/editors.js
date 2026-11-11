@@ -19,9 +19,7 @@ function lineTable(kind, lines) {
   </tbody></table></div>`;
 }
 A.lineSaved = () => {};
-A.matSaved = async (el) => {
-  try { await sb.from(el.dataset.t).update({ needs_mapping: !el.value }).eq('id', el.dataset.id); } catch (e) { /* non-fatal */ }
-};
+A.matSaved = () => { S.cache = {}; };
 
 async function drawerPO(id) {
   const [po, lines] = await Promise.all([
@@ -75,7 +73,7 @@ A.openBill = (id) => drawerBill(id).catch(fail);
 A.useLineTotal = async (t, id, v) => { try { await save(t, id, { total: Math.round(v * 100) / 100 }); S.cache = {}; (t === 'bills' ? drawerBill : drawerPO)(id); } catch (e) { fail(e); } };
 A.addLine = async (kind, id) => {
   try {
-    await insert(kind === 'po' ? 'po_line_items' : 'bill_line_items', kind === 'po' ? { po_id: id, raw_description: 'New item', qty: 1, needs_mapping: true } : { bill_id: id, raw_description: 'New item', qty: 1, needs_mapping: true });
+    await insert(kind === 'po' ? 'po_line_items' : 'bill_line_items', kind === 'po' ? { po_id: id, raw_description: 'New item', qty: 1 } : { bill_id: id, raw_description: 'New item', qty: 1 });
     S.cache = {}; (kind === 'po' ? drawerPO : drawerBill)(id);
   } catch (e) { fail(e); }
 };

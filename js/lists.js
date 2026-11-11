@@ -94,7 +94,7 @@ A.applyAlias = async (i) => {
     $('#q' + i).remove(); S.cache = {}; await loadCore(); toast('Matched ' + (res && res.updated != null ? res.updated + ' lines' : ''));
   } catch (e) { fail(e); }
 };
-A.rematch = async () => { try { const r = await run(sb.rpc('rematch_unmapped')); S.cache = {}; await loadCore(); await rerender(); toast('Matching re-run'); } catch (e) { fail(e); } };
+A.rematch = async () => { try { await run(sb.rpc('rematch_unmapped')); await run(sb.rpc('auto_map_lines')); S.cache = {}; await loadCore(); await rerender(); toast('Matching re-run'); } catch (e) { fail(e); } };
 
 /* ---------- orders: search everything ---------- */
 const OQ = { q: '', job: '', kind: 'pos', open: false };

@@ -83,7 +83,7 @@ A.impRun = async () => {
       const bills = await insert('bills', chunk.map((x, k) => ({ job_id: jobIds[x.jobText], bill_date: x.date, total: x.amount, balance: 0, payment_status: 'paid', source: 'backfill',
         invoice_number: 'HIST-' + Date.now().toString(36) + '-' + (i + k), memo: x.note || ('History: ' + x.kind) })));
       await insert('bill_line_items', bills.map((b, k) => ({ bill_id: b.id, raw_description: chunk[k].note || ('Historical ' + chunk[k].kind), qty: chunk[k].qty, unit_cost: chunk[k].qty ? Math.max(3, chunk[k].amount / chunk[k].qty) : null,
-        line_total: chunk[k].amount, material_id: matFor[chunk[k].kind] || null, needs_mapping: !matFor[chunk[k].kind] })));
+        line_total: chunk[k].amount, material_id: matFor[chunk[k].kind] || null})));
     }
     await audit('backfill', 'jobs', '', { rows: items.length });
     S.cache = {}; await loadCore();

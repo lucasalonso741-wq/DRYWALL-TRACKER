@@ -41,7 +41,7 @@ function monthChart(pm) {
   let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Cost by month">`;
   for (let i = 0; i <= 4; i++) {
     const yy = T + ih - ih * i / 4;
-    svg += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="#e1ddd2"/><text x="${L - 8}" y="${yy + 4}" font-size="12" text-anchor="end" fill="#6b6f76">${moneyK(max * i / 4)}</text>`;
+    svg += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="#2a3645"/><text x="${L - 8}" y="${yy + 4}" font-size="12" text-anchor="end" fill="#9aa9bb">${moneyK(max * i / 4)}</text>`;
   }
   const present = new Set();
   all.forEach((mo, i) => {
@@ -53,7 +53,7 @@ function monthChart(pm) {
       const h = ih * v / max; yy -= h;
       svg += `<rect x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" style="fill:${PHASE_COLOR[k]}"><title>${monthLabel(mo)}: ${lab} ${money(v)}</title></rect>`;
     });
-    if (i % step === 0) svg += `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 10}" font-size="12" text-anchor="middle" fill="#6b6f76">${monthLabel(mo)}</text>`;
+    if (i % step === 0) svg += `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 10}" font-size="12" text-anchor="middle" fill="#9aa9bb">${monthLabel(mo)}</text>`;
   });
   svg += '</svg>';
   const legend = `<div class="legend">${PHASES.filter(([k]) => present.has(k)).map(([k, l]) => `<span><span class="sw" style="background:${PHASE_COLOR[k]}"></span>${l}</span>`).join('')}</div>`;
@@ -155,7 +155,7 @@ async function tabMaterials(id) {
       <tbody>${order.map((c, i) => {
         const x = cats[c], b = bc[c], isBoard = c === 'board';
         const items = x.items.slice().sort((p, q) => n0(q.dollars) - n0(p.dollars));
-        return `<tr class="click" onclick="A.toggleRows('mc${i}')" style="background:#faf9f6"><td><b>${esc(CATLABEL[c] || c)}</b> <span class="faint small">${items.length} items</span></td>
+        return `<tr class="click" onclick="A.toggleRows('mc${i}')" style="background:#1b2430"><td><b>${esc(CATLABEL[c] || c)}</b> <span class="faint small">${items.length} items</span></td>
           <td class="r num">${isBoard ? '<b>' + qty(x.qty) + '</b>' : ''}</td><td class="r num"><b>${money(x.dollars)}</b></td><td class="r"></td>
           <td class="r num ${b && n0(b.cost) && x.dollars > b.cost ? 'bad' : ''}">${b ? (n0(b.cost) ? money(b.cost) : (n0(b.qty) ? qty(b.qty) + ' units' : '')) : ''}</td></tr>` +
           items.map(it => `<tr data-g="mc${i}" hidden><td style="padding-left:30px">${esc(it.item)}</td><td class="r num">${qty(it.qty)} <span class="faint small">${esc(it.uom || '')}</span></td>

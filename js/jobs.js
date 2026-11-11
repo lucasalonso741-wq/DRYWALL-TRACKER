@@ -28,16 +28,28 @@ function jobFlags(m) {
   return { chips, margin };
 }
 
+/* percent complete: the number Lucas set, or an estimate from spend against budget */
+function pctOf(m) {
+  const set = n0(m.pct_complete);
+  if (set > 0) return { pct: set, est: false };
+  const bud = n0(m.material_budget) + n0(m.labor_budget) + n0(m.contingency_budget);
+  if (bud > 0 && n0(m.total_cost) > 0 && n0(m.total_cost) <= bud) return { pct: Math.min(95, Math.round(n0(m.total_cost) / bud * 100)), est: true };
+  return { pct: null, est: false };
+}
+
 function jobCard(m) {
   const { chips, margin } = jobFlags(m);
-  const pc = n0(m.pct_complete);
-  const pp = m.projected_profit;
-  return `<a class="job" href="#/job/${m.job_id}">
-    <div class="spread" style="align-items:flex-start">
+  const { pct, est } = pctOf(m);
+  const pp = m.projected_profit, target = n0(m.target_price_per_board), cpb = n0(m.cost_per_board);
+  const st = pp != null ? (pp < 0 ? 's-bad' : margin < 8 ? 's-warn' : 's-good') : (target && cpb ? (cpb > target ? 's-bad' : 's-good') : '');
+  return `<a class="job ${st}" href="#/job/${m.job_id}">
+    <div class="spread" style="align-items:flex-start;flex-wrap:nowrap">
       <div><div class="name">${esc(jn(m.name))}</div><div class="gc">${esc(m.gc || m.address || '')}</div></div>
-      <div class="r"><div style="font-size:24px;font-weight:800;line-height:1">${pc}%</div><div class="tiny muted">complete</div></div>
+      <div class="ring" style="--p:${pct || 0};--c:${est ? 'var(--blue)' : 'var(--hot)'}"><div><span><b>${pct == null ? '?' : pct + '%'}</b><small>${est ? 'EST' : 'DONE'}</small></span></div></div>
     </div>
-    <div class="bar" style="margin-top:12px"><i style="width:${Math.min(100, pc)}%"></i></div>
+    <div class="hero"><span class="big">${cpb ? money(cpb, 2) : '<span class="faint">no boards yet</span>'}</span><span class="u">per board, all in</span>
+      ${target && cpb ? `<span class="vs ${cpb > target ? 'bad' : 'good'}">${cpb > target ? '+' : '-'}${money(Math.abs(cpb - target), 2)} vs target</span>` : ''}</div>
+    <div class="tiny muted">${qty(Math.round(n0(m.boards_used)))} boards used${m.material_per_board ? ` &middot; material ${money(m.material_per_board, 2)} &middot; labor ${money(m.labor_per_board, 2)}` : ''}</div>
     <div class="kv">
       <div><div class="l">Cost so far</div><div class="v">${money(m.total_cost)}</div></div>
       <div><div class="l">Contract</div><div class="v">${n0(m.contract_value) ? money(m.contract_value) : '<span class="faint">not set</span>'}</div></div>
@@ -45,7 +57,7 @@ function jobCard(m) {
       <div><div class="l">Open POs</div><div class="v">${money(m.open_po_total)}</div></div>
     </div>
     <div class="chips">${chips.map(([k, t]) => `<span class="chip ${k}">${esc(t)}</span>`).join('')}</div>
-    <div class="tiny muted" style="margin-top:10px">Boards used ${qty(m.boards_used)}${m.last_dt ? '. Last bill ' + dt(m.last_dt) : ''}</div>
+    <div class="tiny muted" style="margin-top:8px">${m.last_dt ? 'Last bill ' + dt(m.last_dt) : ''}</div>
   </a>`;
 }
 
@@ -89,7 +101,7 @@ async function renderJob(id, tab, sub) {
   if (!m || !job) { view('<div class="empty">That job was not found. <a href="#/jobs">Back to jobs</a></div>'); return; }
   let d;
   try { d = await jobData(id); } catch (e) { return fail(e); }
-  const pc = n0(m.pct_complete);
+  const pe = pctOf(m), pc = pe.pct == null ? 0 : pe.pct;
   const lastProg = d.prog.length ? d.prog[d.prog.length - 1] : null;
   const contract = n0(m.contract_value);
   const margin = (m.projected_profit != null && contract > 0) ? m.projected_profit / contract * 100 : null;
@@ -116,7 +128,7 @@ async function renderJob(id, tab, sub) {
             oninput="$('#pc-num').value=this.value" onchange="A.setPct('${id}',this.value)">
           <input type="number" id="pc-num" min="0" max="100" value="${pc}" style="width:84px" onchange="A.setPct('${id}',this.value)"><span>%</span>
         </div>
-        <div class="help">${lastProg ? 'Last updated ' + dt(lastProg.as_of) + '. ' : ''}Drag or type a number. Every change is saved with today's date so you can see progress over time.</div>
+        <div class="help">${pe.est ? `<b>Estimated ${pc}% from spend vs budget.</b> <a href="#" onclick="event.preventDefault();A.setPct('${id}',${pc})">Use this number</a>, or drag to set your own. ` : ''}${lastProg ? 'Last updated ' + dt(lastProg.as_of) + '. ' : ''}Drag or type a number. Every change is saved with today's date so you can see progress over time.</div>
       </div>
       <div class="tiles" style="margin:16px 0 0">
         <div class="tile"><div class="l">Contract</div>
@@ -129,7 +141,7 @@ async function renderJob(id, tab, sub) {
           m.projected_profit != null ? (margin != null ? Math.round(margin) + '% margin if costs keep pace' : 'needs a contract amount') : 'needs a contract and 10% or more complete',
           m.projected_profit != null ? (m.projected_profit < 0 ? 'bad' : 'good') : '')}
         ${moneyTile('Open POs', money(m.open_po_total), m.open_po_count + ' ordered, not billed yet')}
-        ${moneyTile('Boards used', qty(m.boards_used), m.cost_per_board ? money(m.cost_per_board, 1) + ' per board all in' : '')}
+        ${moneyTile('Cost per board', m.cost_per_board ? money(m.cost_per_board, 2) : '', qty(Math.round(n0(m.boards_used))) + ' boards used' + (n0(m.target_price_per_board) ? ', target ' + money(m.target_price_per_board, 2) : ''))}
       </div>
     </div>
 
