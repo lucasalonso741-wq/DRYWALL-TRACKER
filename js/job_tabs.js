@@ -351,3 +351,29 @@ A.delLoc = (jobId, table, id, label) => ask('Delete ' + esc(label) + '?', 'POs a
   await sb.from('purchase_orders').update(clear).eq(col, id); await sb.from('bills').update(clear).eq(col, id);
   await remove(table, id); await audit('delete', table, id, { label }); await rerender(); toast('Deleted');
 }, true);
+
+/* ---------- spend: tracked totals vs your own numbers ---------- */
+async function tabSpend(id) {
+  const m = moneyOf(id), j = jobOf(id);
+  const row = (label, tracked, col, val, fmt) => `<tr><td><b>${label}</b></td><td class="r num">${fmt(tracked)}</td>
+    <td class="r"><input type="number" step="any" style="width:150px" placeholder="same as tracked" value="${val ?? ''}" data-t="jobs" data-id="${id}" data-c="${col}" data-k="num" data-after="jobEdited" onchange="A.field(this)"></td>
+    <td class="r num"><b>${fmt(val ?? tracked)}</b></td></tr>`;
+  const mt = n0(m.tracked_material), lt = n0(m.tracked_labor), bt = n0(m.tracked_boards);
+  $('#tab').innerHTML = `
+    <div class="help mb">Totals for this job. The tracked column comes from QuickBooks bills and what you entered in the app. If you have better numbers, such as a real labor total or a real board count, type them in the middle column and every report uses yours. Clear a box to go back to tracked.</div>
+    <div class="card flush scroll"><table>
+      <thead><tr><th></th><th class="r">Tracked</th><th class="r">Your number</th><th class="r">Used in reports</th></tr></thead><tbody>
+      ${row('Material spend', mt, 'material_override', j.material_override, (v) => money(v))}
+      ${row('Labor spend', lt, 'labor_override', j.labor_override, (v) => money(v))}
+      ${row('Boards used', bt, 'boards_override', j.boards_override, (v) => qty(Math.round(n0(v))))}
+      <tr class="total"><td>Total cost</td><td class="r num">${money(mt + lt)}</td><td></td><td class="r num">${money(m.total_cost)}</td></tr>
+      <tr class="total"><td>Cost per board</td><td class="r num">${bt ? money((mt + lt) / bt, 2) : ''}</td><td></td><td class="r num">${m.cost_per_board ? money(m.cost_per_board, 2) : ''}</td></tr>
+      </tbody></table></div>
+    <div class="fld mt" style="max-width:560px"><label>Note (where your numbers came from)</label>
+      <input value="${esc(j.override_note || '')}" placeholder="Example: final numbers from the job closeout sheet" data-t="jobs" data-id="${id}" data-c="override_note" data-k="text0" onchange="A.field(this)"></div>
+    ${m.has_override ? `<button class="btn mt" onclick="A.clearOverrides('${id}')">Go back to tracked numbers</button>` : ''}
+    <div class="help mt">The phase chart and the Materials used tab still show tracked items only.</div>`;
+}
+A.clearOverrides = async (id) => {
+  try { await save('jobs', id, { material_override: null, labor_override: null, boards_override: null, override_note: null }); S.cache = {}; await loadCore(); await rerender(); toast('Back to tracked numbers'); } catch (e) { fail(e); }
+};

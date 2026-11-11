@@ -20,6 +20,7 @@ function jobFlags(m) {
   else if (margin < 0) chips.push(['bad', 'Projected loss']);
   else if (margin < 8) chips.push(['warn', 'Thin margin']);
   else chips.push(['good', 'On track']);
+  if (m.has_override) chips.push(['blue', 'Using your numbers']);
   if (n0(m.unmapped) > 0) chips.push(['warn', m.unmapped + ' lines need a material match']);
   if (m.active && m.last_dt) {
     const d = Math.round((Date.now() - new Date(m.last_dt + 'T12:00:00')) / 86400e3);
@@ -105,7 +106,7 @@ async function renderJob(id, tab, sub) {
   const lastProg = d.prog.length ? d.prog[d.prog.length - 1] : null;
   const contract = n0(m.contract_value);
   const margin = (m.projected_profit != null && contract > 0) ? m.projected_profit / contract * 100 : null;
-  const tabs = [['overview', 'Overview'], ['materials', 'Materials used'], ['orders', 'Orders and bills'], ['budget', 'Budget'], ['locations', 'Locations']];
+  const tabs = [['overview', 'Overview'], ['spend', 'Spend'], ['materials', 'Materials used'], ['orders', 'Orders and bills'], ['budget', 'Budget'], ['locations', 'Locations']];
   view(`
     <div class="spread">
       <div>
@@ -147,7 +148,7 @@ async function renderJob(id, tab, sub) {
 
     <div class="tabs">${tabs.map(([t, l]) => `<a href="#/job/${id}/${t}" class="${tab === t ? 'on' : ''}">${l}</a>`).join('')}</div>
     <div id="tab"><div class="empty">Loading...</div></div>`);
-  const fn = { overview: tabOverview, materials: tabMaterials, orders: tabOrders, budget: tabBudget, locations: tabLocations }[tab] || tabOverview;
+  const fn = { overview: tabOverview, spend: tabSpend, materials: tabMaterials, orders: tabOrders, budget: tabBudget, locations: tabLocations }[tab] || tabOverview;
   try { await fn(id, sub); } catch (e) { fail(e); }
 }
 ROUTES.job = renderJob;
