@@ -106,7 +106,7 @@ async function renderJob(id, tab, sub) {
   const lastProg = d.prog.length ? d.prog[d.prog.length - 1] : null;
   const contract = n0(m.contract_value);
   const margin = (m.projected_profit != null && contract > 0) ? m.projected_profit / contract * 100 : null;
-  const tabs = [['overview', 'Overview'], ['spend', 'Spend'], ['materials', 'Materials used'], ['orders', 'Orders and bills'], ['budget', 'Budget'], ['locations', 'Locations']];
+  const tabs = [['overview', 'Overview'], ['spend', 'Spend'], ['purchases', 'Ordered vs billed'], ['materials', 'Materials used'], ['orders', 'Orders and bills'], ['budget', 'Budget'], ['locations', 'Locations']];
   view(`
     <div class="spread">
       <div>
@@ -148,7 +148,7 @@ async function renderJob(id, tab, sub) {
 
     <div class="tabs">${tabs.map(([t, l]) => `<a href="#/job/${id}/${t}" class="${tab === t ? 'on' : ''}">${l}</a>`).join('')}</div>
     <div id="tab"><div class="empty">Loading...</div></div>`);
-  const fn = { overview: tabOverview, spend: tabSpend, materials: tabMaterials, orders: tabOrders, budget: tabBudget, locations: tabLocations }[tab] || tabOverview;
+  const fn = { overview: tabOverview, spend: tabSpend, purchases: tabPurchases, materials: tabMaterials, orders: tabOrders, budget: tabBudget, locations: tabLocations }[tab] || tabOverview;
   try { await fn(id, sub); } catch (e) { fail(e); }
 }
 ROUTES.job = renderJob;

@@ -377,3 +377,38 @@ async function tabSpend(id) {
 A.clearOverrides = async (id) => {
   try { await save('jobs', id, { material_override: null, labor_override: null, boards_override: null, override_note: null }); S.cache = {}; await loadCore(); await rerender(); toast('Back to tracked numbers'); } catch (e) { fail(e); }
 };
+
+/* ---------- ordered vs billed: what you bought, item by item ---------- */
+async function tabPurchases(id) {
+  const rows = await run(sb.from('v_job_purchases').select('*').eq('job_id', id));
+  const cats = {};
+  rows.forEach(r => { const c = (cats[r.category] = cats[r.category] || { o: 0, b: 0, p: 0, ob: 0, bb: 0, items: [] }); c.o += n0(r.ordered_dollars); c.b += n0(r.billed_dollars); c.p += n0(r.paid_dollars); c.ob += n0(r.ordered_boards); c.bb += n0(r.billed_boards); c.items.push(r); });
+  const order = Object.keys(cats).sort((a, b) => (cats[b].o + cats[b].b) - (cats[a].o + cats[a].b));
+  const O = order.reduce((a, c) => a + cats[c].o, 0), B = order.reduce((a, c) => a + cats[c].b, 0), P = order.reduce((a, c) => a + cats[c].p, 0);
+  const boardsB = order.reduce((a, c) => a + cats[c].bb, 0), boardsO = order.reduce((a, c) => a + cats[c].ob, 0);
+  const cell = (q, d, u) => (n0(d) || n0(q)) ? `${money(d)}<div class="tiny faint">${qty(q)} ${esc(u || '')}</div>` : '';
+  $('#tab').innerHTML = `
+    <div class="help mb">Everything bought for this job. <b>On order</b> is open POs that no bill has covered yet. When the bill comes in from QuickBooks it replaces the PO automatically, and when the bill is paid the Paid column fills in. If a PO was typed in wrong, open it from Orders and bills and fix it; this page follows.</div>
+    <div class="tiles">
+      ${moneyTile('On order, not billed', money(O), boardsO ? qty(Math.round(boardsO)) + ' boards coming' : 'open POs')}
+      ${moneyTile('Billed', money(B), boardsB ? qty(Math.round(boardsB)) + ' boards billed' : 'materials on bills')}
+      ${moneyTile('Paid', money(P), 'of billed')}
+      ${moneyTile('Billed, still owed', money(B - P), 'unpaid to suppliers', B - P > 0 ? 'warn' : '')}
+    </div>
+    <div class="card flush scroll"><table>
+      <thead><tr><th>Category and item</th><th class="r">On order</th><th class="r">Billed</th><th class="r">Paid</th><th class="r">Total committed</th></tr></thead>
+      <tbody>${order.map((c, i) => {
+        const x = cats[c], items = x.items.slice().sort((p, q) => (n0(q.ordered_dollars) + n0(q.billed_dollars)) - (n0(p.ordered_dollars) + n0(p.billed_dollars)));
+        return `<tr class="click" onclick="A.toggleRows('pc${i}')" style="background:#1b2430"><td><b>${esc(CATLABEL[c] || c)}</b> <span class="faint small">${items.length} items</span></td>
+          <td class="r num">${x.o ? money(x.o) : ''}</td><td class="r num">${x.b ? money(x.b) : ''}</td><td class="r num">${x.p ? money(x.p) : ''}</td><td class="r num"><b>${money(x.o + x.b)}</b></td></tr>` +
+          items.map(it => `<tr data-g="pc${i}" hidden><td style="padding-left:30px">${esc(it.item)}</td><td class="r num">${cell(it.ordered_qty, it.ordered_dollars, it.uom)}</td>
+            <td class="r num">${cell(it.billed_qty, it.billed_dollars, it.uom)}</td><td class="r num">${n0(it.paid_dollars) ? money(it.paid_dollars) : ''}</td><td class="r num">${money(n0(it.ordered_dollars) + n0(it.billed_dollars))}</td></tr>`).join('');
+      }).join('') || '<tr><td colspan="5" class="empty">Nothing ordered or billed on this job yet.</td></tr>'}
+      ${order.length ? `<tr class="total"><td>Total</td><td class="r num">${money(O)}</td><td class="r num">${money(B)}</td><td class="r num">${money(P)}</td><td class="r num">${money(O + B)}</td></tr>` : ''}</tbody>
+    </table></div>
+    <div class="row mt"><button class="btn" onclick="location.hash='#/job/${id}/orders/open'">See the open POs</button><button class="btn" onclick="A.dlPurchases('${id}')">Download</button></div>`;
+}
+A.dlPurchases = async (id) => {
+  const rows = await run(sb.from('v_job_purchases').select('*').eq('job_id', id));
+  downloadCSV(jn(jobOf(id).name).replace(/\W+/g, '_') + '_ordered_vs_billed.csv', rows.map(r => ({ category: r.category, item: r.item, on_order_qty: r.ordered_qty, on_order_dollars: r.ordered_dollars, billed_qty: r.billed_qty, billed_dollars: r.billed_dollars, paid_dollars: r.paid_dollars })));
+};
