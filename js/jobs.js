@@ -62,20 +62,98 @@ function jobCard(m) {
   </a>`;
 }
 
+function projOf(m) {
+  /* projected final cost needs a percent complete we trust */
+  const { pct, est } = pctOf(m);
+  if (!pct || pct < 10) return null;
+  const cost = n0(m.total_cost), proj = cost / (pct / 100), c = n0(m.contract_value);
+  return { proj, profit: c ? c - proj : null, margin: c ? (c - proj) / c * 100 : null, est };
+}
+function summaryFlags(active) {
+  const f = [];
+  const add = (lvl, m, text) => f.push({ lvl, id: m.job_id, name: jn(m.name), text });
+  active.forEach(m => {
+    const pr = projOf(m), target = n0(m.target_price_per_board), cpb = n0(m.cost_per_board), c = n0(m.contract_value);
+    if (pr && pr.profit != null && pr.profit < 0) add('bad', m, `is projected to lose ${money(-pr.profit)}`);
+    else if (pr && pr.margin != null && pr.margin < 12) add('warn', m, `margin is thin, about ${Math.round(pr.margin)}%`);
+    if (c && n0(m.total_cost) > c) add('bad', m, `has spent ${money(n0(m.total_cost) - c)} more than the contract`);
+    if (target && cpb > target) add('warn', m, `is running ${money(cpb - target, 2)} per board over target`);
+    if (!c) add('warn', m, 'has no contract amount');
+    if (!n0(m.pct_complete)) add('warn', m, 'needs a percent complete so projections work');
+    if (n0(m.material_cost) > 5000 && !n0(m.labor_cost)) add('warn', m, 'has material but no labor entered yet');
+    if (m.oldest_open_po && (Date.now() - new Date(m.oldest_open_po + 'T12:00:00')) / 86400e3 > 90) add('warn', m, `has POs open over 90 days (${money(m.open_po_total)} on order)`);
+    if (m.last_dt) { const d = Math.round((Date.now() - new Date(m.last_dt + 'T12:00:00')) / 86400e3); if (d > 30) add('warn', m, `has had no bills in ${d} days`); }
+  });
+  return f.sort((x, y) => (x.lvl === 'bad' ? 0 : 1) - (y.lvl === 'bad' ? 0 : 1));
+}
+
 async function renderJobs() {
-  const active = S.money.filter(m => m.active).sort((a, b) => (b.last_dt || '').localeCompare(a.last_dt || ''));
+  const active = S.money.filter(m => m.active).sort((a, b) => n0(b.total_cost) - n0(a.total_cost));
   const finished = S.money.filter(m => !m.active && (n0(m.total_cost) > 0 || n0(m.contract_value) > 0)).length;
   const sum = (k) => active.reduce((a, m) => a + n0(m[k]), 0);
   const attn = S.inbox.pos + S.inbox.bills + S.inbox.mats;
+  const contract = sum('contract_value'), spent = sum('total_cost');
+  const proj = active.map(m => ({ m, p: projOf(m) })).filter(x => x.p && x.p.profit != null);
+  const projProfit = proj.reduce((a, x) => a + x.p.profit, 0), projRev = proj.reduce((a, x) => a + n0(x.m.contract_value), 0);
+  const flags = summaryFlags(active);
+  const boardsJobs = active.filter(m => n0(m.cost_per_board) > 0 && n0(m.boards_used) >= 100).sort((a, b) => n0(b.cost_per_board) - n0(a.cost_per_board));
+  const matT = sum('material_cost'), labT = sum('labor_cost');
   view(`
-    <div class="spread mb"><h1>Jobs</h1><button class="btn primary" onclick="A.newJob()">New job</button></div>
-    <div class="tiles">
-      <div class="tile"><div class="l">Active jobs</div><div class="v">${active.length}</div><div class="s">${finished} finished, see Archive</div></div>
-      <div class="tile"><div class="l">Cost so far</div><div class="v">${money(sum('total_cost'))}</div><div class="s">materials and labor, active jobs</div></div>
-      <div class="tile"><div class="l">Open POs</div><div class="v">${money(sum('open_po_total'))}</div><div class="s">${sum('open_po_count')} ordered, not billed yet</div></div>
-      <a class="tile ${attn ? 'alert' : ''}" href="#/inbox"><div class="l">Needs a look</div><div class="v">${attn}</div><div class="s">${attn ? 'POs, bills and materials to sort out' : 'Nothing waiting'}</div></a>
+    <div class="spread mb"><div><h1>Summary</h1><div class="muted small">${active.length} jobs in progress. Numbers update as bills come in from QuickBooks.</div></div><button class="btn primary" onclick="A.newJob()">New job</button></div>
+
+    <div class="panel flags ${flags.length ? '' : 'clear'} mb">
+      <h2>${flags.length ? 'Needs your attention' : 'All clear'}<small>${flags.length ? flags.length + ' item' + (flags.length > 1 ? 's' : '') : 'nothing flagged right now'}</small></h2>
+      ${flags.slice(0, 7).map(x => `<a class="flag" href="#/job/${x.id}"><span class="dotf" style="background:var(--${x.lvl === 'bad' ? 'bad' : 'warn'})"></span><span><b>${esc(x.name)}</b> ${esc(x.text)}</span></a>`).join('')}
+      ${flags.length > 7 ? `<div class="tiny muted">and ${flags.length - 7} more, open each job to see them.</div>` : ''}
+      ${attn ? `<a class="flag" href="#/inbox"><span class="dotf" style="background:var(--warn)"></span><span><b>${attn} items</b> in the Inbox need a job or material match</span></a>` : ''}
     </div>
-    <div class="jobs">${active.map(jobCard).join('') || '<div class="empty">No active jobs yet. Tap New job to start one.</div>'}</div>`);
+
+    <div class="tiles">
+      <div class="tile"><div class="l">In progress</div><div class="v">${active.length}</div><div class="s">${finished} finished, see Finished Jobs</div></div>
+      <div class="tile"><div class="l">Contract value</div><div class="v">${moneyK(contract)}</div><div class="s">${contract ? Math.round(spent / contract * 100) + '% spent so far' : 'add contracts to see this'}</div></div>
+      <div class="tile"><div class="l">Spent so far</div><div class="v">${moneyK(spent)}</div><div class="s">${moneyK(matT)} material, ${moneyK(labT)} labor</div></div>
+      <div class="tile"><div class="l">Projected profit</div><div class="v ${projProfit < 0 ? 'bad' : 'good'}">${proj.length ? moneyK(projProfit) : '?'}</div><div class="s">${proj.length ? Math.round(projProfit / projRev * 100) + '% margin, ' + proj.length + ' jobs with a % done' : 'set a % done on each job'}</div></div>
+      <div class="tile"><div class="l">On order, not billed</div><div class="v">${moneyK(sum('open_po_total'))}</div><div class="s">${qty(sum('open_po_count'))} open POs, about ${qty(Math.round(sum('open_po_boards')))} boards</div></div>
+      <div class="tile"><div class="l">Boards billed</div><div class="v">${qty(Math.round(sum('boards_used')))}</div><div class="s">${qty(Math.round(sum('est_boards')))} with open POs</div></div>
+    </div>
+
+    <div class="duo">
+      <div class="panel"><h2>Cost per board <small>all in, billed so far</small></h2>
+        ${hbars(boardsJobs.map(m => { const t = n0(m.target_price_per_board), c = n0(m.cost_per_board); return { label: jn(m.name), value: c, text: money(c), href: '#/job/' + m.job_id, color: t ? (c > t ? 'var(--bad)' : 'var(--good)') : 'var(--blue)' }; }))}
+        <div class="tiny muted mt">Green is at or under the job's target, red is over. Blue means no target set.</div></div>
+      <div class="panel"><h2>Where the money goes <small>active jobs</small></h2>
+        ${donut([{ label: 'Material', value: matT, color: 'var(--hot)' }, { label: 'Labor', value: labT, color: 'var(--labor)' }], moneyK(matT + labT), 'total spent')}
+        <div class="tiny muted mt">${labT && matT ? 'Labor is ' + Math.round(labT / (matT + labT) * 100) + '% of spend.' : ''}</div></div>
+    </div>
+
+    <div class="panel mb"><h2>Spending by month <small>bills from QuickBooks, all active jobs</small></h2><div id="sum-months"><div class="empty">Loading...</div></div></div>
+
+    <div class="panel" style="padding:0;overflow:hidden"><div style="padding:16px 16px 0"><h2>Jobs in progress</h2></div>
+      <div class="scroll"><table class="board">
+        <thead><tr><th>Job</th><th>Done</th><th style="min-width:150px">Spent of contract</th><th class="r">Per board</th><th class="r">Boards</th><th class="r">Projected profit</th><th class="r">On order</th><th></th></tr></thead>
+        <tbody>${active.map(m => {
+          const { pct, est } = pctOf(m), c = n0(m.contract_value), cost = n0(m.total_cost), pr = projOf(m), spentPct = c ? Math.min(100, cost / c * 100) : 0;
+          const t = n0(m.target_price_per_board), cpb = n0(m.cost_per_board);
+          const st = (pr && pr.profit != null) ? (pr.profit < 0 ? ['bad', 'Losing'] : pr.margin < 12 ? ['warn', 'Thin'] : ['good', 'On track']) : ['gray', 'Set % done'];
+          return `<tr class="click" onclick="location.hash='#/job/${m.job_id}'">
+            <td class="nm"><b>${esc(jn(m.name))}</b><div class="tiny muted">${esc(m.gc || '')}</div></td>
+            <td class="num">${pct == null ? '<span class="faint">?</span>' : pct + '%' + (est ? '<span class="tiny muted"> est</span>' : '')}</td>
+            <td><div class="mini"><i style="width:${spentPct}%;background:${c && cost > c ? 'var(--bad)' : 'var(--blue)'}"></i></div><div class="tiny muted num">${money(cost)}${c ? ' of ' + moneyK(c) : ''}</div></td>
+            <td class="r num"><b ${t && cpb ? `class="${cpb > t ? 'bad' : 'good'}"` : ''}>${cpb ? money(cpb, 2) : '<span class="faint">none</span>'}</b></td>
+            <td class="r num">${n0(m.boards_used) ? qty(Math.round(m.boards_used)) : ''}${n0(m.open_po_boards) ? `<div class="tiny muted">+${qty(Math.round(m.open_po_boards))} ordered</div>` : ''}</td>
+            <td class="r num ${pr && pr.profit != null ? (pr.profit < 0 ? 'bad' : 'good') : ''}">${pr && pr.profit != null ? money(pr.profit) + `<div class="tiny muted">${Math.round(pr.margin)}%</div>` : '<span class="faint">not yet</span>'}</td>
+            <td class="r num">${n0(m.open_po_total) ? money(m.open_po_total) : ''}</td>
+            <td><span class="pill ${st[0]}">${st[1]}</span></td></tr>`;
+        }).join('') || '<tr><td colspan="8" class="empty">No jobs in progress. Tap New job to start one.</td></tr>'}</tbody></table></div></div>`);
+
+  /* spending by month, loaded after the page is up */
+  try {
+    const ids = new Set(active.map(m => m.job_id));
+    const pm = await all(() => sb.from('v_job_phase_month').select('job_id,month,cost'));
+    const by = {}; pm.forEach(r => { if (ids.has(r.job_id) && r.month) by[String(r.month).slice(0, 7)] = (by[String(r.month).slice(0, 7)] || 0) + n0(r.cost); });
+    const keys = Object.keys(by).sort().slice(-12);
+    const el = $('#sum-months'); if (el) el.innerHTML = colChart(keys.map(k => ({ label: MON[Number(k.slice(5)) - 1], value: Math.max(0, by[k]) })), moneyK);
+  } catch (e) { const el = $('#sum-months'); if (el) el.innerHTML = '<div class="empty">Could not load the monthly chart.</div>'; }
 }
 ROUTES.jobs = renderJobs;
 

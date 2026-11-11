@@ -5,41 +5,83 @@
 
 /* ---------- archive ---------- */
 async function renderArchive() {
-  loading();
-  const pm = await all(() => sb.from('v_job_phase_month').select('job_id,bucket,cost'));
-  const by = {};
-  pm.forEach(r => { const o = (by[r.job_id] = by[r.job_id] || {}); o[r.bucket] = (o[r.bucket] || 0) + n0(r.cost); });
-  const done = S.money.filter(m => !m.active).sort((a, b) => (b.completed_on || b.last_dt || '').localeCompare(a.completed_on || a.last_dt || ''));
-  const withData = done.filter(m => n0(m.total_cost) > 0 || n0(m.contract_value) > 0);
-  const empty = done.length - withData.length;
-  const tot = (k) => withData.reduce((a, m) => a + n0(m[k]), 0);
-  const profitTot = withData.reduce((a, m) => a + (n0(m.contract_value) ? n0(m.contract_value) - n0(m.total_cost) : 0), 0);
+  const onSheet = (m) => m.has_override && /master sheet/.test(m.override_note || '');
+  const allDone = S.money.filter(m => !m.active && (n0(m.total_cost) > 0 || n0(m.contract_value) > 0));
+  const left = allDone.filter(m => !onSheet(m));
+  const done = allDone.filter(onSheet)
+    .sort((a, b) => (b.completed_on || b.last_dt || '').localeCompare(a.completed_on || a.last_dt || ''));
+  const row = (m) => { const c = n0(m.contract_value), cost = n0(m.total_cost), mat = n0(m.material_cost), lab = n0(m.labor_cost), b = n0(m.boards_used), u = n0(m.units);
+    return { m, c, cost, mat, lab, b, u, profit: c ? c - cost : null, margin: c ? (c - cost) / c * 100 : null, perBoard: b >= 100 ? cost / b : null, perUnit: u ? cost / u : null }; };
+  const R = done.map(row);
+  const withC = R.filter(r => r.c > 0);
+  const T = (k, list = R) => list.reduce((a, r) => a + (r[k] || 0), 0);
+  const totC = T('c', withC), totCost = T('cost', withC), totProfit = totC - totCost, totMargin = totC ? totProfit / totC * 100 : 0;
+  const bR = R.filter(r => r.b >= 100), avgBoard = bR.length ? T('cost', bR) / T('b', bR) : 0;
+  const uR = R.filter(r => r.u > 0 && r.c > 0), avgUnit = uR.length ? T('cost', uR) / T('u', uR) : 0;
+  const matT = T('mat', withC), labT = T('lab', withC);
+  const byProfit = withC.slice().sort((a, b) => b.profit - a.profit);
+  const flags = [];
+  withC.forEach(r => {
+    const n = jn(r.m.name);
+    if (r.profit < 0) flags.push(['bad', n, `lost ${money(-r.profit)}`, r.m.job_id]);
+    else if (r.margin < 20) flags.push(['warn', n, `only made ${Math.round(r.margin)}% (${money(r.profit)})`, r.m.job_id]);
+    if (r.mat < r.c * 0.02 && r.c > 50000) flags.push(['warn', n, 'has almost no material cost on it, so profit may be overstated', r.m.job_id]);
+    if (r.lab < r.c * 0.02 && r.c > 50000) flags.push(['warn', n, 'has almost no labor cost on it, so profit may be overstated', r.m.job_id]);
+    if (r.margin > 85 && r.c > 50000) flags.push(['warn', n, `shows a ${Math.round(r.margin)}% margin, check that all costs are in`, r.m.job_id]);
+  });
+  R.filter(r => n0(r.m.open_po_total) > 5000).forEach(r => flags.push(['warn', jn(r.m.name), `still shows ${money(r.m.open_po_total)} in open POs even though it is finished, probably already billed, so they are not counted in its cost`, r.m.job_id]));
+  if (left.length) flags.push(['warn', left.length + ' finished jobs not on your spreadsheet', '(' + left.map(m => jn(m.name)).join(', ') + ') are left out of every total and chart so they do not skew your numbers', null]);
+  const noC = R.filter(r => !r.c); if (noC.length) flags.push(['warn', noC.length + ' finished jobs', 'have no contract amount, so they are left out of the profit totals', null]);
+  const pillFor = (r) => r.margin == null ? ['gray', 'No contract'] : r.profit < 0 ? ['bad', 'Loss'] : r.margin < 20 ? ['warn', 'Thin'] : ['good', 'Healthy'];
   view(`
-    <div class="spread mb"><h1>Archive</h1>
+    <div class="spread mb"><div><h1>Finished Jobs</h1><div class="muted small">What each job really made. Profit is contract minus all material and labor.</div></div>
       <div class="row"><button class="btn" onclick="location.hash='#/setup/import'">Add past job data</button><button class="btn sm" onclick="A.dlArchive()">Download</button></div></div>
-    <div class="help mb">Finished jobs, with how each one actually ran. Tap a job to see where its money went and how many boards and studs it used. Use "Add past job data" to load history that never went through QuickBooks.</div>
+
     <div class="tiles">
-      <div class="tile"><div class="l">Finished jobs</div><div class="v">${withData.length}</div></div>
-      <div class="tile"><div class="l">Total cost</div><div class="v">${moneyK(tot('total_cost'))}</div></div>
-      <div class="tile"><div class="l">Boards</div><div class="v">${qty(Math.round(tot('boards_used')))}</div></div>
-      <div class="tile"><div class="l">Profit (with contract)</div><div class="v">${moneyK(profitTot)}</div></div>
+      <div class="tile"><div class="l">Finished jobs</div><div class="v">${R.length}</div><div class="s">${withC.length} with a contract</div></div>
+      <div class="tile"><div class="l">Total contracts</div><div class="v">${moneyK(totC)}</div></div>
+      <div class="tile"><div class="l">Total profit</div><div class="v ${totProfit < 0 ? 'bad' : 'good'}">${moneyK(totProfit)}</div><div class="s">${Math.round(totMargin)}% overall margin</div></div>
+      <div class="tile"><div class="l">Avg cost per board</div><div class="v">${avgBoard ? money(avgBoard, 2) : '?'}</div><div class="s">${bR.length} jobs with board counts</div></div>
+      <div class="tile"><div class="l">Avg cost per unit</div><div class="v">${avgUnit ? money(avgUnit) : '?'}</div><div class="s">${uR.length} jobs with units</div></div>
     </div>
-    <div class="card flush scroll"><table>
-      <thead><tr><th>Job</th><th>Finished</th><th class="r">Contract</th><th class="r">Cost</th><th class="r">Profit</th><th class="r">Margin</th><th class="r">Boards</th><th class="r">Per board</th><th style="min-width:150px">Where it went</th></tr></thead>
-      <tbody>${withData.map(m => {
-        const c = n0(m.contract_value), cost = n0(m.total_cost), p = c ? c - cost : null, ph = by[m.job_id] || {}, sum = Object.values(ph).reduce((a, b) => a + Math.max(0, b), 0);
-        return `<tr class="click" onclick="location.hash='#/job/${m.job_id}'"><td><b>${esc(jn(m.name))}</b></td><td>${dt(m.completed_on || m.last_dt)}</td>
-          <td class="r num">${c ? money(c) : ''}</td><td class="r num">${money(cost)}</td>
-          <td class="r num ${p != null && p < 0 ? 'bad' : ''}">${p != null ? money(p) : ''}</td><td class="r num">${p != null ? Math.round(p / c * 100) + '%' : ''}</td>
-          <td class="r num">${m.boards_used ? qty(Math.round(m.boards_used)) : ''}</td><td class="r num">${m.cost_per_board ? money(m.cost_per_board, 2) : ''}</td>
-          <td>${sum ? `<div class="phasebar">${PHASES.map(([k, l]) => n0(ph[k]) > 0 ? `<i title="${l} ${money(ph[k])}" style="width:${ph[k] / sum * 100}%;background:${PHASE_COLOR[k]}"></i>` : '').join('')}</div>` : ''}</td></tr>`;
-      }).join('') || '<tr><td colspan="9" class="empty">No finished jobs yet. Mark a job finished from its page, or add past job data.</td></tr>'}</tbody>
-    </table></div>
-    ${empty ? `<div class="help mt">${empty} finished jobs have no cost data and are hidden here.</div>` : ''}
-    <div class="legend mt">${PHASES.map(([k, l]) => `<span><span class="sw" style="background:${PHASE_COLOR[k]}"></span>${l}</span>`).join('')}</div>`);
+
+    ${flags.length ? `<div class="panel flags mb"><h2>Red flags<small>${flags.length}</small></h2>${flags.slice(0, 8).map(([l, n, t, id]) => `<${id ? `a href="#/job/${id}"` : 'div'} class="flag"><span class="dotf" style="background:var(--${l === 'bad' ? 'bad' : 'warn'})"></span><span><b>${esc(n)}</b> ${esc(t)}</span></${id ? 'a' : 'div'}>`).join('')}${flags.length > 8 ? `<div class="tiny muted">and ${flags.length - 8} more.</div>` : ''}</div>` : ''}
+
+    <div class="duo">
+      <div class="panel"><h2>Profit by job <small>biggest first</small></h2>
+        ${hbars(byProfit.slice(0, 14).map(r => ({ label: jn(r.m.name), value: r.profit, text: moneyK(r.profit), href: '#/job/' + r.m.job_id, color: r.profit < 0 ? 'var(--bad)' : 'var(--good)' })))}</div>
+      <div class="panel"><h2>Margin by job <small>profit as % of contract</small></h2>
+        ${hbars(withC.slice().sort((a, b) => b.margin - a.margin).slice(0, 14).map(r => ({ label: jn(r.m.name), value: r.margin, text: Math.round(r.margin) + '%', href: '#/job/' + r.m.job_id, color: r.margin < 20 ? 'var(--warn)' : 'var(--blue)' })))}</div>
+    </div>
+    <div class="duo">
+      <div class="panel"><h2>Cost per board <small>jobs with 100+ boards counted</small></h2>
+        ${hbars(bR.slice().sort((a, b) => b.perBoard - a.perBoard).map(r => ({ label: jn(r.m.name), value: r.perBoard, text: money(r.perBoard, 2), href: '#/job/' + r.m.job_id, color: 'var(--hot)' })))}
+        <div class="tiny muted mt">More jobs show up here as you backfill board counts.</div></div>
+      <div class="panel"><h2>Where the money went <small>all finished jobs</small></h2>
+        ${donut([{ label: 'Material', value: matT, color: 'var(--hot)' }, { label: 'Labor', value: labT, color: 'var(--labor)' }, { label: 'Profit', value: Math.max(0, totProfit), color: 'var(--good)' }], moneyK(totC), 'billed')}
+        <div class="tiny muted mt">Of every $100 billed: $${totC ? Math.round(matT / totC * 100) : 0} material, $${totC ? Math.round(labT / totC * 100) : 0} labor, $${totC ? Math.round(totProfit / totC * 100) : 0} profit.</div></div>
+    </div>
+
+    <div class="panel" style="padding:0;overflow:hidden"><div style="padding:16px 16px 0"><h2>Every finished job</h2></div>
+      <div class="scroll"><table class="board">
+        <thead><tr><th>Job</th><th>Finished</th><th class="r">Units</th><th class="r">Contract</th><th class="r">Material</th><th class="r">Labor</th><th class="r">Real profit</th><th class="r">Margin</th><th class="r">Boards</th><th class="r">Per board</th><th class="r">Per unit</th><th></th></tr></thead>
+        <tbody>${R.map(r => { const st = pillFor(r); return `<tr class="click" onclick="location.hash='#/job/${r.m.job_id}'">
+          <td class="nm"><b>${esc(jn(r.m.name))}</b></td><td class="nowrap">${monthYear(r.m.completed_on || r.m.last_dt)}</td>
+          <td class="r num">${r.u ? qty(r.u) : ''}</td><td class="r num">${r.c ? money(r.c) : ''}</td>
+          <td class="r num">${money(r.mat)}</td><td class="r num">${money(r.lab)}</td>
+          <td class="r num ${r.profit != null ? (r.profit < 0 ? 'bad' : 'good') : ''}"><b>${r.profit != null ? money(r.profit) : ''}</b></td>
+          <td class="r num">${r.margin != null ? Math.round(r.margin) + '%' : ''}</td>
+          <td class="r num">${r.b ? qty(Math.round(r.b)) : ''}</td><td class="r num">${r.perBoard ? money(r.perBoard, 2) : ''}</td><td class="r num">${r.perUnit ? money(r.perUnit) : ''}</td>
+          <td><span class="pill ${st[0]}">${st[1]}</span></td></tr>`; }).join('') || '<tr><td colspan="12" class="empty">No finished jobs yet. Mark a job finished from its page, or add past job data.</td></tr>'}</tbody>
+        <tfoot><tr><td>TOTAL</td><td></td><td class="r num">${qty(T('u', withC))}</td><td class="r num">${money(totC)}</td><td class="r num">${money(matT)}</td><td class="r num">${money(labT)}</td>
+          <td class="r num ${totProfit < 0 ? 'bad' : 'good'}">${money(totProfit)}</td><td class="r num">${Math.round(totMargin)}%</td><td class="r num">${qty(Math.round(T('b', withC)))}</td><td class="r num">${avgBoard ? money(avgBoard, 2) : ''}</td><td class="r num">${avgUnit ? money(avgUnit) : ''}</td><td></td></tr></tfoot>
+      </table></div></div>
+
+    <div class="totalbar"><div><div class="l">Total profit, all finished jobs</div><div class="big">${money(totProfit)}</div></div>
+      <div><div class="l">On contracts of</div><div class="v">${money(totC)}</div></div><div><div class="l">Total cost</div><div class="v">${money(totCost)}</div></div><div><div class="l">Overall margin</div><div class="v">${Math.round(totMargin)}%</div></div></div>`);
 }
 ROUTES.archive = renderArchive;
-A.dlArchive = () => downloadCSV('archive.csv', S.money.filter(m => !m.active).map(m => ({ job: jn(m.name), finished: m.completed_on || '', contract: m.contract_value, cost: m.total_cost, material: m.material_cost, labor: m.labor_cost, boards: Math.round(n0(m.boards_used)), cost_per_board: m.cost_per_board })));
+A.dlArchive = () => downloadCSV('finished_jobs.csv', S.money.filter(m => !m.active).map(m => ({ job: jn(m.name), finished: monthYear(m.completed_on), units: m.units, contract: m.contract_value, cost: m.total_cost, material: m.material_cost, labor: m.labor_cost, boards: Math.round(n0(m.boards_used)), cost_per_board: m.cost_per_board })));
 
 /* ---------- inbox ---------- */
 async function renderInbox(sub) {

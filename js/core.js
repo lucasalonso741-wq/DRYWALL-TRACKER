@@ -321,7 +321,7 @@ function startLive() {
 }
 
 /* ---------- header + router ---------- */
-const NAV = [['jobs', 'Jobs'], ['archive', 'Archive'], ['inbox', 'Inbox'], ['orders', 'Orders'], ['setup', 'Setup']];
+const NAV = [['jobs', 'Summary'], ['archive', 'Finished Jobs'], ['inbox', 'Inbox'], ['orders', 'Orders'], ['setup', 'Setup']];
 function renderNav() {
   const cur = S.route[0] === 'job' ? 'jobs' : S.route[0];
   const n = S.inbox.pos + S.inbox.bills + S.inbox.mats;
