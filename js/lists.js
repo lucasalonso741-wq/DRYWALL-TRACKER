@@ -146,7 +146,7 @@ async function renderOrders(sub) {
     <div class="spread mb"><div class="seg"><a href="#/orders/pos" class="${OQ.kind === 'pos' ? 'on' : ''}">Purchase orders</a><a href="#/orders/bills" class="${OQ.kind === 'bills' ? 'on' : ''}">Bills</a></div>
       <div class="row"><input id="oq" placeholder="Search number, vendor, memo" value="${esc(OQ.q)}" style="width:240px">
       ${selectHtml(jobOptions(false), OQ.job, 'id="oj"', 'All jobs')}
-      ${OQ.kind === 'pos' ? `<label class="row small"><input type="checkbox" id="oo" ${OQ.open ? 'checked' : ''}> Open only</label>` : ''}
+      ${OQ.kind === 'pos' ? `<label class="row small"><input type="checkbox" id="oo" ${OQ.open ? 'checked' : ''}> Open, last 120 days</label>` : ''}
       <button class="btn primary" onclick="A.newPO('')">Add a PO</button></div></div>
     <div id="olist"><div class="empty">Loading...</div></div>`);
   const go = debounce(() => { OQ.q = $('#oq').value.trim(); OQ.job = $('#oj').value; OQ.open = !!($('#oo') && $('#oo').checked); loadOrders(); }, 300);
@@ -159,7 +159,7 @@ async function loadOrders() {
   let rows, q;
   if (k === 'pos') {
     q = sb.from('purchase_orders').select('id,job_id,po_number,po_date,total,qb_status,source,archived,memo,vendors!inner(name)').order('po_date', { ascending: false, nullsFirst: false }).limit(200);
-    if (OQ.open) q = q.eq('archived', false).neq('qb_status', 'Closed');
+    if (OQ.open) { const cut = new Date(Date.now() - 120 * 864e5).toISOString().slice(0, 10); q = q.eq('archived', false).neq('qb_status', 'Closed').neq('source', 'backfill').gte('po_date', cut); }
     if (OQ.q) q = q.or(`po_number.ilike.%${OQ.q.replace(/[,%()]/g, ' ')}%,memo.ilike.%${OQ.q.replace(/[,%()]/g, ' ')}%`);
   } else {
     q = sb.from('bills').select('id,job_id,invoice_number,bill_date,total,balance,payment_status,source,memo,vendors!inner(name,type)').order('bill_date', { ascending: false, nullsFirst: false }).limit(200);

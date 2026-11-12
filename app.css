@@ -244,3 +244,19 @@ a.flag:hover b{color:var(--blue)}
 .totalbar .v{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
 .duo{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin-bottom:16px}
 @media(max-width:600px){.hb{grid-template-columns:90px 1fr 64px}}
+
+/* summary v2 */
+.costcard .bigv{font-size:40px;font-weight:900;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:6px}
+.costcard .sub{border-top:1px solid var(--line);padding-top:10px}
+.costcard .sub>div:first-child{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.costcard .sub .l{font-size:12px;color:var(--dim);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.pcin{width:68px;padding:5px 7px;font-weight:800;text-align:center}
+details.panel>summary{cursor:pointer;list-style:none} details.panel>summary::-webkit-details-marker{display:none}
+details.panel>summary::before{content:"\25B8  ";color:var(--dim)} details.panel[open]>summary::before{content:"\25BE  "}
+.estmode{display:inline-flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden;background:var(--card2)}
+.estmode button{padding:6px 14px;font-weight:700;color:var(--dim);background:none;border:0;border-right:1px solid var(--line2)}
+.estmode button:last-child{border-right:0} .estmode button.on{background:var(--hot);color:#fff}
+.estcmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px}
+.estcmp>div{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.estcmp .l{font-size:11.5px;color:var(--dim);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.estcmp .v{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}

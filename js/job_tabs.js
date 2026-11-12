@@ -3,19 +3,48 @@
    Job page tabs
    ===================================================================== */
 
-function phaseBudgets(buds) {
-  const out = {};
-  buds.forEach(b => {
-    if (b.kind === 'material' && !b.building_id) {
-      const mat = matOf(b.material_id);
-      const k = phaseOf(mat ? mat.category : b.category);
-      out[k] = (out[k] || 0) + n0(b.budget_cost);
-    } else if (b.kind === 'labor') {
-      const k = laborPhaseFromNote(b.notes);
-      out[k] = (out[k] || 0) + n0(b.budget_cost);
+/* ---------- estimate helpers (lump sum or by item) ---------- */
+const LAB_SLOTS = [['framing', 'Framing'], ['hang', 'Hang'], ['finish', 'Finish'], ['punch', 'Punch out']];
+const slotOf = (note) => { const t = String(note || '').trim().toLowerCase(); return t.startsWith('punch') ? 'punch' : /^(framing|hang|finish)/.test(t) ? t.match(/^(framing|hang|finish)/)[1] : null; };
+const matBudgets = (bud) => bud.filter(b => b.kind === 'material' && !b.building_id);
+const labBudgets = (bud) => bud.filter(b => b.kind === 'labor');
+const matchRows = (rows, b, nameKey) => {
+  const mat = matOf(b.material_id);
+  if (mat) return rows.filter(r => r.item === mat.name || r.item === mat.family);
+  if (b.category && b.category !== 'misc') return rows.filter(r => r.category === b.category);
+  return [];
+};
+const lineLabel = (b) => { const mt = matOf(b.material_id); return mt ? mt.name : (b.category && b.category !== 'misc' && CATLABEL[b.category]) || b.notes || 'Miscellaneous'; };
+
+/* every by-item material line, with what has been billed and what is on open POs against it */
+function materialLines(d, pur) {
+  return matBudgets(d.bud).map(b => {
+    const used = matchRows(d.mu, b), ord = matchRows(pur, b);
+    const isBoard = (matOf(b.material_id) || {}).category === 'board' || b.category === 'board';
+    const bq = used.reduce((a, r) => a + n0(r.qty), 0), bd = used.reduce((a, r) => a + n0(r.dollars), 0);
+    const oq = ord.reduce((a, r) => a + n0(isBoard ? r.ordered_boards : r.ordered_qty), 0), od = ord.reduce((a, r) => a + n0(r.ordered_dollars), 0);
+    const bq2 = isBoard ? ord.reduce((a, r) => a + n0(r.billed_boards), 0) || bq : bq;
+    const budQ = n0(b.budget_qty), budD = n0(b.budget_cost);
+    const tracked = !!(matOf(b.material_id) || (b.category && b.category !== 'misc'));
+    let st = ['gray', tracked ? 'No number set' : 'Not tracked'];
+    if (budD > 0 || budQ > 0) {
+      const overD = budD > 0 && bd > budD, overQ = budQ > 0 && bq2 > budQ;
+      const ballD = budD > 0 && bd + od > budD, ballQ = budQ > 0 && bq2 + oq > budQ;
+      st = !tracked ? ['gray', 'Not tracked'] : (overD || overQ) ? ['bad', 'Over'] : (ballD || ballQ) ? ['warn', 'Open POs push it over'] : ['good', 'Under'];
     }
+    return { b, label: lineLabel(b), tracked, isBoard, bq: bq2, bd, oq, od, budQ, budD, st };
   });
-  return out;
+}
+/* labor by phase: only entries you typed in by phase can be compared per phase */
+function laborSlots(d) {
+  const spentBy = {}; (d.lab || []).forEach(r => { spentBy[r.phase] = (spentBy[r.phase] || 0) + n0(r.cost); });
+  const lines = labBudgets(d.bud), used = new Set();
+  const slots = LAB_SLOTS.map(([k, label]) => {
+    const b = lines.find(x => !used.has(x.id) && slotOf(x.notes) === k); if (b) used.add(b.id);
+    return { k, label, b, spent: n0(spentBy[k]), budget: b ? n0(b.budget_cost) : 0 };
+  });
+  const extra = lines.filter(x => !used.has(x.id));
+  return { slots, extra, unsplit: n0(spentBy.labor) + n0(spentBy.other) };
 }
 
 function niceMax(v) {
@@ -60,19 +89,23 @@ function monthChart(pm) {
   return svg + legend;
 }
 
-function watchItems(m, d, spent, bud) {
-  const out = [];
-  const contract = n0(m.contract_value);
+function watchItems(m, d) {
+  const out = [], e = estOf(m), contract = n0(m.contract_value);
   if (m.projected_profit != null && m.projected_profit < 0)
     out.push(['bad', `At this pace the job finishes ${money(-m.projected_profit)} over the contract.`]);
   else if (m.projected_profit != null && contract > 0 && m.projected_profit / contract < 0.08)
     out.push(['', `Projected margin is only ${Math.round(m.projected_profit / contract * 100)}%. Check what is still to be bought.`]);
-  PHASES.forEach(([k, lab]) => {
-    if (n0(bud[k]) > 0 && n0(spent[k]) > n0(bud[k]))
-      out.push(['bad', `${lab} is ${money(spent[k] - bud[k])} over its budget (${Math.round(spent[k] / bud[k] * 100)}% used).`]);
-  });
-  const old = d.open.filter(p => n0(p.age_days) > 60);
-  if (old.length) out.push(['', `${old.length} POs have been open more than 60 days (${money(old.reduce((a, p) => a + n0(p.total), 0))}). Close them in QuickBooks if they were billed or cancelled.`]);
+  if (e.mat.over) out.push(['bad', `Material is ${money(e.mat.spent - e.mat.est)} over the ${money(e.mat.est)} estimate (${Math.round(e.mat.pct)}% used).`]);
+  else if (e.mat.ballOver) out.push(['', `Material billed plus open POs would be ${money(e.mat.spent + e.mat.open - e.mat.est)} over the estimate. Open POs are only a ballpark until the bills come in.`]);
+  if (e.lab.over) out.push(['bad', `Labor is ${money(e.lab.spent - e.lab.est)} over the ${money(e.lab.est)} estimate (${Math.round(e.lab.pct)}% used).`]);
+  /* line by line checks only when that estimate was entered by item. A lump sum is only checked as a total. */
+  if (e.mat.mode === 'items') {
+    materialLines(d, d.pur || []).forEach(l => { if (l.st[0] === 'bad') out.push(['bad', `${l.label} is over its estimate${l.budQ && l.bq > l.budQ ? ` (${qty(Math.round(l.bq))} of ${qty(l.budQ)} ordered)` : ` (${money(l.bd)} of ${money(l.budD)})`}.`]); });
+  }
+  if (e.lab.mode === 'items') {
+    laborSlots(d).slots.forEach(x => { if (x.budget > 0 && x.spent > x.budget) out.push(['bad', `${x.label} labor is ${money(x.spent - x.budget)} over its ${money(x.budget)} estimate.`]); });
+  }
+  if (!e.mat.has && !e.lab.has) out.push(['', 'No estimate yet. Add one on the Estimate tab so the app can tell you when you are over.']);
   if (n0(m.unmapped) > 0) out.push(['', `${m.unmapped} lines on this job still need a material match, so the material counts are low. Fix them in the Inbox.`]);
   if (m.active && m.last_dt) {
     const days = Math.round((Date.now() - new Date(m.last_dt + 'T12:00:00')) / 86400e3);
@@ -84,37 +117,36 @@ function watchItems(m, d, spent, bud) {
 
 async function tabOverview(id) {
   const m = moneyOf(id), d = await jobData(id);
+  d.pur = d.pur || await run(sb.from('v_job_purchases').select('*').eq('job_id', id));
   const spent = {}; d.pm.forEach(r => { spent[r.bucket] = (spent[r.bucket] || 0) + n0(r.cost); });
-  const bud = phaseBudgets(d.bud);
-  const rows = PHASES.filter(([k]) => n0(spent[k]) || n0(bud[k]));
+  const rows = PHASES.filter(([k]) => n0(spent[k]));
   const totSpent = Object.values(spent).reduce((a, b) => a + b, 0);
-  const totBud = Object.values(bud).reduce((a, b) => a + b, 0);
   const target = n0(m.target_price_per_board);
-  const watch = watchItems(m, d, spent, bud);
+  const watch = watchItems(m, d);
   $('#tab').innerHTML = `
     <div class="mb"><h2>What to watch</h2><ul class="watch">${watch.map(([k, t]) => `<li class="${k}">${esc(t)}</li>`).join('')}</ul></div>
     <div class="two">
       <div>
         <h2>Where the money went</h2>
         <div class="card flush scroll"><table>
-          <thead><tr><th>Phase</th><th class="r">Spent</th><th class="r">Budget</th><th style="min-width:140px">Budget used</th><th class="r">Share</th></tr></thead>
+          <thead><tr><th>Phase</th><th class="r">Spent</th><th style="min-width:140px"></th><th class="r">Share</th></tr></thead>
           <tbody>${rows.map(([k, l]) => {
-            const s = n0(spent[k]), b = n0(bud[k]), used = b > 0 ? s / b * 100 : null;
-            return `<tr><td><span class="sw" style="background:${PHASE_COLOR[k]}"></span>${l}</td><td class="r num">${money(s)}</td><td class="r num">${b ? money(b) : ''}</td>
-              <td>${used != null ? `<div class="row" style="flex-wrap:nowrap;gap:8px"><div class="phasebar grow"><i style="width:${Math.min(100, used)}%;background:${used > 100 ? 'var(--bad)' : PHASE_COLOR[k]}"></i></div><span class="small num ${used > 100 ? 'bad' : ''}">${Math.round(used)}%</span></div>` : ''}</td>
-              <td class="r num">${totSpent ? Math.round(s / totSpent * 100) + '%' : ''}</td></tr>`;
-          }).join('') || '<tr><td colspan="5" class="empty">No costs on this job yet.</td></tr>'}
-          ${rows.length ? `<tr class="total"><td>Total</td><td class="r num">${money(totSpent)}</td><td class="r num">${totBud ? money(totBud) : ''}</td><td></td><td></td></tr>` : ''}</tbody>
+            const sp = n0(spent[k]);
+            return `<tr><td><span class="sw" style="background:${PHASE_COLOR[k]}"></span>${l}</td><td class="r num">${money(sp)}</td>
+              <td><div class="phasebar"><i style="width:${totSpent ? Math.min(100, sp / totSpent * 100) : 0}%;background:${PHASE_COLOR[k]}"></i></div></td>
+              <td class="r num">${totSpent ? Math.round(sp / totSpent * 100) + '%' : ''}</td></tr>`;
+          }).join('') || '<tr><td colspan="4" class="empty">No costs on this job yet.</td></tr>'}
+          ${rows.length ? `<tr class="total"><td>Total</td><td class="r num">${money(totSpent)}</td><td></td><td></td></tr>` : ''}</tbody>
         </table></div>
-        <div class="help mt">Materials are grouped into phases automatically: framing (metal, lumber, plywood), hang (board and fasteners), finish (mud, tape, sealants). Labor from your subcontractor bills shows as its own line. Labor you enter by phase on the Orders and bills tab lands in that phase.</div>
+        <div class="help mt">Materials are grouped into phases automatically: framing (metal, lumber, plywood), hang (board and fasteners), finish (mud, tape, sealants). Labor from your subcontractor bills shows as its own line. Your estimate and how much of it is used are on the Estimate tab.</div>
       </div>
       <div>
         <h2>Per board numbers</h2>
         <div class="card">
           <table><tbody>
             <tr><td>Boards billed</td><td class="r num"><b>${qty(m.boards_used)}</b></td></tr>
-            <tr><td>Boards on open POs</td><td class="r num">${qty(Math.round(n0(m.open_po_boards)))}</td></tr>
-            <tr><td>Estimated boards (billed + on order)</td><td class="r num"><b>${qty(Math.round(n0(m.est_boards)))}</b></td></tr>
+            <tr><td>Boards on open POs (last 120 days)</td><td class="r num">${qty(Math.round(n0(m.open_po_boards)))}</td></tr>
+            <tr><td>Estimated boards (billed + open POs)</td><td class="r num"><b>${qty(Math.round(n0(m.est_boards)))}</b></td></tr>
             <tr><td>Material per board</td><td class="r num">${m.material_per_board ? money(m.material_per_board, 2) : ''}</td></tr>
             <tr><td>Labor per board</td><td class="r num">${m.labor_per_board ? money(m.labor_per_board, 2) : ''}</td></tr>
             <tr><td>All in per board</td><td class="r num"><b>${m.cost_per_board ? money(m.cost_per_board, 2) : ''}</b></td></tr>
@@ -134,8 +166,8 @@ async function tabMaterials(id) {
   const m = moneyOf(id), d = await jobData(id);
   const cats = {};
   d.mu.forEach(r => { const c = (cats[r.category] = cats[r.category] || { dollars: 0, qty: 0, items: [] }); c.dollars += n0(r.dollars); c.qty += n0(r.qty); c.items.push(r); });
-  const bc = {};
-  d.bud.filter(b => b.kind === 'material' && !b.building_id).forEach(b => {
+  const bc = {}, itemsMode = (m.material_est_mode || 'items') === 'items';
+  (itemsMode ? d.bud.filter(b => b.kind === 'material' && !b.building_id) : []).forEach(b => {
     const mat = matOf(b.material_id), cat = (mat && mat.category) || b.category || 'uncategorized';
     const x = (bc[cat] = bc[cat] || { qty: 0, cost: 0 }); x.qty += n0(b.budget_qty); x.cost += n0(b.budget_cost);
   });
@@ -145,7 +177,7 @@ async function tabMaterials(id) {
   const bb = bc.board;
   $('#tab').innerHTML = `
     <div class="tiles">
-      ${moneyTile('Boards', qty(boards), bb && bb.qty ? `of ${qty(bb.qty)} budgeted (${Math.round(boards / bb.qty * 100)}%)` : 'sheets billed to this job')}
+      ${moneyTile('Boards', qty(boards), (bb && bb.qty ? `of ${qty(bb.qty)} budgeted (${Math.round(boards / bb.qty * 100)}%)` : 'sheets billed to this job') + (n0(m.open_po_boards) ? `, plus about ${qty(Math.round(m.open_po_boards))} on open POs` : ''), bb && bb.qty && boards > bb.qty ? 'bad' : '')}
       ${moneyTile('Studs', qty(studs), 'pieces billed')}
       ${moneyTile('Track', qty(track), 'pieces billed')}
       ${moneyTile('Materials total', money(m.material_cost), 'from supplier bills')}
@@ -207,8 +239,8 @@ async function tabOrders(id, sub) {
     <div class="row">${sub === 'open' || sub === 'pos' ? `<button class="btn primary" onclick="A.newPO('${id}')">Add a PO</button>` : ''}</div></div>`;
   let body = '';
   if (sub === 'open') {
-    body = `<div class="help mb">POs that are still open in QuickBooks with no bill against them yet. This is money you have committed but not been billed for: ${money(d.open.reduce((a, p) => a + n0(p.total), 0))}.</div>
-      <div class="card flush scroll"><table>${poHead(false)}<tbody>${poRows(d.open, false) || '<tr><td colspan="5" class="empty">No open POs on this job.</td></tr>'}</tbody></table></div>`;
+    body = `<div class="help mb">POs from the last 120 days that no bill has covered yet: ${money(d.open.reduce((a, p) => a + n0(p.total), 0))}. This is a ballpark of what is being ordered. Older POs are treated as closed, and the real spend is always the bills.</div>
+      <div class="card flush scroll"><table>${poHead(false)}<tbody>${poRows(d.open, false) || '<tr><td colspan="5" class="empty">No open POs in the last 120 days.</td></tr>'}</tbody></table></div>`;
   } else if (sub === 'pos') {
     const rows = await all(() => sb.from('purchase_orders').select('id,job_id,po_number,po_date,total,qb_status,source,archived,vendors(name)').eq('job_id', id).order('po_date', { ascending: false, nullsFirst: false }));
     body = `<div class="card flush scroll"><table>${poHead(false)}<tbody>${poRows(rows, false) || '<tr><td colspan="5" class="empty">No POs yet.</td></tr>'}</tbody></table></div><div class="help mt">${rows.length} POs</div>`;
@@ -253,52 +285,119 @@ A.delLabor = (lid) => ask('Delete this labor entry?', 'It will be removed from t
   await remove('labor_entries', lid); S.cache = {}; await loadCore(); await rerender(); toast('Deleted');
 }, true);
 
-/* ---------- budget ---------- */
+/* ---------- estimate: lump sum or by item, material and labor ---------- */
+const cmpTiles = (x, extra) => `<div class="estcmp">
+  <div><div class="l">Estimate</div><div class="v">${x.has ? money(x.est) : '<span class="faint">none</span>'}</div></div>
+  <div><div class="l">${x.kind === 'labor' ? 'Spent' : 'Billed'}</div><div class="v">${money(x.spent)}</div></div>
+  <div><div class="l">${x.over ? 'Over by' : 'Left'}</div><div class="v ${x.over ? 'bad' : ''}">${x.has ? money(Math.abs(x.est - x.spent)) : ''}</div></div>
+  <div><div class="l">Used</div><div class="v ${x.over ? 'bad' : ''}">${x.has ? Math.round(x.pct) + '%' : ''}</div></div>
+  ${extra || ''}</div>`;
+const modeToggle = (id, kind, mode) => `<div class="estmode"><button class="${mode === 'lump' ? 'on' : ''}" onclick="A.setEstMode('${id}','${kind}','lump')">Lump sum</button><button class="${mode === 'items' ? 'on' : ''}" onclick="A.setEstMode('${id}','${kind}','items')">By item</button></div>`;
+
 async function tabBudget(id) {
-  const d = await jobData(id);
-  const mats = d.bud.filter(b => b.kind === 'material' && !b.building_id);
-  const labor = d.bud.filter(b => b.kind === 'labor');
-  const cont = d.bud.find(b => b.kind === 'contingency');
-  const hidden = d.bud.filter(b => b.kind === 'material' && b.building_id).length;
+  const d = await jobData(id), m = moneyOf(id), j = jobOf(id), e = estOf(m);
+  const pur = await run(sb.from('v_job_purchases').select('*').eq('job_id', id));
   const ai = (b, c, v, extra = '') => `data-t="budgets" data-id="${b.id}" data-c="${c}" data-k="num" value="${v ?? ''}" onchange="A.field(this)" ${extra}`;
-  const totMat = mats.reduce((a, b) => a + n0(b.budget_cost), 0), totLab = labor.reduce((a, b) => a + n0(b.budget_cost), 0), totCont = cont ? n0(cont.budget_cost) : 0;
+  const cont = d.bud.find(b => b.kind === 'contingency'), totCont = cont ? n0(cont.budget_cost) : 0;
+  const hidden = d.bud.filter(b => b.kind === 'material' && b.building_id).length;
+  const matMode = e.mat.mode, labMode = e.lab.mode;
+  const ml = materialLines(d, pur), ls = laborSlots(d);
+  const itemsMat = ml.reduce((a, l) => a + l.budD, 0), itemsLab = ls.slots.reduce((a, x) => a + x.budget, 0) + ls.extra.reduce((a, b) => a + n0(b.budget_cost), 0);
+  const lumpInput = (kind, val) => `<div class="row"><span class="muted">Total ${kind} estimate</span><input type="number" step="any" style="width:170px;font-size:20px;font-weight:800" placeholder="$ total" value="${val ?? ''}"
+      data-t="jobs" data-id="${id}" data-c="${kind}_estimate" data-k="num" data-after="jobEdited" onchange="A.field(this)"></div>`;
+
+  const matBody = matMode === 'lump' ? `
+      <div class="help mb">One number for all material on this job. The app only watches the total, so it will not flag individual items as over budget, because you did not set one for them.</div>
+      ${lumpInput('material', j.material_estimate)}
+      ${itemsMat ? `<div class="tiny muted mt">Your by-item lines add up to ${money(itemsMat)}. Switch to By item to use them instead.</div>` : ''}`
+    : `<div class="spread mb"><div class="help">Set a quantity and/or a dollar amount for the materials you want to watch. Leave a box empty if you do not want to track it. The app checks each line against what is billed, and against open POs from the last 120 days as a ballpark.</div>
+        <div class="row"><button class="btn sm primary" onclick="A.addBudgetLine('${id}')">Add material</button><button class="btn sm" onclick="A.addMiscMaterial('${id}')">Add miscellaneous item</button></div></div>
+      <div class="scroll"><table><thead><tr><th>Material</th><th class="r">Budget qty</th><th class="r">Budget $</th><th class="r">Billed</th><th class="r">Open POs</th><th>Status</th><th></th></tr></thead>
+      <tbody>${ml.map(l => { const b = l.b; return `<tr>
+        <td>${matOf(b.material_id) || (b.category && b.category !== 'misc') ? esc(l.label) : `<input value="${esc(b.notes || '')}" placeholder="Name this item" data-t="budgets" data-id="${b.id}" data-c="notes" data-k="text0" onchange="A.field(this)">`}</td>
+        <td class="r"><input type="number" style="width:100px" placeholder="qty" ${ai(b, 'budget_qty', n0(b.budget_qty) || '')}></td>
+        <td class="r"><input type="number" style="width:120px" placeholder="$" ${ai(b, 'budget_cost', n0(b.budget_cost) || '')}></td>
+        <td class="r num">${l.tracked ? `${qty(Math.round(l.bq))}<div class="tiny muted">${money(l.bd)}</div>` : ''}</td>
+        <td class="r num">${l.tracked && (l.oq || l.od) ? `${qty(Math.round(l.oq))}<div class="tiny muted">${money(l.od)}</div>` : ''}</td>
+        <td><span class="pill ${l.st[0]}">${esc(l.st[1])}</span></td>
+        <td class="r"><button class="btn sm danger" onclick="A.delBudget('${b.id}')">Remove</button></td></tr>`; }).join('') || '<tr><td colspan="7" class="empty">No lines yet. Add the materials you want to watch, like boards.</td></tr>'}
+      ${ml.length ? `<tr class="total"><td>Material estimate</td><td></td><td class="r num">${money(itemsMat)}</td><td></td><td></td><td></td><td></td></tr>` : ''}</tbody></table></div>
+      ${hidden ? `<div class="help mt">${hidden} building level allocations are also stored for this job and counted in reports.</div>` : ''}`;
+
+  const labBody = labMode === 'lump' ? `
+      <div class="help mb">One number for all labor on this job (framing, hang, finish and punch out together). The app only watches the total.</div>
+      ${lumpInput('labor', j.labor_estimate)}
+      ${itemsLab ? `<div class="tiny muted mt">Your by-phase lines add up to ${money(itemsLab)}. Switch to By item to use them instead.</div>` : ''}`
+    : `<div class="spread mb"><div class="help">Enter what you expect each phase to cost. Add a miscellaneous item for anything else.</div><button class="btn sm" onclick="A.addLaborBudget('${id}')">Add miscellaneous item</button></div>
+      <table><thead><tr><th>Phase</th><th class="r">Estimate $</th><th class="r">Spent</th><th>Status</th><th></th></tr></thead><tbody>
+      ${ls.slots.map(x => { const st = x.budget > 0 ? (x.spent > x.budget ? ['bad', 'Over'] : ['good', 'Under']) : ['gray', 'No number set'];
+        return `<tr><td><b>${x.label}</b></td>
+        <td class="r"><input type="number" style="width:130px" placeholder="$" value="${x.b ? n0(x.b.budget_cost) || '' : ''}" onchange="A.setLaborPhase('${id}','${x.k}','${esc(x.label)}',this.value)"></td>
+        <td class="r num">${x.spent ? money(x.spent) : ''}</td><td><span class="pill ${st[0]}">${st[1]}</span></td>
+        <td class="r">${x.b ? `<button class="btn sm danger" onclick="A.delBudget('${x.b.id}')">Clear</button>` : ''}</td></tr>`; }).join('')}
+      ${ls.extra.map(b => `<tr><td><input value="${esc(b.notes || '')}" placeholder="Name this item" data-t="budgets" data-id="${b.id}" data-c="notes" data-k="text0" onchange="A.field(this)"></td>
+        <td class="r"><input type="number" style="width:130px" ${ai(b, 'budget_cost', n0(b.budget_cost) || '')}></td><td></td><td><span class="pill gray">Not tracked</span></td>
+        <td class="r"><button class="btn sm danger" onclick="A.delBudget('${b.id}')">Remove</button></td></tr>`).join('')}
+      <tr class="total"><td>Labor estimate</td><td class="r num">${money(itemsLab)}</td><td></td><td></td><td></td></tr></tbody></table>
+      <div class="help mt">Labor from payroll and subcontractor bills is not split by phase, so those dollars count toward the total labor estimate above. The Spent column only shows labor you entered by phase on the Orders and bills tab.</div>`;
+
   $('#tab').innerHTML = `
-    <div class="help mb">The budget is your bid: what you expected to spend. Everything else on this job is measured against it. Changes save as you type.</div>
-    <div class="card mb"><div class="spread mb"><b>Material estimate</b><button class="btn sm primary" onclick="A.addBudgetLine('${id}')">Add material line</button></div>
-      <div class="scroll"><table><thead><tr><th>Material</th><th class="r">Quantity</th><th class="r">Budget $</th><th></th></tr></thead>
-      <tbody>${mats.map(b => { const mt = matOf(b.material_id); return `<tr>
-        <td>${mt ? esc(mt.name) : esc(CATLABEL[b.category] || b.notes || 'Total')}</td>
-        <td class="r"><input type="number" style="width:110px" placeholder="qty" ${ai(b, 'budget_qty', n0(b.budget_qty) || '')}></td>
-        <td class="r"><input type="number" style="width:130px" placeholder="$" ${ai(b, 'budget_cost', n0(b.budget_cost) || '')}></td>
-        <td class="r"><button class="btn sm danger" onclick="A.delBudget('${b.id}')">Remove</button></td></tr>`; }).join('') || '<tr><td colspan="4" class="empty">No material lines yet.</td></tr>'}
-      ${mats.length ? `<tr class="total"><td>Material budget</td><td></td><td class="r num">${money(totMat)}</td><td></td></tr>` : ''}</tbody></table></div>
-      ${hidden ? `<div class="help mt">${hidden} building level allocations are also stored for this job and counted in reports.</div>` : ''}</div>
-    <div class="card mb"><div class="spread mb"><b>Labor budget</b><button class="btn sm primary" onclick="A.addLaborBudget('${id}')">Add labor line</button></div>
-      <div class="help mb">Name each line with its phase (Framing, Hang, Finish, Punch out) and the Overview will compare it to what you actually spent.</div>
-      <table><tbody>${labor.map(b => `<tr><td><input value="${esc(b.notes || '')}" data-t="budgets" data-id="${b.id}" data-c="notes" data-k="text0" onchange="A.field(this)"></td>
-        <td class="r"><input type="number" style="width:130px" ${ai(b, 'budget_cost', n0(b.budget_cost) || '')}></td>
-        <td class="r"><button class="btn sm danger" onclick="A.delBudget('${b.id}')">Remove</button></td></tr>`).join('') || '<tr><td class="empty">No labor lines yet.</td></tr>'}
-      ${labor.length ? `<tr class="total"><td>Labor budget</td><td class="r num">${money(totLab)}</td><td></td></tr>` : ''}</tbody></table></div>
+    <div class="help mb">Your estimate is the bid: what you expect this job to cost. For both material and labor, pick <b>Lump sum</b> if you only have one total, or <b>By item</b> if you want to set numbers line by line. Nothing is flagged as over unless you set a number for it. Changes save as you type.</div>
+    <div class="card mb"><div class="spread mb"><b style="font-size:17px">Material estimate</b>${modeToggle(id, 'material', matMode)}</div>
+      ${matBody}
+      ${cmpTiles({ ...e.mat, kind: 'material' }, `<div><div class="l">Open POs (120 days)</div><div class="v">${money(e.mat.open)}</div><div class="tiny muted">billed + open = ${money(e.mat.spent + e.mat.open)}${e.mat.has ? ', ' + Math.round((e.mat.spent + e.mat.open) / e.mat.est * 100) + '%' : ''}</div></div>`)}</div>
+    <div class="card mb"><div class="spread mb"><b style="font-size:17px">Labor estimate</b>${modeToggle(id, 'labor', labMode)}</div>
+      ${labBody}
+      ${cmpTiles({ ...e.lab, kind: 'labor' })}</div>
     <div class="card"><b>Cushion for small unplanned items</b>
       <div class="row mt">${cont ? `<input type="number" style="max-width:160px" ${ai(cont, 'budget_cost', n0(cont.budget_cost) || '')}>` : `<button class="btn sm" onclick="A.addCushion('${id}')">Add a cushion</button>`}</div></div>
-    <div class="tile mt" style="max-width:300px"><div class="l">Total budget</div><div class="v">${money(totMat + totLab + totCont)}</div></div>`;
+    <div class="tile mt" style="max-width:320px"><div class="l">Total estimate</div><div class="v">${money(e.mat.est + e.lab.est + totCont)}</div><div class="s">material + labor${totCont ? ' + cushion' : ''}</div></div>`;
 }
-A.delBudget = (bid) => ask('Remove this budget line?', 'This only removes the estimate. No costs are touched.', 'Remove', async () => {
+A.setEstMode = async (id, kind, mode) => {
+  try {
+    const j = jobOf(id), patch = { [kind + '_est_mode']: mode };
+    if (mode === 'lump' && j[kind + '_estimate'] == null) {
+      const d = await jobData(id);
+      const tot = kind === 'material' ? matBudgets(d.bud).reduce((a, b) => a + n0(b.budget_cost), 0) : labBudgets(d.bud).reduce((a, b) => a + n0(b.budget_cost), 0);
+      if (tot > 0) patch[kind + '_estimate'] = tot;
+    }
+    await save('jobs', id, patch);
+    S.cache = {}; await loadCore(); await rerender();
+  } catch (e) { fail(e); }
+};
+A.setLaborPhase = async (id, k, label, v) => {
+  try {
+    const d = await jobData(id), cur = laborSlots(d).slots.find(x => x.k === k), val = parseNum(v);
+    if (cur && cur.b) await save('budgets', cur.b.id, { budget_cost: val || 0 });
+    else if (val) await insert('budgets', { job_id: id, kind: 'labor', notes: label, budget_cost: val, budget_qty: 0 });
+    S.cache = {}; await loadCore(); await rerender();
+  } catch (e) { fail(e); }
+};
+A.delBudget = (bid) => ask('Remove this estimate line?', 'This only removes the estimate. No costs are touched.', 'Remove', async () => {
   await remove('budgets', bid); S.cache = {}; await loadCore(); await rerender();
 }, true);
-A.addBudgetLine = (jobId) => openModal('Add a material line', `
+A.addBudgetLine = (jobId) => openModal('Add a material', `
   ${fld('Material', matSelect('', 'id="bl-mat"'))}
-  <div class="fields mt">${fld('Quantity', '<input id="bl-qty" type="number">')}${fld('Budget $', '<input id="bl-cost" type="number">')}</div>`, {
+  <div class="fields mt">${fld('Quantity (optional)', '<input id="bl-qty" type="number">')}${fld('Budget $ (optional)', '<input id="bl-cost" type="number">')}</div>`, {
   onSave: async () => {
     const mid = $('#bl-mat').value; if (!mid) { toast('Pick a material', true); return false; }
     await insert('budgets', { job_id: jobId, material_id: mid, kind: 'material', budget_qty: parseNum($('#bl-qty').value) || 0, budget_cost: parseNum($('#bl-cost').value) || 0 });
     S.cache = {}; await loadCore(); await rerender();
   }
 });
-A.addLaborBudget = (jobId) => openModal('Add a labor line', `
-  <div class="fields">${fld('Name', '<input id="lb-n" placeholder="Framing labor, Hang, Finish, Punch out">')}${fld('Budget $', '<input id="lb-c" type="number">')}</div>`, {
+A.addMiscMaterial = (jobId) => openModal('Add a miscellaneous material item', `
+  <div class="fields">${fld('Name', '<input id="mm-n" placeholder="Example: Delivery fees, special trim">')}${fld('Budget $', '<input id="mm-c" type="number">')}</div>
+  <div class="help mt">Miscellaneous items count toward your material estimate total but are not matched to bills.</div>`, {
   onSave: async () => {
-    await insert('budgets', { job_id: jobId, kind: 'labor', notes: $('#lb-n').value.trim() || 'Labor', budget_cost: parseNum($('#lb-c').value) || 0, budget_qty: 0 });
+    const n = $('#mm-n').value.trim(); if (!n) { toast('Give it a name', true); return false; }
+    await insert('budgets', { job_id: jobId, kind: 'material', category: 'misc', notes: n, budget_cost: parseNum($('#mm-c').value) || 0, budget_qty: 0 });
+    S.cache = {}; await loadCore(); await rerender();
+  }
+});
+A.addLaborBudget = (jobId) => openModal('Add a miscellaneous labor item', `
+  <div class="fields">${fld('Name', '<input id="lb-n" placeholder="Example: Punch out extras, cleanup crew">')}${fld('Estimate $', '<input id="lb-c" type="number">')}</div>`, {
+  onSave: async () => {
+    await insert('budgets', { job_id: jobId, kind: 'labor', notes: $('#lb-n').value.trim() || 'Miscellaneous', budget_cost: parseNum($('#lb-c').value) || 0, budget_qty: 0 });
     S.cache = {}; await loadCore(); await rerender();
   }
 });
@@ -390,15 +489,15 @@ async function tabPurchases(id) {
   const boardsB = order.reduce((a, c) => a + cats[c].bb, 0), boardsO = order.reduce((a, c) => a + cats[c].ob, 0);
   const cell = (q, d, u) => (n0(d) || n0(q)) ? `${money(d)}<div class="tiny faint">${qty(q)} ${esc(u || '')}</div>` : '';
   $('#tab').innerHTML = `
-    <div class="help mb">Everything bought for this job. <b>On order</b> is open POs that no bill has covered yet. When the bill comes in from QuickBooks it replaces the PO automatically, and when the bill is paid the Paid column fills in. If a PO was typed in wrong, open it from Orders and bills and fix it; this page follows.</div>
+    <div class="help mb">Everything bought for this job. <b>Open POs</b> are the last 120 days of POs that no bill has covered yet, a ballpark of what is coming. <b>Billed</b> is the real spend. When a bill comes in from QuickBooks it replaces its PO automatically, and when the bill is paid the Paid column fills in.</div>
     <div class="tiles">
-      ${moneyTile('On order, not billed', money(O), boardsO ? qty(Math.round(boardsO)) + ' boards coming' : 'open POs')}
+      ${moneyTile('Open POs (120 days)', money(O), boardsO ? 'about ' + qty(Math.round(boardsO)) + ' boards, ballpark' : 'ballpark only')}
       ${moneyTile('Billed', money(B), boardsB ? qty(Math.round(boardsB)) + ' boards billed' : 'materials on bills')}
       ${moneyTile('Paid', money(P), 'of billed')}
       ${moneyTile('Billed, still owed', money(B - P), 'unpaid to suppliers', B - P > 0 ? 'warn' : '')}
     </div>
     <div class="card flush scroll"><table>
-      <thead><tr><th>Category and item</th><th class="r">On order</th><th class="r">Billed</th><th class="r">Paid</th><th class="r">Total committed</th></tr></thead>
+      <thead><tr><th>Category and item</th><th class="r">Open POs</th><th class="r">Billed</th><th class="r">Paid</th><th class="r">Billed + open POs</th></tr></thead>
       <tbody>${order.map((c, i) => {
         const x = cats[c], items = x.items.slice().sort((p, q) => (n0(q.ordered_dollars) + n0(q.billed_dollars)) - (n0(p.ordered_dollars) + n0(p.billed_dollars)));
         return `<tr class="click" onclick="A.toggleRows('pc${i}')" style="background:#1b2430"><td><b>${esc(CATLABEL[c] || c)}</b> <span class="faint small">${items.length} items</span></td>

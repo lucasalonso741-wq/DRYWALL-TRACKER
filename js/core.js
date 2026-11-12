@@ -11,7 +11,12 @@ const S = {
   jobs: [], money: [], vendors: [], mats: [],
   inbox: { pos: 0, bills: 0, mats: 0 },
   lastSync: null, loadedAt: 0, live: false,
-  cache: {}, route: ['jobs'], dirty: false,
+  cache: {}, route: ['jobs'], dirty: false, recent: {},
+};
+/* small per-person preferences kept in this browser */
+const pref = {
+  get(k, d) { try { const v = localStorage.getItem('aa_' + k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('aa_' + k, v); } catch (e) {} },
 };
 const A = {};          // actions called from onclick
 
@@ -270,7 +275,7 @@ async function enter() {
 
 /* ---------- load the shared data ---------- */
 async function loadCore() {
-  const [jobs, money, vendors, mats, poNo, billNo, rq, sync] = await Promise.all([
+  const [jobs, money, vendors, mats, poNo, billNo, rq, sync, recent] = await Promise.all([
     run(sb.from('jobs').select('*').order('name')),
     run(sb.from('v_job_money').select('*').order('name')),
     all(() => sb.from('vendors').select('id,name,type').order('name')),
@@ -279,7 +284,9 @@ async function loadCore() {
     countOf(sb.from('bills').select('id', { count: 'exact', head: true }).is('job_id', null)),
     countOf(sb.from('v_review_queue').select('norm', { count: 'exact', head: true })),
     run(sb.from('app_audit').select('created_at').eq('action', 'qb_ingest').order('created_at', { ascending: false }).limit(1)),
+    run(sb.from('v_job_recent').select('*')),
   ]);
+  S.recent = Object.fromEntries(recent.map(r => [r.job_id, r]));
   S.jobs = jobs; S.money = money; S.vendors = vendors; S.mats = mats;
   S.inbox = { pos: poNo, bills: billNo, mats: rq };
   S.lastSync = sync[0]?.created_at || null;
