@@ -267,3 +267,5 @@ details.panel>summary::before{content:"\25B8  ";color:var(--dim)} details.panel[
 .track{position:relative;height:11px;background:#222d3b;border-radius:6px;margin-top:5px;min-width:150px}
 .track i{display:block;height:100%;border-radius:6px}
 .track u{position:absolute;top:-3px;bottom:-3px;width:3px;background:#fff;border-radius:2px;text-decoration:none}
+
+.star{color:var(--warn);font-weight:700;cursor:help;margin-left:2px}

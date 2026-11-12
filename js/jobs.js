@@ -57,7 +57,7 @@ function jobCard(m) {
       <div><div class="name">${esc(jn(m.name))}</div><div class="gc">${esc(m.gc || m.address || '')}</div></div>
       <div class="ring" style="--p:${pct || 0};--c:${est ? 'var(--blue)' : 'var(--hot)'}"><div><span><b>${pct == null ? '?' : pct + '%'}</b><small>${est ? 'EST' : 'DONE'}</small></span></div></div>
     </div>
-    <div class="hero"><span class="big">${cpb ? money(cpb, 2) : '<span class="faint">no boards yet</span>'}</span><span class="u">per board, all in</span>
+    <div class="hero"><span class="big">${cpb ? pbStar(m, money(cpb, 2)) : '<span class="faint">no boards yet</span>'}</span><span class="u">per board, all in</span>
       ${target && cpb ? `<span class="vs ${cpb > target ? 'bad' : 'good'}">${cpb > target ? '+' : '-'}${money(Math.abs(cpb - target), 2)} vs target</span>` : ''}</div>
     <div class="tiny muted">${qty(Math.round(n0(m.boards_used)))} boards billed${n0(m.open_po_boards) ? ` + ${qty(Math.round(n0(m.open_po_boards)))} on open POs (est ${qty(Math.round(n0(m.est_boards)))})` : ''}${m.material_per_board ? ` &middot; material ${money(m.material_per_board, 2)} &middot; labor ${money(m.labor_per_board, 2)}` : ''}</div>
     <div class="kv">
@@ -142,7 +142,7 @@ async function renderJobs() {
   const proj = active.map(m => ({ m, p: projOf(m) })).filter(x => x.p && x.p.profit != null);
   const projProfit = proj.reduce((a, x) => a + x.p.profit, 0), projRev = proj.reduce((a, x) => a + n0(x.m.contract_value), 0);
   const flags = summaryFlags(active);
-  const boardsJobs = R.filter(x => x.r.boards >= 100 && (x.r.mat + x.r.lab) > 0).map(x => ({ m: x.m, cpb: (x.r.mat + x.r.lab) / x.r.boards })).sort((a, b) => b.cpb - a.cpb);
+  const boardsJobs = R.filter(x => x.m.boards_ok !== false && x.r.boards >= 100 && (x.r.mat + x.r.lab) > 0).map(x => ({ m: x.m, cpb: (x.r.mat + x.r.lab) / x.r.boards })).sort((a, b) => b.cpb - a.cpb);
   const openT = sum('open_po_total'), openBoards = Math.round(sum('open_po_boards'));
   const chartsOpen = pref.get('charts', 'open') === 'open';
   view(`
@@ -182,7 +182,7 @@ async function renderJobs() {
               return `<div class="num"><b>${money(cost)}</b><span class="tiny muted"> of ${c ? money(c) : 'no contract'}</span></div>` +
                 (c ? `<div class="track"><i style="width:${Math.min(100, cp)}%;background:${cp > 100 || cp > dn + 15 ? 'var(--bad)' : cp > dn + 5 ? 'var(--warn)' : 'var(--good)'}"></i>${dn ? `<u style="left:${Math.min(100, dn)}%" title="${dn}% done"></u>` : ''}</div><div class="tiny muted">${Math.round(cp)}% of contract spent${dn ? ', ' + dn + '% done' : ''}</div>` : ''); })()}</td>
             <td class="r num">${n0(m.open_po_total) ? money(m.open_po_total) : ''}${n0(m.open_po_boards) ? `<div class="tiny muted">~${qty(Math.round(m.open_po_boards))} boards</div>` : ''}</td>
-            <td class="r num"><b ${t && cpb ? `class="${cpb > t ? 'bad' : 'good'}"` : ''}>${cpb ? money(cpb, 2) : '<span class="faint">none</span>'}</b>${r.boards ? `<div class="tiny muted">${qty(Math.round(r.boards))} boards</div>` : ''}</td>
+            <td class="r num"><b ${t && cpb ? `class="${cpb > t ? 'bad' : 'good'}"` : ''}>${cpb ? pbStar(m, money(cpb, 2)) : '<span class="faint">none</span>'}</b>${r.boards ? `<div class="tiny muted">${qty(Math.round(r.boards))} boards</div>` : ''}</td>
             <td><span class="pill ${st[0]}">${st[1]}</span></td></tr>`;
         }).join('') || '<tr><td colspan="8" class="empty">No jobs in progress. Tap New job to start one.</td></tr>'}</tbody></table></div></div>
 
@@ -190,7 +190,7 @@ async function renderJobs() {
       <div class="duo mt">
         <div><h2>Cost per board <small>all in${rangeOn() ? ', last 120 days' : ''}</small></h2>
           ${hbars(boardsJobs.map(({ m, cpb }) => { const t = n0(m.target_price_per_board); return { label: jn(m.name), value: cpb, text: money(cpb, 2), href: '#/job/' + m.job_id, color: t ? (cpb > t ? 'var(--bad)' : 'var(--good)') : 'var(--blue)' }; }))}
-          <div class="tiny muted mt">Green is at or under the job's target, red is over. Blue means no target set.</div></div>
+          <div class="tiny muted mt">Green is at or under the job's target, red is over. Blue means no target set. Jobs with incomplete board data (marked * in the table) are left out.</div></div>
         <div><h2>Spending by month <small>bills, jobs in progress</small></h2><div id="sum-months"><div class="empty">Loading...</div></div></div>
       </div>
     </details>`);
@@ -272,7 +272,7 @@ async function renderJob(id, tab, sub) {
           m.projected_profit != null ? (margin != null ? Math.round(margin) + '% margin if costs keep pace' : 'needs a contract amount') : 'needs a contract and 10% or more complete',
           m.projected_profit != null ? (m.projected_profit < 0 ? 'bad' : 'good') : '')}
         ${moneyTile('Open POs', money(m.open_po_total), m.open_po_count + ' in the last 120 days, ballpark only')}
-        ${moneyTile('Cost per board', m.cost_per_board ? money(m.cost_per_board, 2) : '', qty(Math.round(n0(m.boards_used))) + ' boards billed' + (n0(m.open_po_boards) ? ', ' + qty(Math.round(n0(m.open_po_boards))) + ' more on open POs' : '') + (n0(m.target_price_per_board) ? ', target ' + money(m.target_price_per_board, 2) : ''))}
+        ${moneyTile('Cost per board', m.cost_per_board ? pbStar(m, money(m.cost_per_board, 2)) : '', qty(Math.round(n0(m.boards_used))) + ' boards billed' + (n0(m.open_po_boards) ? ', ' + qty(Math.round(n0(m.open_po_boards))) + ' more on open POs' : '') + (n0(m.target_price_per_board) ? ', target ' + money(m.target_price_per_board, 2) : ''))}
       </div>
     </div>
 

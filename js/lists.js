@@ -11,12 +11,12 @@ async function renderArchive() {
   const done = allDone.filter(onSheet)
     .sort((a, b) => (b.completed_on || b.last_dt || '').localeCompare(a.completed_on || a.last_dt || ''));
   const row = (m) => { const c = n0(m.contract_value), cost = n0(m.total_cost), mat = n0(m.material_cost), lab = n0(m.labor_cost), b = n0(m.boards_used), u = n0(m.units);
-    return { m, c, cost, mat, lab, b, u, profit: c ? c - cost : null, margin: c ? (c - cost) / c * 100 : null, perBoard: b >= 100 ? cost / b : null, perUnit: u ? cost / u : null }; };
+    return { m, c, cost, mat, lab, b, u, profit: c ? c - cost : null, margin: c ? (c - cost) / c * 100 : null, perBoard: b >= 100 ? cost / b : null, ok: m.boards_ok !== false, perUnit: u ? cost / u : null }; };
   const R = done.map(row);
   const withC = R.filter(r => r.c > 0);
   const T = (k, list = R) => list.reduce((a, r) => a + (r[k] || 0), 0);
   const totC = T('c', withC), totCost = T('cost', withC), totProfit = totC - totCost, totMargin = totC ? totProfit / totC * 100 : 0;
-  const bR = R.filter(r => r.b >= 100), avgBoard = bR.length ? T('cost', bR) / T('b', bR) : 0;
+  const bR = R.filter(r => r.b >= 100 && r.ok), avgBoard = bR.length ? T('cost', bR) / T('b', bR) : 0;
   const uR = R.filter(r => r.u > 0 && r.c > 0), avgUnit = uR.length ? T('cost', uR) / T('u', uR) : 0;
   const matT = T('mat', withC), labT = T('lab', withC);
   const byProfit = withC.slice().sort((a, b) => b.profit - a.profit);
@@ -56,7 +56,7 @@ async function renderArchive() {
     <div class="duo">
       <div class="panel"><h2>Cost per board <small>jobs with 100+ boards counted</small></h2>
         ${hbars(bR.slice().sort((a, b) => b.perBoard - a.perBoard).map(r => ({ label: jn(r.m.name), value: r.perBoard, text: money(r.perBoard, 2), href: '#/job/' + r.m.job_id, color: 'var(--hot)' })))}
-        <div class="tiny muted mt">More jobs show up here as you backfill board counts.</div></div>
+        <div class="tiny muted mt">Jobs marked * in the table are left out because their board data is incomplete. They show up here once board counts are backfilled.</div></div>
       <div class="panel"><h2>Where the money went <small>all finished jobs</small></h2>
         ${donut([{ label: 'Material', value: matT, color: 'var(--hot)' }, { label: 'Labor', value: labT, color: 'var(--labor)' }, { label: 'Profit', value: Math.max(0, totProfit), color: 'var(--good)' }], moneyK(totC), 'billed')}
         <div class="tiny muted mt">Of every $100 billed: $${totC ? Math.round(matT / totC * 100) : 0} material, $${totC ? Math.round(labT / totC * 100) : 0} labor, $${totC ? Math.round(totProfit / totC * 100) : 0} profit.</div></div>
@@ -71,7 +71,7 @@ async function renderArchive() {
           <td class="r num">${money(r.mat)}</td><td class="r num">${money(r.lab)}</td>
           <td class="r num ${r.profit != null ? (r.profit < 0 ? 'bad' : 'good') : ''}"><b>${r.profit != null ? money(r.profit) : ''}</b></td>
           <td class="r num">${r.margin != null ? Math.round(r.margin) + '%' : ''}</td>
-          <td class="r num">${r.b ? qty(Math.round(r.b)) : ''}</td><td class="r num">${r.perBoard ? money(r.perBoard, 2) : ''}</td><td class="r num">${r.perUnit ? money(r.perUnit) : ''}</td>
+          <td class="r num">${r.b ? qty(Math.round(r.b)) : ''}</td><td class="r num">${r.perBoard ? pbStar(r.m, money(r.perBoard, 2)) : ''}</td><td class="r num">${r.perUnit ? money(r.perUnit) : ''}</td>
           <td><span class="pill ${st[0]}">${st[1]}</span></td></tr>`; }).join('') || '<tr><td colspan="12" class="empty">No finished jobs yet. Mark a job finished from its page, or add past job data.</td></tr>'}</tbody>
         <tfoot><tr><td>TOTAL</td><td></td><td class="r num">${qty(T('u', withC))}</td><td class="r num">${money(totC)}</td><td class="r num">${money(matT)}</td><td class="r num">${money(labT)}</td>
           <td class="r num ${totProfit < 0 ? 'bad' : 'good'}">${money(totProfit)}</td><td class="r num">${Math.round(totMargin)}%</td><td class="r num">${qty(Math.round(T('b', withC)))}</td><td class="r num">${avgBoard ? money(avgBoard, 2) : ''}</td><td class="r num">${avgUnit ? money(avgUnit) : ''}</td><td></td></tr></tfoot>

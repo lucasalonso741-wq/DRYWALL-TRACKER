@@ -273,9 +273,15 @@ async function enter() {
   if (S.recovery) A.changePassword(true);
 }
 
+/* per-board numbers we can't fully stand behind get an asterisk with the reason on hover */
+function pbStar(m, txt) {
+  if (!txt || m.boards_ok !== false) return txt;
+  return txt + '<span class="star" title="' + esc((m.boards_note || 'Board data for this job is incomplete.') + ' Treat as a rough number.') + '">*</span>';
+}
+
 /* ---------- load the shared data ---------- */
 async function loadCore() {
-  const [jobs, money, vendors, mats, poNo, billNo, rq, sync, recent] = await Promise.all([
+  const [jobs, money, vendors, mats, poNo, billNo, rq, sync, recent, conf] = await Promise.all([
     run(sb.from('jobs').select('*').order('name')),
     run(sb.from('v_job_money').select('*').order('name')),
     all(() => sb.from('vendors').select('id,name,type').order('name')),
@@ -285,8 +291,11 @@ async function loadCore() {
     countOf(sb.from('v_review_queue').select('norm', { count: 'exact', head: true })),
     run(sb.from('app_audit').select('created_at').eq('action', 'qb_ingest').order('created_at', { ascending: false }).limit(1)),
     run(sb.from('v_job_recent').select('*')),
+    run(sb.from('v_job_board_conf').select('*')),
   ]);
   S.recent = Object.fromEntries(recent.map(r => [r.job_id, r]));
+  const bc = Object.fromEntries(conf.map(r => [r.job_id, r]));
+  money.forEach(m => { const c = bc[m.job_id] || {}; m.boards_ok = c.boards_ok !== false; m.boards_note = c.boards_note || ''; });
   S.jobs = jobs; S.money = money; S.vendors = vendors; S.mats = mats;
   S.inbox = { pos: poNo, bills: billNo, mats: rq };
   S.lastSync = sync[0]?.created_at || null;

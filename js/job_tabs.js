@@ -147,9 +147,9 @@ async function tabOverview(id) {
             <tr><td>Boards billed</td><td class="r num"><b>${qty(m.boards_used)}</b></td></tr>
             <tr><td>Boards on open POs (last 120 days)</td><td class="r num">${qty(Math.round(n0(m.open_po_boards)))}</td></tr>
             <tr><td>Estimated boards (billed + open POs)</td><td class="r num"><b>${qty(Math.round(n0(m.est_boards)))}</b></td></tr>
-            <tr><td>Material per board</td><td class="r num">${m.material_per_board ? money(m.material_per_board, 2) : ''}</td></tr>
-            <tr><td>Labor per board</td><td class="r num">${m.labor_per_board ? money(m.labor_per_board, 2) : ''}</td></tr>
-            <tr><td>All in per board</td><td class="r num"><b>${m.cost_per_board ? money(m.cost_per_board, 2) : ''}</b></td></tr>
+            <tr><td>Material per board</td><td class="r num">${m.material_per_board ? pbStar(m, money(m.material_per_board, 2)) : ''}</td></tr>
+            <tr><td>Labor per board</td><td class="r num">${m.labor_per_board ? pbStar(m, money(m.labor_per_board, 2)) : ''}</td></tr>
+            <tr><td>All in per board</td><td class="r num"><b>${m.cost_per_board ? pbStar(m, money(m.cost_per_board, 2)) : ''}</b></td></tr>
             ${target ? `<tr><td>Your target</td><td class="r num">${money(target, 2)}</td></tr>` : ''}
           </tbody></table>
           ${m.cost_per_board && target ? `<div class="help mt">${n0(m.cost_per_board) > target ? `<span class="bad">Running ${money(n0(m.cost_per_board) - target, 2)} per board over target.</span>` : `<span class="good">Running ${money(target - n0(m.cost_per_board), 2)} per board under target.</span>`}</div>` : ''}
