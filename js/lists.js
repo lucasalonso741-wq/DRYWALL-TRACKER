@@ -45,7 +45,7 @@ async function renderArchive() {
       <div class="tile"><div class="l">Avg cost per unit</div><div class="v">${avgUnit ? money(avgUnit) : '?'}</div><div class="s">${uR.length} jobs with units</div></div>
     </div>
 
-    ${flags.length ? `<div class="panel flags mb"><h2>Red flags<small>${flags.length}</small></h2>${flags.slice(0, 8).map(([l, n, t, id]) => `<${id ? `a href="#/job/${id}"` : 'div'} class="flag"><span class="dotf" style="background:var(--${l === 'bad' ? 'bad' : 'warn'})"></span><span><b>${esc(n)}</b> ${esc(t)}</span></${id ? 'a' : 'div'}>`).join('')}${flags.length > 8 ? `<div class="tiny muted">and ${flags.length - 8} more.</div>` : ''}</div>` : ''}
+    ${flags.length ? hideable('redflags', `Red flags (${flags.length})`, `${flags.slice(0, 8).map(([l, n, t, id]) => `<${id ? `a href="#/job/${id}"` : 'div'} class="flag"><span class="dotf" style="background:var(--${l === 'bad' ? 'bad' : 'warn'})"></span><span><b>${esc(n)}</b> ${esc(t)}</span></${id ? 'a' : 'div'}>`).join('')}${flags.length > 8 ? `<div class="tiny muted">and ${flags.length - 8} more.</div>` : ''}`, 'flags') : ''}
 
     <div class="duo">
       <div class="panel"><h2>Profit by job <small>biggest first</small></h2>

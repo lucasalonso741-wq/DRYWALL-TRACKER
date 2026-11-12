@@ -124,7 +124,7 @@ async function tabOverview(id) {
   const target = n0(m.target_price_per_board);
   const watch = watchItems(m, d);
   $('#tab').innerHTML = `
-    <div class="mb"><h2>What to watch</h2><ul class="watch">${watch.map(([k, t]) => `<li class="${k}">${esc(t)}</li>`).join('')}</ul></div>
+    ${hideable('watch', 'What to watch', `<ul class="watch">${watch.map(([k, t]) => `<li class="${k}">${esc(t)}</li>`).join('')}</ul>`, '')}
     <div class="two">
       <div>
         <h2>Where the money went</h2>
@@ -192,7 +192,7 @@ async function tabMaterials(id) {
         return `<tr class="click" onclick="A.toggleRows('mc${i}')" style="background:#1b2430"><td><b>${esc(CATLABEL[c] || c)}</b> <span class="faint small">${items.length} items</span></td>
           <td class="r num">${isBoard ? '<b>' + qty(x.qty) + '</b>' : ''}</td><td class="r num"><b>${money(x.dollars)}</b></td><td class="r"></td>
           <td class="r num ${b && n0(b.cost) && x.dollars > b.cost ? 'bad' : ''}">${b ? (n0(b.cost) ? money(b.cost) : (n0(b.qty) ? qty(b.qty) + ' units' : '')) : ''}</td></tr>` +
-          items.map(it => `<tr data-g="mc${i}" hidden><td style="padding-left:30px">${esc(it.item)}</td><td class="r num">${qty(it.qty)} <span class="faint small">${esc(it.uom || '')}</span></td>
+          items.map(it => `<tr data-g="mc${i}" hidden><td style="padding-left:30px">${esc(it.item)}</td><td class="r num">${qty(Math.round(n0(it.qty)))} <span class="faint small">${c === 'board' ? 'sheets' : esc(it.uom || '')}</span></td>
             <td class="r num">${money(it.dollars)}</td><td class="r num">${n0(it.qty) ? money(n0(it.dollars) / n0(it.qty), 2) : ''}</td><td class="r small faint">${it.lines} lines</td></tr>`).join('');
       }).join('') || '<tr><td colspan="5" class="empty">No material bills on this job yet.</td></tr>'}</tbody>
     </table></div>`;

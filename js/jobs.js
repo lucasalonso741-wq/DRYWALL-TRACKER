@@ -11,6 +11,15 @@ function ask(title, message, okLabel, onYes, danger) {
   if (danger) { const b = $('#m-save'); if (b) { b.classList.remove('primary'); b.classList.add('danger'); } }
 }
 
+/* any big panel can be hidden; the choice is remembered in this browser */
+function hideable(key, title, inner, cls) {
+  const hidden = pref.get('hide_' + key, '0') === '1';
+  const tog = `onclick="event.preventDefault();A.hideSec('${key}')"`;
+  if (hidden) return `<div class="mb"><a href="#" class="small" ${tog}>Show ${esc(title)}</a></div>`;
+  return `<div class="panel ${cls || ''} mb"><h2>${esc(title)}<small><a href="#" ${tog}>Hide</a></small></h2>${inner}</div>`;
+}
+A.hideSec = (k) => { pref.set('hide_' + k, pref.get('hide_' + k, '0') === '1' ? '0' : '1'); rerender(); };
+
 function jobFlags(m) {
   const chips = [];
   const contract = n0(m.contract_value);
@@ -82,7 +91,6 @@ function rangeVals(m) {
   return { mat: n0(m.material_cost), lab: n0(m.labor_cost), boards: n0(m.boards_used) };
 }
 A.setRange = (v) => { pref.set('range', v); rerender(); };
-A.toggleAttn = () => { pref.set('attn', pref.get('attn', 'show') === 'show' ? 'hide' : 'show'); rerender(); };
 
 function projOf(m) {
   /* projected final cost needs a percent complete we trust */
@@ -122,19 +130,6 @@ function summaryFlags(active) {
   return f.sort((x, y) => (x.lvl === 'bad' ? 0 : 1) - (y.lvl === 'bad' ? 0 : 1));
 }
 
-function costCard(title, sub, spent, est, extra) {
-  /* est = { total, spentOn, jobs, missing } for jobs that have an estimate */
-  const pct = est.total > 0 ? est.spentOn / est.total * 100 : null;
-  return `<div class="panel costcard"><h2>${title}<small>${sub}</small></h2>
-    <div class="bigv">${money(spent)}</div>
-    ${rangeOn() ? '<div class="tiny muted mt">Estimates are for the whole job, so switch to All time to see how much of each is used.</div>' :
-      est.total > 0 ? `<div class="mini mt" style="height:12px"><i style="width:${Math.min(100, pct)}%;background:${pct > 100 ? 'var(--bad)' : 'var(--blue)'}"></i></div>
-        <div class="small mt"><b class="num">${Math.round(pct)}%</b> of the ${money(est.total)} estimated on the ${est.jobs} job${est.jobs === 1 ? '' : 's'} that have one</div>` :
-        '<div class="tiny muted mt">No estimates entered yet. Open a job and use its Estimate tab.</div>'}
-    ${!rangeOn() && est.missing ? `<div class="tiny muted">${est.missing} job${est.missing === 1 ? ' has' : 's have'} no estimate yet</div>` : ''}
-    ${extra || ''}</div>`;
-}
-
 async function renderJobs() {
   const active = S.money.filter(m => m.active).sort((a, b) => n0(b.total_cost) - n0(a.total_cost));
   const finished = S.money.filter(m => !m.active && (n0(m.total_cost) > 0 || n0(m.contract_value) > 0)).length;
@@ -147,7 +142,6 @@ async function renderJobs() {
   const proj = active.map(m => ({ m, p: projOf(m) })).filter(x => x.p && x.p.profit != null);
   const projProfit = proj.reduce((a, x) => a + x.p.profit, 0), projRev = proj.reduce((a, x) => a + n0(x.m.contract_value), 0);
   const flags = summaryFlags(active);
-  const showAttn = pref.get('attn', 'show') === 'show';
   const boardsJobs = R.filter(x => x.r.boards >= 100 && (x.r.mat + x.r.lab) > 0).map(x => ({ m: x.m, cpb: (x.r.mat + x.r.lab) / x.r.boards })).sort((a, b) => b.cpb - a.cpb);
   const openT = sum('open_po_total'), openBoards = Math.round(sum('open_po_boards'));
   const chartsOpen = pref.get('charts', 'open') === 'open';
@@ -156,29 +150,25 @@ async function renderJobs() {
       <div class="row"><div class="seg"><a href="#" onclick="event.preventDefault();A.setRange('all')" class="${rangeOn() ? '' : 'on'}">All time</a><a href="#" onclick="event.preventDefault();A.setRange('120')" class="${rangeOn() ? 'on' : ''}">Last 120 days</a></div>
       <button class="btn primary" onclick="A.newJob()">New job</button></div></div>
 
-    ${(flags.length || attn) ? (showAttn ? `<div class="panel flags mb">
-      <h2>Needs your attention<small>${flags.length + (attn ? 1 : 0)} item${flags.length + (attn ? 1 : 0) > 1 ? 's' : ''} <a href="#" onclick="event.preventDefault();A.toggleAttn()">Hide</a></small></h2>
+    ${(flags.length || attn) ? hideable('attn', `Needs your attention (${flags.length + (attn ? 1 : 0)})`, `
       ${flags.slice(0, 7).map(x => `<a class="flag" href="#/job/${x.id}"><span class="dotf" style="background:var(--${x.lvl === 'bad' ? 'bad' : 'warn'})"></span><span><b>${esc(x.name)}</b> ${esc(x.text)}</span></a>`).join('')}
       ${flags.length > 7 ? `<div class="tiny muted">and ${flags.length - 7} more, open each job to see them.</div>` : ''}
-      ${attn ? `<a class="flag" href="#/inbox"><span class="dotf" style="background:var(--warn)"></span><span><b>${attn} items</b> in the Inbox need a job or material match</span></a>` : ''}
-    </div>` : `<div class="mb"><a href="#" class="small" onclick="event.preventDefault();A.toggleAttn()">Show ${flags.length + (attn ? 1 : 0)} item${flags.length + (attn ? 1 : 0) > 1 ? 's' : ''} that need your attention</a></div>`) : ''}
+      ${attn ? `<a class="flag" href="#/inbox"><span class="dotf" style="background:var(--warn)"></span><span><b>${attn} items</b> in the Inbox need a job or material match</span></a>` : ''}`, 'flags') : ''}
 
-    <div class="duo">
-      ${costCard('Material cost', rangeOn() ? 'billed, last 120 days' : 'billed so far', matT, estSum('mat'),
-        `<div class="sub mt"><div><span class="l">Open POs, last 120 days</span><b class="num">${money(openT)}</b></div><div class="tiny muted">${qty(sum('open_po_count'))} POs, about ${qty(openBoards)} boards. Ballpark only. The bill is the real number.</div></div>`)}
-      ${costCard('Labor cost', rangeOn() ? 'last 120 days' : 'spent so far', labT, estSum('lab'), '')}
-    </div>
+    ${hideable('bigpic', `Big picture${rangeOn() ? ', last 120 days' : ''}`, `<div class="tiles sm">
+      ${(() => { const em = estSum('mat'), el = estSum('lab'); const sub = (e) => !rangeOn() && e.total > 0 ? Math.round(e.spentOn / e.total * 100) + '% of estimates' : ''; return `
+      <div class="tile"><div class="l">Material cost</div><div class="v">${moneyK(matT)}</div><div class="s">${sub(em) || (rangeOn() ? 'billed' : 'billed so far')}</div></div>
+      <div class="tile"><div class="l">Labor cost</div><div class="v">${moneyK(labT)}</div><div class="s">${sub(el) || 'spent'}</div></div>`; })()}
+      <div class="tile"><div class="l">Total cost</div><div class="v">${moneyK(matT + labT)}</div><div class="s">${contract && !rangeOn() ? Math.round((matT + labT) / contract * 100) + '% of contracts' : 'material + labor'}</div></div>
+      <div class="tile"><div class="l">Total contract</div><div class="v">${moneyK(contract)}</div><div class="s">${active.length} jobs in progress</div></div>
+      <div class="tile"><div class="l">Projected profit</div><div class="v ${projProfit < 0 ? 'bad' : 'good'}">${proj.length ? moneyK(projProfit) : '?'}</div><div class="s">${proj.length ? Math.round(projProfit / projRev * 100) + '% margin, ' + proj.length + ' jobs' : 'set a % done'}</div></div>
+      <div class="tile"><div class="l">Open POs, 120 days</div><div class="v">${moneyK(openT)}</div><div class="s">about ${qty(openBoards)} boards, ballpark</div></div>
+      <div class="tile"><div class="l">Boards billed</div><div class="v">${qty(Math.round(boardsT))}</div><div class="s">${finished} jobs finished</div></div>
+    </div>`, '')}
 
-    <div class="tiles">
-      <div class="tile"><div class="l">In progress</div><div class="v">${active.length}</div><div class="s">${finished} finished, see Finished Jobs</div></div>
-      <div class="tile"><div class="l">Contract value</div><div class="v">${moneyK(contract)}</div><div class="s">${contract ? Math.round(sum('total_cost') / contract * 100) + '% spent, all time' : 'add contracts to see this'}</div></div>
-      <div class="tile"><div class="l">Projected profit</div><div class="v ${projProfit < 0 ? 'bad' : 'good'}">${proj.length ? moneyK(projProfit) : '?'}</div><div class="s">${proj.length ? Math.round(projProfit / projRev * 100) + '% margin, ' + proj.length + ' jobs with a % done' : 'set a % done on each job'}</div></div>
-      <div class="tile"><div class="l">Boards billed</div><div class="v">${qty(Math.round(boardsT))}</div><div class="s">${rangeOn() ? 'last 120 days' : 'all time'}${openBoards ? ', plus about ' + qty(openBoards) + ' on open POs' : ''}</div></div>
-    </div>
-
-    <div class="panel mb" style="padding:0;overflow:hidden"><div style="padding:16px 16px 0"><h2>Jobs in progress<small>${rangeOn() ? 'billed in the last 120 days' : 'billed so far'}. Tap the % to change it.</small></h2></div>
+    <div class="panel mb" style="padding:0;overflow:hidden"><div style="padding:16px 16px 0"><h2>Jobs in progress<small>${rangeOn() ? 'billed in the last 120 days' : 'billed so far'}. Tap the % done to change it. The tick on each bar is how far along the job is.</small></h2></div>
       <div class="scroll"><table class="board">
-        <thead><tr><th>Job</th><th>Done</th><th style="min-width:160px">Material</th><th style="min-width:160px">Labor</th><th class="r">Open POs</th><th class="r">Per board</th><th></th></tr></thead>
+        <thead><tr><th>Job</th><th>Done</th><th style="min-width:160px">Material</th><th style="min-width:160px">Labor</th><th style="min-width:200px">Total cost vs contract</th><th class="r">Open POs</th><th class="r">Per board</th><th></th></tr></thead>
         <tbody>${R.map(({ m, r }) => {
           const { pct, est } = pctOf(m), e = estOf(m), st = jobStatus(m), t = n0(m.target_price_per_board);
           const cpb = r.boards > 0 ? (r.mat + r.lab) / r.boards : 0;
@@ -188,10 +178,13 @@ async function renderJobs() {
             <td class="nm"><b>${esc(jn(m.name))}</b><div class="tiny muted">${esc(m.gc || '')}</div></td>
             <td onclick="event.stopPropagation()"><input type="number" min="0" max="100" step="5" class="pcin" value="${pct == null ? '' : pct}" placeholder="${est ? 'est' : '?'}" title="Percent complete" onchange="A.setPct('${m.job_id}',this.value)">${est ? '<div class="tiny muted">estimated</div>' : ''}</td>
             <td>${cell(r.mat, e.mat)}</td><td>${cell(r.lab, e.lab)}</td>
+            <td>${(() => { const c = n0(m.contract_value), cost = n0(m.total_cost), cp = c ? cost / c * 100 : 0, dn = pct || 0;
+              return `<div class="num"><b>${money(cost)}</b><span class="tiny muted"> of ${c ? money(c) : 'no contract'}</span></div>` +
+                (c ? `<div class="track"><i style="width:${Math.min(100, cp)}%;background:${cp > 100 || cp > dn + 15 ? 'var(--bad)' : cp > dn + 5 ? 'var(--warn)' : 'var(--good)'}"></i>${dn ? `<u style="left:${Math.min(100, dn)}%" title="${dn}% done"></u>` : ''}</div><div class="tiny muted">${Math.round(cp)}% of contract spent${dn ? ', ' + dn + '% done' : ''}</div>` : ''); })()}</td>
             <td class="r num">${n0(m.open_po_total) ? money(m.open_po_total) : ''}${n0(m.open_po_boards) ? `<div class="tiny muted">~${qty(Math.round(m.open_po_boards))} boards</div>` : ''}</td>
             <td class="r num"><b ${t && cpb ? `class="${cpb > t ? 'bad' : 'good'}"` : ''}>${cpb ? money(cpb, 2) : '<span class="faint">none</span>'}</b>${r.boards ? `<div class="tiny muted">${qty(Math.round(r.boards))} boards</div>` : ''}</td>
             <td><span class="pill ${st[0]}">${st[1]}</span></td></tr>`;
-        }).join('') || '<tr><td colspan="7" class="empty">No jobs in progress. Tap New job to start one.</td></tr>'}</tbody></table></div></div>
+        }).join('') || '<tr><td colspan="8" class="empty">No jobs in progress. Tap New job to start one.</td></tr>'}</tbody></table></div></div>
 
     <details class="panel" ${chartsOpen ? 'open' : ''} ontoggle="pref.set('charts', this.open ? 'open' : 'closed')"><summary><b>Charts</b> <span class="tiny muted">cost per board and spending by month</span></summary>
       <div class="duo mt">
