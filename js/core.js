@@ -294,6 +294,8 @@ async function loadCore() {
     run(sb.from('v_job_board_conf').select('*')),
   ]);
   S.recent = Object.fromEntries(recent.map(r => [r.job_id, r]));
+  const hideIds = new Set(jobs.filter(j => j.untracked).map(j => j.id));
+  for (let i = money.length - 1; i >= 0; i--) if (hideIds.has(money[i].job_id)) money.splice(i, 1);
   const bc = Object.fromEntries(conf.map(r => [r.job_id, r]));
   money.forEach(m => { const c = bc[m.job_id] || {}; m.boards_ok = c.boards_ok !== false; m.boards_note = c.boards_note || ''; });
   S.jobs = jobs; S.money = money; S.vendors = vendors; S.mats = mats;
